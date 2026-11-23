@@ -152,6 +152,7 @@ services:
       - -c
       - >-
         set -e;
+        rm -f /tmp/ready;
         s3="aws --endpoint-url http://seaweedfs:8333 s3api";
         $$s3 head-bucket --bucket "$$DENTASOFT_S3_BUCKET" 2>/dev/null
         || $$s3 create-bucket --bucket "$$DENTASOFT_S3_BUCKET";
@@ -165,7 +166,8 @@ services:
       seaweedfs:
         condition: service_healthy
     healthcheck:
-      # The marker is written only after versioning has been verified.
+      # The marker is removed when the script starts (it would survive a container restart)
+      # and written again only after versioning has been verified.
       test: ["CMD", "test", "-f", "/tmp/ready"]
       interval: 5s
       timeout: 3s
@@ -173,7 +175,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64m
+          # Each AWS CLI call starts its own Python runtime; keep headroom for the setup phase.
+          memory: 128m
     restart: unless-stopped
 
   # Antivirus for uploaded files. Optional (1.5-2 GB of RAM); needed from M05-T02 on.
