@@ -3,7 +3,10 @@ package es.crisbr.dentasoft.shared.web;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,13 +95,12 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(ex, body, new HttpHeaders(), status, request);
     }
 
-    private static <T extends Throwable> @Nullable T findCause(Throwable ex, Class<T> type) {
-        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+    /** Walks the cause chain, stopping at a cycle (A caused by B caused by A). */
+    static <T extends Throwable> @Nullable T findCause(Throwable ex, Class<T> type) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable cause = ex; cause != null && seen.add(cause); cause = cause.getCause()) {
             if (type.isInstance(cause)) {
                 return type.cast(cause);
-            }
-            if (cause.getCause() == cause) {
-                break;
             }
         }
         return null;

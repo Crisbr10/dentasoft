@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.WithTestEnvironment;
 import java.util.List;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.StandardEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import tools.jackson.databind.JsonNode;
@@ -46,6 +48,15 @@ class RequestLoggingTests {
         logging.cleanUp();
         logging.beforeInitialize();
         logging.initialize(new LoggingInitializationContext(environment), null, null);
+    }
+
+    /** Leaves the default configuration behind, so later test classes do not inherit this JSON format. */
+    @AfterEach
+    void restoreTheDefaultLoggingConfiguration() {
+        LoggingSystem logging = LoggingSystem.get(getClass().getClassLoader());
+        logging.cleanUp();
+        logging.beforeInitialize();
+        logging.initialize(new LoggingInitializationContext(new StandardEnvironment()), null, null);
     }
 
     @Test

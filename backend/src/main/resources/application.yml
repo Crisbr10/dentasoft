@@ -39,6 +39,11 @@ server:
       enabled: false
 
 management:
+  health:
+    # Redis only holds the rate limits, which fall back to a per-instance limit when it is down
+    # (metric dentasoft.rate.limit.redis.available), so a Redis outage must not turn health DOWN.
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:

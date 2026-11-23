@@ -14,10 +14,12 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
@@ -53,7 +55,8 @@ class RateLimitFilter extends OncePerRequestFilter {
         this.limiter = limiter;
         this.clientIpResolver = clientIpResolver;
         this.exceptionResolver = exceptionResolver;
-        this.hmacKey = new SecretKeySpec(properties.key().getBytes(StandardCharsets.UTF_8), HMAC);
+        String key = Objects.requireNonNull(properties.key(), "dentasoft.rate-limit.key");
+        this.hmacKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), HMAC);
     }
 
     @Override
@@ -74,13 +77,19 @@ class RateLimitFilter extends OncePerRequestFilter {
             chain.doFilter(request, response);
             return;
         }
-        long retryAfterSeconds = Math.max(1, TimeUnit.NANOSECONDS.toSeconds(probe.getNanosToWaitForRefill() + 999_999_999L));
+        long retryAfterSeconds = retryAfterSeconds(probe.getNanosToWaitForRefill());
         ModelAndView handled = exceptionResolver.resolveException(
                 request, response, null, new RateLimitExceededException(retryAfterSeconds));
         if (handled == null) {
-            response.setHeader("Retry-After", Long.toString(retryAfterSeconds));
+            response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
             response.sendError(HttpStatus.TOO_MANY_REQUESTS.value());
         }
+    }
+
+    /** Whole seconds, rounded up so the client never retries too early, and at least 1. */
+    static long retryAfterSeconds(long nanosToWait) {
+        long nanosPerSecond = TimeUnit.SECONDS.toNanos(1);
+        return Math.max(1, Math.ceilDiv(nanosToWait, nanosPerSecond));
     }
 
     private static byte[] clientBytes(InetAddress address) {

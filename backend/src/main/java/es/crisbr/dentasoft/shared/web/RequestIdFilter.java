@@ -25,12 +25,18 @@ class RequestIdFilter extends OncePerRequestFilter {
     static final String MDC_KEY = "requestId";
     static final int MAX_LENGTH = 64;
 
+    /** Keeps the ID for the error dispatch of the same request, which runs this filter again. */
+    private static final String ATTRIBUTE = RequestIdFilter.class.getName() + ".requestId";
+
     private static final Pattern VALID_ID = Pattern.compile("[A-Za-z0-9._-]{1," + MAX_LENGTH + "}");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String requestId = acceptOrGenerate(request.getHeader(HEADER));
+        String requestId = request.getAttribute(ATTRIBUTE) instanceof String previous
+                ? previous
+                : acceptOrGenerate(request.getHeader(HEADER));
+        request.setAttribute(ATTRIBUTE, requestId);
         MDC.put(MDC_KEY, requestId);
         response.setHeader(HEADER, requestId);
         try {
@@ -40,7 +46,7 @@ class RequestIdFilter extends OncePerRequestFilter {
         }
     }
 
-    /** Errors dispatched to the error page keep the ID of the original request. */
+    /** Errors dispatched to the error page keep the ID of the original request, generated or not. */
     @Override
     protected boolean shouldNotFilterErrorDispatch() {
         return false;

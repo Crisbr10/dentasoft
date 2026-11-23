@@ -33,6 +33,14 @@ class RateLimitPropertiesTests {
     }
 
     @Test
+    void doesNotNeedTheKeyWhenDisabled() {
+        runner.withPropertyValues("dentasoft.rate-limit.enabled=false").run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(RateLimitProperties.class).enabled()).isFalse();
+        });
+    }
+
+    @Test
     void rejectsAShortKey() {
         runner.withPropertyValues("dentasoft.rate-limit.key=too-short").run(context -> {
             assertThat(context).hasFailed();

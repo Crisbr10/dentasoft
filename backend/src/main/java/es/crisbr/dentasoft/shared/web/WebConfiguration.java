@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.InstantSource;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -88,32 +89,36 @@ class WebConfiguration {
         return new ClientIpResolver(properties.trustedProxies());
     }
 
-    @Bean
-    RedisBuckets redisBuckets(LettuceConnectionFactory connectionFactory) {
-        return new RedisBuckets(connectionFactory);
-    }
-
-    @Bean
-    RateLimiter rateLimiter(RateLimitProperties properties, RedisBuckets redisBuckets, MeterRegistry registry) {
-        return new RateLimiter(properties, redisBuckets, registry, InstantSource.system());
-    }
-
-    @Bean
-    FilterRegistrationBean<RateLimitFilter> rateLimitFilter(
-            RateLimitProperties properties,
-            RateLimiter rateLimiter,
-            ClientIpResolver clientIpResolver,
-            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
-        FilterRegistrationBean<RateLimitFilter> registration = registration(
-                new RateLimitFilter(rateLimiter, clientIpResolver, exceptionResolver, properties),
-                RateLimitFilter.ORDER);
-        registration.setEnabled(properties.enabled());
-        return registration;
-    }
-
     private static <T extends jakarta.servlet.Filter> FilterRegistrationBean<T> registration(T filter, int order) {
         FilterRegistrationBean<T> registration = new FilterRegistrationBean<>(filter);
         registration.setOrder(order);
         return registration;
+    }
+
+    /** Only built while the limit is on, so {@code DENTASOFT_RATE_LIMIT_ENABLED=false} needs no key or Redis. */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnBooleanProperty(name = "dentasoft.rate-limit.enabled", matchIfMissing = true)
+    static class RateLimitConfiguration {
+
+        @Bean
+        RedisBuckets redisBuckets(LettuceConnectionFactory connectionFactory) {
+            return new RedisBuckets(connectionFactory);
+        }
+
+        @Bean
+        RateLimiter rateLimiter(RateLimitProperties properties, RedisBuckets redisBuckets, MeterRegistry registry) {
+            return new RateLimiter(properties, redisBuckets, registry, InstantSource.system());
+        }
+
+        @Bean
+        FilterRegistrationBean<RateLimitFilter> rateLimitFilter(
+                RateLimitProperties properties,
+                RateLimiter rateLimiter,
+                ClientIpResolver clientIpResolver,
+                @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
+            return registration(
+                    new RateLimitFilter(rateLimiter, clientIpResolver, exceptionResolver, properties),
+                    RateLimitFilter.ORDER);
+        }
     }
 }

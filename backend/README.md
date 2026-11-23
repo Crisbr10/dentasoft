@@ -64,7 +64,7 @@ El jar empaquetado no activa ningún perfil por sí mismo: se elige con `SPRING_
 | `DENTASOFT_RATE_LIMIT_KEY` | solo en `local`: un valor de desarrollo | Clave secreta (32 caracteres o más) del HMAC con el que se guardan IPs y usuarios en Redis. **Obligatoria fuera de `local`** |
 | `DENTASOFT_RATE_LIMIT_ANONYMOUS_PER_MINUTE` | `120` | Peticiones por minuto de cada IP sin usuario (`dentasoft.rate-limit.anonymous-per-minute`) |
 | `DENTASOFT_RATE_LIMIT_USER_PER_MINUTE` | `600` | Peticiones por minuto de cada usuario autenticado (`dentasoft.rate-limit.user-per-minute`) |
-| `DENTASOFT_RATE_LIMIT_ENABLED` | `true` | Desactiva el límite (solo para diagnosticar problemas) |
+| `DENTASOFT_RATE_LIMIT_ENABLED` | `true` | Desactiva el límite (solo para diagnosticar problemas); desactivado, no hace falta `DENTASOFT_RATE_LIMIT_KEY` |
 | `DENTASOFT_TRUSTED_PROXIES` | *(vacía)* | IPs o rangos CIDR de los proxies de confianza, separados por comas (`dentasoft.http.trusted-proxies`) |
 | `DENTASOFT_HTTP_MAX_REQUEST_BODY_SIZE` | `1MB` | Tamaño máximo del cuerpo de las peticiones que no son multipart (`dentasoft.http.max-request-body-size`) |
 | `DENTASOFT_LOG_FORMAT` | `ecs`; en `local`, texto | Formato de los logs: `ecs`, `logstash`, `gelf` o vacío para texto |
@@ -92,7 +92,7 @@ Filtros de `shared.web`, en este orden: ID de petición, cabeceras de seguridad,
 - **Tamaño máximo**: un cuerpo de más de `DENTASOFT_HTTP_MAX_REQUEST_BODY_SIZE` devuelve 413 con `ProblemDetail`, también si llega sin `Content-Length`. Las subidas multipart se limitan con `spring.servlet.multipart.*`.
 - **Límite de peticiones** (Bucket4j sobre Redis): por usuario si la petición está autenticada y por IP si es anónima. Superarlo devuelve 429 con `ProblemDetail` y `Retry-After`. Las sondas `/actuator/health/liveness` y `/readiness` no cuentan. Las claves de Redis son HMAC-SHA256 con `DENTASOFT_RATE_LIMIT_KEY`: nunca guardan la IP ni el usuario en claro. Las IPv6 se agrupan por su prefijo /64.
 - **IP del cliente**: se usa la de la conexión. `CF-Connecting-IP` y `X-Forwarded-For` solo se leen si la conexión viene de un proxy de `DENTASOFT_TRUSTED_PROXIES`; en `X-Forwarded-For` el cliente es el primer salto que no es de confianza, leyendo de derecha a izquierda. Pon en la lista solo proxies que reescriben esas cabeceras.
-- **Si Redis no responde**, las peticiones no se bloquean: se aplica el mismo límite en memoria en cada instancia y se reintenta Redis cada 5 segundos. Se escribe un aviso como mucho una vez por minuto, y la métrica `dentasoft.rate.limit.redis.available` baja a 0 (también hay `dentasoft.rate.limit.fallback` y `dentasoft.rate.limit.rejected`). `/actuator/health` marca Redis como `DOWN`, pero las sondas de Kubernetes siguen en `UP`.
+- **Si Redis no responde**, las peticiones no se bloquean: se aplica el mismo límite en memoria en cada instancia y cada 5 segundos una sola petición vuelve a probar Redis, y las demás no esperan. Se escribe un aviso como mucho una vez por minuto, y la métrica `dentasoft.rate.limit.redis.available` baja a 0 (también hay `dentasoft.rate.limit.fallback`, `dentasoft.rate.limit.fallback.evicted` y `dentasoft.rate.limit.rejected`). `/actuator/health` no incluye Redis (`management.health.redis.enabled: false`), así que una caída de Redis no lo pone en `DOWN`; si más adelante Redis pasa a ser imprescindible, por ejemplo para colas, habrá que volver a incluirlo.
 
 ### Logs
 

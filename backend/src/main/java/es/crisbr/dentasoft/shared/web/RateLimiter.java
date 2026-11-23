@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.shared.web;
 
+import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
@@ -22,8 +23,9 @@ import org.slf4j.LoggerFactory;
  * Token buckets shared by every instance through Redis, with a per-instance fallback.
  *
  * <p>If Redis fails, requests are not blocked: they are counted against an in-memory bucket of this instance
- * until Redis answers again, which is retried every {@link #REDIS_RETRY_INTERVAL}. Meanwhile a warning is logged at
- * most once per {@link #WARNING_INTERVAL} and the {@value #REDIS_AVAILABLE_METRIC} gauge drops to 0.
+ * until Redis answers again. Every {@link #REDIS_RETRY_INTERVAL} a single request probes Redis; the others keep
+ * using the local bucket, so a stalled Redis never holds more than one request at a time. Meanwhile a warning is
+ * logged at most once per {@link #WARNING_INTERVAL} and the {@value #REDIS_AVAILABLE_METRIC} gauge drops to 0.
  */
 class RateLimiter {
 
@@ -40,6 +42,7 @@ class RateLimiter {
     static final String REDIS_AVAILABLE_METRIC = "dentasoft.rate.limit.redis.available";
     static final String FALLBACK_METRIC = "dentasoft.rate.limit.fallback";
     static final String REJECTED_METRIC = "dentasoft.rate.limit.rejected";
+    static final String EVICTED_METRIC = "dentasoft.rate.limit.fallback.evicted";
     static final Duration REDIS_RETRY_INTERVAL = Duration.ofSeconds(5);
     static final Duration WARNING_INTERVAL = Duration.ofMinutes(1);
     static final int MAX_LOCAL_BUCKETS = 10_000;
@@ -49,7 +52,7 @@ class RateLimiter {
     private final DistributedBuckets redis;
     private final InstantSource clock;
     private final Map<Scope, BucketConfiguration> configurations = new EnumMap<>(Scope.class);
-    private final LocalBuckets localBuckets = new LocalBuckets();
+    private final LocalBuckets localBuckets;
     private final AtomicReference<Instant> redisRetryAt = new AtomicReference<>(Instant.MIN);
     private final AtomicReference<Instant> lastWarning = new AtomicReference<>(Instant.MIN);
     private final AtomicBoolean redisAvailable = new AtomicBoolean(true);
@@ -60,6 +63,9 @@ class RateLimiter {
     RateLimiter(RateLimitProperties properties, DistributedBuckets redis, MeterRegistry registry, InstantSource clock) {
         this.redis = redis;
         this.clock = clock;
+        localBuckets = new LocalBuckets(Counter.builder(EVICTED_METRIC)
+                .description("Per-instance buckets dropped because the fallback was full")
+                .register(registry));
         configurations.put(Scope.ANONYMOUS, perMinute(properties.anonymousPerMinute()));
         configurations.put(Scope.USER, perMinute(properties.userPerMinute()));
         Gauge.builder(REDIS_AVAILABLE_METRIC, redisAvailable, available -> available.get() ? 1 : 0)
@@ -89,7 +95,7 @@ class RateLimiter {
 
     private ConsumptionProbe distributedOrLocal(String key, BucketConfiguration configuration) {
         Instant now = clock.instant();
-        if (!now.isBefore(redisRetryAt.get())) {
+        if (mayUseRedis(now)) {
             try {
                 ConsumptionProbe probe = redis.tryConsume(key, configuration);
                 if (redisAvailable.compareAndSet(false, true)) {
@@ -105,6 +111,18 @@ class RateLimiter {
         fallbacks.increment();
         fallbacksSinceWarning.incrementAndGet();
         return localBuckets.get(key, configuration).tryConsumeAndReturnRemaining(1);
+    }
+
+    /**
+     * While Redis is up every request uses it. Once it has failed, only the request that wins the compare-and-set
+     * after {@link #REDIS_RETRY_INTERVAL} probes it; it moves the retry time forward first.
+     */
+    private boolean mayUseRedis(Instant now) {
+        if (redisAvailable.get()) {
+            return true;
+        }
+        Instant retryAt = redisRetryAt.get();
+        return !now.isBefore(retryAt) && redisRetryAt.compareAndSet(retryAt, now.plus(REDIS_RETRY_INTERVAL));
     }
 
     private void warnAtMostOncePerInterval(Instant now, RuntimeException ex) {
@@ -126,20 +144,36 @@ class RateLimiter {
                 .build();
     }
 
-    /** In-memory buckets, bounded so a flood of distinct clients cannot exhaust the heap. */
+    /**
+     * In-memory buckets, bounded so a flood of distinct clients cannot exhaust the heap. A dropped bucket starts
+     * again full, so evictions weaken the limit; the {@value #EVICTED_METRIC} counter shows that pressure.
+     */
     private static final class LocalBuckets {
 
+        private final Counter evictions;
         private final Map<String, Bucket> buckets = new LinkedHashMap<>(256, 0.75f, true) {
             @Override
             protected boolean removeEldestEntry(Map.Entry<String, Bucket> eldest) {
-                return size() > MAX_LOCAL_BUCKETS;
+                boolean full = size() > MAX_LOCAL_BUCKETS;
+                if (full) {
+                    evictions.increment();
+                }
+                return full;
             }
         };
 
+        LocalBuckets(Counter evictions) {
+            this.evictions = evictions;
+        }
+
         synchronized Bucket get(String key, BucketConfiguration configuration) {
-            return buckets.computeIfAbsent(key, ignored -> Bucket.builder()
-                    .addLimit(configuration.getBandwidths()[0])
-                    .build());
+            return buckets.computeIfAbsent(key, ignored -> {
+                var builder = Bucket.builder();
+                for (Bandwidth bandwidth : configuration.getBandwidths()) {
+                    builder.addLimit(bandwidth);
+                }
+                return builder.build();
+            });
         }
     }
 }

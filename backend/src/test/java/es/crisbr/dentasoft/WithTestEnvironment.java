@@ -6,7 +6,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.TestPropertySource;
 
 /**
  * What every non-local profile must receive from the environment: the public URLs and the rate-limit key, plus a
@@ -16,13 +15,7 @@ import org.springframework.test.context.TestPropertySource;
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
 @Import(TestRedisConfiguration.class)
-@TestPropertySource(
-        properties = {
-            "dentasoft.urls.app=" + WithTestEnvironment.APP,
-            "dentasoft.urls.api=" + WithTestEnvironment.API,
-            "dentasoft.urls.auth=" + WithTestEnvironment.AUTH,
-            "dentasoft.rate-limit.key=" + WithTestEnvironment.RATE_LIMIT_KEY
-        })
+@WithTestProperties
 public @interface WithTestEnvironment {
 
     String APP = "https://app.dentasoft.test";
