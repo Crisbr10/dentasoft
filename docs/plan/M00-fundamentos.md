@@ -82,13 +82,13 @@
 
 ### M00-T04 · Imagen Docker del backend
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T02
 - **Descripción**: `backend/Dockerfile` multi-etapa con capas de Spring Boot, JRE 25, usuario sin privilegios y health check; servicio `app` opcional en Compose (perfil `app`) para probar la app en contenedor.
 - **Criterios de aceptación**:
-  - [ ] La imagen arranca contra la infraestructura local y responde `/actuator/health/readiness`
-  - [ ] El proceso corre con UID distinto de 0
-  - [ ] Trivy no reporta vulnerabilidades críticas
+  - [x] La imagen arranca contra la infraestructura local y responde `/actuator/health/readiness`
+  - [x] El proceso corre con UID distinto de 0
+  - [x] Trivy no reporta vulnerabilidades críticas
 
 ### M00-T05 · Esqueleto del frontend
 
