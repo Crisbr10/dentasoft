@@ -134,6 +134,8 @@ Cada tarea del plan tiene un issue en GitHub (título `Mxx-Tyy · …`, etiqueta
 
 **Revisiones de código**: se repite la revisión mientras una ronda encuentre hallazgos de gravedad media o alta, o cuando las correcciones toquen seguridad, permisos, datos de pacientes, migraciones o multi-clínica. Se para cuando una ronda solo devuelve hallazgos informativos: se arreglan si llevan menos de 15 minutos o se anotan en el PR o como tarea del plan. Máximo 3 rondas; si a la tercera sigue habiendo hallazgos importantes, se para y se consulta a Cristhian.
 
+Las revisiones de código excluyen los ficheros generados (pnpm-lock.yaml, código en src/app/api/); los lockfiles se verifican con --frozen-lockfile, audit y revisión de licencias.
+
 ## Definición de terminado
 
 Una tarea está terminada cuando:
