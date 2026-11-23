@@ -13,7 +13,8 @@ class FindCauseTests {
         RequestBodyTooLargeException tooLarge = new RequestBodyTooLargeException();
         IllegalStateException wrapper = new IllegalStateException("x", new IllegalArgumentException("y", tooLarge));
 
-        assertThat(GlobalExceptionHandler.findCause(wrapper, RequestBodyTooLargeException.class)).isSameAs(tooLarge);
+        assertThat(GlobalExceptionHandler.findCause(wrapper, RequestBodyTooLargeException.class))
+                .isSameAs(tooLarge);
     }
 
     @Test
@@ -22,8 +23,9 @@ class FindCauseTests {
         IllegalArgumentException second = new IllegalArgumentException("b", first);
         first.initCause(second);
 
-        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> assertThat(
-                        GlobalExceptionHandler.findCause(first, RequestBodyTooLargeException.class))
-                .isNull());
+        assertTimeoutPreemptively(
+                Duration.ofSeconds(2),
+                () -> assertThat(GlobalExceptionHandler.findCause(first, RequestBodyTooLargeException.class))
+                        .isNull());
     }
 }

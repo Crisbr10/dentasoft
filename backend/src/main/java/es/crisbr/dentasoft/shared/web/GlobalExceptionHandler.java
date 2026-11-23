@@ -65,7 +65,8 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    @Nullable ResponseEntity<Object> handleConstraintViolation(ConstraintViolationException ex, WebRequest request) {
+    @Nullable
+    ResponseEntity<Object> handleConstraintViolation(ConstraintViolationException ex, WebRequest request) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
         ProblemDetail body = createProblemDetail(
                 ex, status, "Invalid request content.", "problemDetail.constraint-violation.detail", null, request);
@@ -77,7 +78,8 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    @Nullable ResponseEntity<Object> handleUnexpected(Exception ex, WebRequest request) {
+    @Nullable
+    ResponseEntity<Object> handleUnexpected(Exception ex, WebRequest request) {
         HttpStatus status = statusOf(ex);
         ProblemDetail body;
         if (status.is5xxServerError()) {

@@ -49,7 +49,8 @@ class RequestSizeTests {
         byte[] body = jsonOfSize(LIMIT * 4).getBytes(StandardCharsets.UTF_8);
 
         // ofInputStream has no known length, so the client sends Transfer-Encoding: chunked.
-        HttpResponse<String> response = post(HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body)));
+        HttpResponse<String> response =
+                post(HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body)));
 
         assertIsProblem413(response);
     }
@@ -58,7 +59,8 @@ class RequestSizeTests {
     void chunkedBodyWithinTheLimitIsAccepted() throws Exception {
         byte[] body = jsonOfSize(LIMIT / 2).getBytes(StandardCharsets.UTF_8);
 
-        HttpResponse<String> response = post(HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body)));
+        HttpResponse<String> response =
+                post(HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body)));
 
         assertThat(response.statusCode()).isEqualTo(200);
     }

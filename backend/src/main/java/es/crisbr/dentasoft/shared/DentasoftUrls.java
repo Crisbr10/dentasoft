@@ -17,6 +17,11 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties("dentasoft.urls")
 public record DentasoftUrls(
-        @NotBlank(message = "is required: set the DENTASOFT_URLS_APP environment variable") @URL String app,
-        @NotBlank(message = "is required: set the DENTASOFT_URLS_API environment variable") @URL String api,
-        @NotBlank(message = "is required: set the DENTASOFT_URLS_AUTH environment variable") @URL String auth) {}
+        @NotBlank(message = "is required: set the DENTASOFT_URLS_APP environment variable") @URL
+        String app,
+
+        @NotBlank(message = "is required: set the DENTASOFT_URLS_API environment variable") @URL
+        String api,
+
+        @NotBlank(message = "is required: set the DENTASOFT_URLS_AUTH environment variable") @URL
+        String auth) {}

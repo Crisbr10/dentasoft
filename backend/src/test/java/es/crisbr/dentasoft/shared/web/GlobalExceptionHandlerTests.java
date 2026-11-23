@@ -52,20 +52,26 @@ class GlobalExceptionHandlerTests {
         assertThat(mvc.get().uri("/test/conflict"))
                 .hasStatus(HttpStatus.CONFLICT)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .satisfies(result -> assertThat(result.getResponse().getContentAsString())
-                        .doesNotContain(INTERNAL_MESSAGE));
+                .satisfies(result ->
+                        assertThat(result.getResponse().getContentAsString()).doesNotContain(INTERNAL_MESSAGE));
     }
 
     @Test
     void invalidRequestBodyReturnsProblemDetailWithFieldErrors() {
-        assertThat(mvc.post().uri("/test/echo").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"\"}"))
+        assertThat(mvc.post()
+                        .uri("/test/echo")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"\"}"))
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .bodyJson()
                 .satisfies(json -> {
                     assertThat(json).extractingPath("$.status").isEqualTo(400);
                     assertThat(json).extractingPath("$.errors[0].field").isEqualTo("name");
-                    assertThat(json).extractingPath("$.errors[0].message").asString().isNotBlank();
+                    assertThat(json)
+                            .extractingPath("$.errors[0].message")
+                            .asString()
+                            .isNotBlank();
                 });
     }
 
@@ -74,8 +80,8 @@ class GlobalExceptionHandlerTests {
         assertThat(mvc.get().uri("/test/constraint"))
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .satisfies(result -> assertThat(result.getResponse().getContentAsString())
-                        .doesNotContain(INTERNAL_MESSAGE))
+                .satisfies(result ->
+                        assertThat(result.getResponse().getContentAsString()).doesNotContain(INTERNAL_MESSAGE))
                 .bodyJson()
                 .extractingPath("$.detail")
                 .isEqualTo("La petición contiene datos no válidos.");

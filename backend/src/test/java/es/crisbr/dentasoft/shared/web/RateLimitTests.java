@@ -62,7 +62,8 @@ class RateLimitTests {
                     assertThat(json).extractingPath("$.title").isEqualTo("Demasiadas peticiones");
                     assertThat(json)
                             .extractingPath("$.detail")
-                            .isEqualTo("Has superado el límite de peticiones. Espera unos segundos y vuelve a intentarlo.");
+                            .isEqualTo(
+                                    "Has superado el límite de peticiones. Espera unos segundos y vuelve a intentarlo.");
                 });
         long retryAfter = Long.parseLong(rejected.getResponse().getHeader(HttpHeaders.RETRY_AFTER));
         assertThat(retryAfter).isBetween(1L, 60L);
@@ -149,8 +150,10 @@ class RateLimitTests {
     @Test
     void kubernetesProbesAreNeverLimited() {
         for (int i = 0; i < ANONYMOUS_LIMIT * 3; i++) {
-            assertThat(mvc.get().uri("/actuator/health/liveness").with(from("203.0.113.8")::apply)).hasStatusOk();
-            assertThat(mvc.get().uri("/actuator/health/readiness").with(from("203.0.113.8")::apply)).hasStatusOk();
+            assertThat(mvc.get().uri("/actuator/health/liveness").with(from("203.0.113.8")::apply))
+                    .hasStatusOk();
+            assertThat(mvc.get().uri("/actuator/health/readiness").with(from("203.0.113.8")::apply))
+                    .hasStatusOk();
         }
     }
 
@@ -161,10 +164,12 @@ class RateLimitTests {
 
         Set<String> keys = redis.keys(RateLimitFilter.KEY_PREFIX + "*");
 
-        assertThat(keys).isNotEmpty().allSatisfy(key -> assertThat(key)
-                .doesNotContain("203.0.113")
-                .doesNotContain("user-with-visible-id")
-                .matches(RateLimitFilter.KEY_PREFIX + "(ip|user):[A-Za-z0-9_-]{43}"));
+        assertThat(keys)
+                .isNotEmpty()
+                .allSatisfy(key -> assertThat(key)
+                        .doesNotContain("203.0.113")
+                        .doesNotContain("user-with-visible-id")
+                        .matches(RateLimitFilter.KEY_PREFIX + "(ip|user):[A-Za-z0-9_-]{43}"));
     }
 
     @Test
