@@ -29,3 +29,6 @@ Thumbs.db
 
 # Claude Code (ajustes personales)
 .claude/settings.local.json
+
+# Gentle AI (caché de skills, local de cada PC)
+.atl/
