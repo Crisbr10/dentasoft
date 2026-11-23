@@ -24,6 +24,14 @@ function isTestFile(path) {
   return path.endsWith('.spec.ts') || path.startsWith('testing/');
 }
 
+// The generated API client (pnpm api:gen) has links to documentation in its comments,
+// which are not addresses the app connects to. Its code lines are still checked.
+const COMMENT_LINE = /^\s*(?:\/\/|\/\*|\*)/;
+
+function isGeneratedComment(path, line) {
+  return path.startsWith('app/api/') && COMMENT_LINE.test(line);
+}
+
 function findHardcodedUrls(root) {
   const findings = [];
   for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
@@ -33,6 +41,7 @@ function findHardcodedUrls(root) {
     readFileSync(file, 'utf8')
       .split(/\r?\n/)
       .forEach((line, index) => {
+        if (isGeneratedComment(path, line)) return;
         let checked = line.replace(ALLOWED, '');
         if (isTestFile(path)) checked = checked.replace(ALLOWED_IN_TESTS, '');
         if (FORBIDDEN.test(checked)) {
@@ -78,15 +87,25 @@ describe('no hardcoded URLs', () => {
       write('app/local.ts', "const a = '//localhost:8080/x';\nconst b = '//127.0.0.1:8080';\n");
       write('app/commented.ts', '//this.http.get(x);\nconst a = b; //c.d\n');
       write('app/page.html', '<link href=//cdn.example.org/x.css>\n');
+      write(
+        'app/api/request-builder.ts',
+        [
+          ' * See https://github.com/angular/angular/issues/18261',
+          "  rootUrl: string = 'http://localhost:8080';",
+        ].join('\n'),
+      );
+      write('app/other/comment.ts', ' * See https://docs.example.org\n');
 
       assert.deepEqual(findHardcodedUrls(dir).sort(), [
         "app/api.spec.ts:2: const ko = 'https://api.test.example.org';",
         "app/api.ts:1: const api = 'https://api.dentasoft.test';",
+        "app/api/request-builder.ts:2: rootUrl: string = 'http://localhost:8080';",
         "app/cdn.ts:1: const cdn = '//cdn.example.org/x.js';",
         "app/dev.ts:1: const api = 'http://localhost:8080';",
         "app/host.ts:1: const host = 'dentasoft.crisbr.es';",
         "app/local.ts:1: const a = '//localhost:8080/x';",
         "app/local.ts:2: const b = '//127.0.0.1:8080';",
+        'app/other/comment.ts:1: * See https://docs.example.org',
         'app/page.html:1: <link href=//cdn.example.org/x.css>',
         "app/userinfo.spec.ts:1: const ko = 'https://a.test@evil.example';",
         "app/userinfo.spec.ts:2: const ko = 'https://a.test:pw@evil.example';",

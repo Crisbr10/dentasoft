@@ -10,6 +10,7 @@ import {
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
+import { provideApiConfiguration } from './core/config/api-configuration';
 import { provideRuntimeConfig } from './core/config/runtime-config';
 import { provideI18n } from './core/i18n/i18n';
 import { provideIcons } from './core/icons/icons';
@@ -22,6 +23,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(withFetch()),
     provideRuntimeConfig(),
+    provideApiConfiguration(),
     provideI18n(),
     provideIcons(),
     { provide: LOCALE_ID, useValue: 'es' },
