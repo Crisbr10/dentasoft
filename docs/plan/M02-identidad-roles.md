@@ -99,6 +99,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Criterios de aceptación**:
   - [ ] Cerrar sesión cierra también la sesión de Keycloak
   - [ ] Los tokens no se guardan en `localStorage`
+  - [ ] Renovación del token con refresh token, sin iframes de Keycloak (`silentRenew` sin iframe y sin `checkSession`), para no abrir `frame-src` en la CSP; si hiciera falta un iframe, se documenta y se añade el origen de Keycloak solo a `frame-src`
   - [ ] Cambiar de clínica recarga los datos de la nueva clínica
 
 ### M02-T08 · Pantallas de administración
