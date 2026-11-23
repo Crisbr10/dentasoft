@@ -38,3 +38,67 @@ services:
   clamav:
     ports:
       - "127.0.0.1:3310:3310"
+
+  # The backend in a container, built from the local code. Optional: it uses port 8080, like
+  # `mvnw spring-boot:run`, so run only one of them.
+  #   docker compose -f compose.yml -f compose.local.yml --profile app up -d --wait --build
+  # Other environments run the image published to GHCR (M00-T07), not a local build.
+  app:
+    profiles: ["app"]
+    build:
+      context: ../backend
+    image: dentasoft-backend:local
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      # Public URLs: what the browser sees, so localhost even inside Docker.
+      DENTASOFT_URLS_APP: http://localhost:4200
+      DENTASOFT_URLS_API: http://localhost:8080
+      DENTASOFT_URLS_AUTH: http://localhost:8180
+      # Backing services, reached by their service name inside the Docker network.
+      # Prepared for the tasks that add them (database M01-T01, Redis M00-T08, S3 M05,
+      # email M07): those tasks may rename these variables when they wire them up.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/dentasoft
+      SPRING_DATASOURCE_USERNAME: dentasoft_app
+      SPRING_DATASOURCE_PASSWORD: ${DENTASOFT_DB_APP_PASSWORD:?set DENTASOFT_DB_APP_PASSWORD in .env}
+      SPRING_FLYWAY_USER: dentasoft_owner
+      SPRING_FLYWAY_PASSWORD: ${DENTASOFT_DB_OWNER_PASSWORD:?set DENTASOFT_DB_OWNER_PASSWORD in .env}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ${DENTASOFT_REDIS_PASSWORD:?set DENTASOFT_REDIS_PASSWORD in .env}
+      DENTASOFT_S3_ENDPOINT: http://seaweedfs:8333
+      DENTASOFT_S3_REGION: ${DENTASOFT_S3_REGION:?set DENTASOFT_S3_REGION in .env}
+      DENTASOFT_S3_BUCKET: ${DENTASOFT_S3_BUCKET:?set DENTASOFT_S3_BUCKET in .env}
+      DENTASOFT_S3_ACCESS_KEY: ${DENTASOFT_S3_ACCESS_KEY:?set DENTASOFT_S3_ACCESS_KEY in .env}
+      DENTASOFT_S3_SECRET_KEY: ${DENTASOFT_S3_SECRET_KEY:?set DENTASOFT_S3_SECRET_KEY in .env}
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: "1025"
+      # Keycloak from inside Docker is http://keycloak:8080, but the tokens it issues carry the
+      # public URL (DENTASOFT_URLS_AUTH) as issuer: M02 has to handle both when it adds JWT.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      seaweedfs-init:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    # Nothing writes to the image: only /tmp (JVM temporary files) is writable.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Longer than the graceful shutdown timeout (SHUTDOWN_TIMEOUT, 30s) so Docker does not
+    # kill the JVM while it is still finishing requests.
+    stop_grace_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+    restart: unless-stopped
