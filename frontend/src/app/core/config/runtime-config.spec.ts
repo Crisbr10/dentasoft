@@ -21,11 +21,19 @@ describe('parseRuntimeConfig', () => {
 
   it('rejects missing or relative URLs', () => {
     expect(() => parseRuntimeConfig({ authUrl: 'https://auth.dentasoft.test' })).toThrow(
-      'config.json: apiUrl must be an absolute URL',
+      'config.json: apiUrl must be an absolute http(s) URL',
     );
     expect(() =>
       parseRuntimeConfig({ apiUrl: 'https://api.dentasoft.test', authUrl: '/auth' }),
-    ).toThrow('config.json: authUrl must be an absolute URL');
+    ).toThrow('config.json: authUrl must be an absolute http(s) URL');
+  });
+
+  it('rejects URLs that are not http or https', () => {
+    for (const apiUrl of ['localhost:8080', 'javascript:alert(1)']) {
+      expect(() => parseRuntimeConfig({ apiUrl, authUrl: 'https://auth.dentasoft.test' })).toThrow(
+        'config.json: apiUrl must be an absolute http(s) URL',
+      );
+    }
   });
 });
 

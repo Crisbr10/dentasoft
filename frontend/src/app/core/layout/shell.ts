@@ -4,7 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
-import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSidenav, MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -35,4 +35,11 @@ export class Shell {
       .pipe(map((state) => state.matches)),
     { initialValue: false },
   );
+
+  /** On phones the menu covers the content, so close it after choosing an option. */
+  protected closeOnHandset(sidenav: MatSidenav): void {
+    if (this.isHandset()) {
+      void sidenav.close();
+    }
+  }
 }

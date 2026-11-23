@@ -1,7 +1,7 @@
 // Adds a Content-Security-Policy <meta> to the built index.html, limiting connect-src to
 // the API and Keycloak URLs of this build. vercel.json cannot read environment variables,
-// so its header policy names no domain; the browser enforces both policies, and the
-// stricter one wins. frame-ancestors only works in the header (see vercel.json).
+// so its header policy names no domain. The browser enforces both policies: a request
+// must satisfy each one. frame-ancestors only works in the header (see vercel.json).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -49,7 +49,8 @@ export function injectMetaCsp(html, policy) {
     throw new Error('index.html has no <head>');
   }
   const end = head.index + head[0].length;
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${policy}">`;
+  const content = policy.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${content}">`;
   return `${html.slice(0, end)}\n  ${meta}${html.slice(end)}`;
 }
 

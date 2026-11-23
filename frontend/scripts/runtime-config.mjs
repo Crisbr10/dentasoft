@@ -65,6 +65,10 @@ function normalizeUrl(raw, { dev }) {
   if (url.username || url.password || url.search || url.hash) {
     throw new Error('must not contain credentials, a query string or a fragment');
   }
+  // WHATWG URL accepts characters such as ; " , in a hostname; they would break the CSP.
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(url.hostname)) {
+    throw new Error('must have a hostname made of letters, digits, dots and hyphens');
+  }
   return url.href.replace(/\/+$/, '');
 }
 
@@ -81,7 +85,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     console.log(`config.json written (${dev ? 'development' : 'build'})`);
   } catch (error) {
     console.error(error.message);
-    console.error('See frontend/README.md, section "Configuration".');
+    console.error('See frontend/README.md, section "Configuración".');
     process.exit(1);
   }
 }

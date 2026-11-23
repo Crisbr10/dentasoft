@@ -19,7 +19,8 @@ export function toHealthStatus(
     return 'checking';
   }
   if (error) {
-    // Spring Boot answers 503 with a body when the app is running but a component is down.
+    // Any answer with an HTTP status means the server is there but not healthy: Spring Boot
+    // answers 503 when a component is down; other statuses (404, 401...) are treated alike.
     const reachable = error instanceof HttpErrorResponse && error.status > 0;
     return reachable ? 'down' : 'unreachable';
   }

@@ -46,13 +46,15 @@ module.exports = defineConfig([
     rules: {
       // No visible text written by hand: every text and attribute goes through Transloco
       // (AGENTS.md, ADR 0008). The rule allows bindings such as {{ 'key' | transloco }}.
+      // It is Angular's native i18n rule: fix it with a Transloco key, never with an i18n
+      // attribute or `--fix` (that needs @angular/localize, which is not installed).
       '@angular-eslint/template/i18n': [
         'error',
         {
           checkId: false,
           checkText: true,
           checkAttributes: true,
-          ignoreAttributes: ['appearance', 'diameter'],
+          ignoreAttributes: ['appearance', 'aria-hidden', 'ariaCurrentWhenActive', 'diameter'],
         },
       ],
     },

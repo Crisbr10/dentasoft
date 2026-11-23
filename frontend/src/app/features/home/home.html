@@ -8,7 +8,8 @@
     <p class="home__status" [attr.data-status]="status()" role="status">
       @switch (status()) {
         @case ('checking') {
-          <mat-spinner diameter="20" />
+          <!-- The text next to it already says what is happening. -->
+          <mat-spinner diameter="20" aria-hidden="true" />
         }
         @case ('up') {
           <mat-icon svgIcon="check-circle" />
@@ -17,7 +18,7 @@
           <mat-icon svgIcon="error" />
         }
       }
-      <span>{{ 'home.health.' + status() | transloco }}</span>
+      <span>{{ statusKey() | transloco }}</span>
     </p>
   </mat-card-content>
   <mat-card-actions>

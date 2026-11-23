@@ -18,7 +18,7 @@ Para un SaaS que aspira a crecer, depender de una licencia con umbrales, renovac
 ## Decisión
 
 - **Angular Material** con **Angular CDK** (MIT, mantenidos por el equipo de Angular) como única librería de componentes. No se mezclan otras librerías de componentes.
-- Tema de Material 3 definido en `frontend/src/styles/` con **tokens propios** (colores provisionales hasta tener identidad visual), sin fuentes ni iconos cargados desde dominios externos: fuentes del sistema e iconos SVG servidos desde el propio build.
+- Tema de Material 3 definido en `frontend/src/styles.scss`, con paletas y **tokens propios** en `frontend/src/styles/` (colores provisionales hasta tener identidad visual), sin fuentes ni iconos cargados desde dominios externos: fuentes del sistema e iconos SVG servidos desde el propio build.
 - Lo que Material no trae (tablas con filtros avanzados, árbol de selección, calendario de agenda) se construye sobre CDK o se decide en su tarea (por ejemplo, el calendario en M06-T04).
 - **Transloco** sigue como en ADR 0003: traducción en tiempo de ejecución, ficheros `src/assets/i18n/<idioma>.json`, solo español en la primera versión y ningún texto visible escrito a mano. Fechas y números con el locale `es`.
 

@@ -11,10 +11,11 @@
           mat-list-item
           routerLink="/"
           routerLinkActive
+          ariaCurrentWhenActive="page"
           #home="routerLinkActive"
           [routerLinkActiveOptions]="{ exact: true }"
           [activated]="home.isActive"
-          (click)="isHandset() && sidenav.close()"
+          (click)="closeOnHandset(sidenav)"
         >
           <mat-icon matListItemIcon svgIcon="home" />
           <span matListItemTitle>{{ 'layout.nav.home' | transloco }}</span>
@@ -29,6 +30,7 @@
         mat-icon-button
         type="button"
         [attr.aria-label]="'layout.toggleMenu' | transloco"
+        [attr.aria-expanded]="sidenav.opened"
         (click)="sidenav.toggle()"
       >
         <mat-icon svgIcon="menu" />

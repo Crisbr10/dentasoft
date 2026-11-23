@@ -63,6 +63,11 @@ describe('injectMetaCsp', () => {
     assert.throws(() => injectMetaCsp(html, buildMetaCsp(CONFIG)), /already has/);
   });
 
+  it('escapes the policy so it cannot close the content attribute', () => {
+    const html = injectMetaCsp(INDEX, `default-src 'self' "x" &y`);
+    assert.match(html, /content="default-src 'self' &quot;x&quot; &amp;y">/);
+  });
+
   it('fails when there is no <head>', () => {
     assert.throws(() => injectMetaCsp('<html></html>', 'default-src'), /no <head>/);
   });

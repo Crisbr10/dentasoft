@@ -60,6 +60,8 @@ describe('Home', () => {
     expect(root().textContent).toContain(es.home.title);
     expect(root().textContent).toContain(es.home.health.checking);
     expect(status()).toBe('checking');
+    // The spinner is decorative: the status text already says what is happening.
+    expect(root().querySelector('mat-spinner')?.getAttribute('aria-hidden')).toBe('true');
     http.expectOne(HEALTH_URL).flush({ status: 'UP' });
   });
 

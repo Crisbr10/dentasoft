@@ -7,7 +7,15 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import { RuntimeConfigStore } from '../../core/config/runtime-config';
-import { HEALTH_PATH, HealthResponse, toHealthStatus } from './health';
+import { HEALTH_PATH, HealthResponse, HealthStatus, toHealthStatus } from './health';
+
+/** Full keys, so they can be found in es.json and by key tooling. */
+const STATUS_KEYS: Record<HealthStatus, string> = {
+  checking: 'home.health.checking',
+  up: 'home.health.up',
+  down: 'home.health.down',
+  unreachable: 'home.health.unreachable',
+};
 
 @Component({
   selector: 'app-home',
@@ -29,6 +37,8 @@ export class Home {
       this.health.error(),
     ),
   );
+
+  protected readonly statusKey = computed(() => STATUS_KEYS[this.status()]);
 
   protected retry(): void {
     this.health.reload();

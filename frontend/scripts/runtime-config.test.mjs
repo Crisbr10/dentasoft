@@ -80,6 +80,28 @@ describe('buildRuntimeConfig', () => {
       );
     }
   });
+
+  it('rejects hostnames with characters that would break the CSP', () => {
+    for (const value of ['https://a;b.test', 'https://ex%22ample.test', 'https://a,b.test']) {
+      assert.throws(
+        () => buildRuntimeConfig({ ...CLINIC_A, DENTASOFT_URLS_AUTH: value }),
+        /DENTASOFT_URLS_AUTH: must have a hostname made of letters, digits, dots and hyphens/,
+      );
+    }
+  });
+
+  it('accepts ports, paths and localhost in development', () => {
+    assert.deepEqual(
+      buildRuntimeConfig(
+        {
+          DENTASOFT_URLS_API: 'https://api.dentasoft.test:8443/base/',
+          DENTASOFT_URLS_AUTH: 'http://localhost:8180',
+        },
+        { dev: true },
+      ),
+      { apiUrl: 'https://api.dentasoft.test:8443/base', authUrl: 'http://localhost:8180' },
+    );
+  });
 });
 
 describe('writeRuntimeConfig', () => {

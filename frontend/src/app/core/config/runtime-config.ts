@@ -1,11 +1,5 @@
 import { HttpClient } from '@angular/common/http';
-import {
-  EnvironmentProviders,
-  Injectable,
-  inject,
-  provideAppInitializer,
-  signal,
-} from '@angular/core';
+import { EnvironmentProviders, Injectable, inject, provideAppInitializer } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
 /**
@@ -22,20 +16,20 @@ export const RUNTIME_CONFIG_FILE = 'config.json';
 @Injectable({ providedIn: 'root' })
 export class RuntimeConfigStore {
   private readonly http = inject(HttpClient);
-  private readonly current = signal<RuntimeConfig | null>(null);
+  // Set once at startup and never changed afterwards, so it is a plain field.
+  private current: RuntimeConfig | null = null;
 
   /** The loaded configuration. Available once the app has started. */
   get config(): RuntimeConfig {
-    const config = this.current();
-    if (!config) {
+    if (!this.current) {
       throw new Error('Runtime configuration is not loaded');
     }
-    return config;
+    return this.current;
   }
 
   async load(): Promise<void> {
     const raw = await firstValueFrom(this.http.get<unknown>(RUNTIME_CONFIG_FILE));
-    this.current.set(parseRuntimeConfig(raw));
+    this.current = parseRuntimeConfig(raw);
   }
 }
 
@@ -49,10 +43,11 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
 
 function requireUrl(values: Record<string, unknown>, key: keyof RuntimeConfig): string {
   const value = values[key];
-  if (typeof value !== 'string' || !URL.canParse(value)) {
-    throw new Error(`${RUNTIME_CONFIG_FILE}: ${key} must be an absolute URL`);
+  const url = typeof value === 'string' && URL.canParse(value) ? new URL(value) : null;
+  if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
+    throw new Error(`${RUNTIME_CONFIG_FILE}: ${key} must be an absolute http(s) URL`);
   }
-  return value.replace(/\/+$/, '');
+  return (value as string).replace(/\/+$/, '');
 }
 
 /** Loads config.json before the app starts; the app does not start without it. */

@@ -1,6 +1,6 @@
 // Dentasoft design tokens (provisional until there is a visual identity, ADR 0008).
-// Components use these variables and the Material system tokens (--mat-sys-*),
-// never literal colours or sizes.
+// Components use these variables and the Material system tokens (--mat-sys-*) for
+// colours and spacing, not literal values.
 
 @mixin tokens {
   // Spacing scale (4px base).
