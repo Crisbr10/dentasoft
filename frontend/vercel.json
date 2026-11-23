@@ -5,7 +5,7 @@
   "outputDirectory": "dist/dentasoft/browser",
   "rewrites": [
     {
-      "source": "/((?!.*\\.(?:js|mjs|css|map|json|ico|png|jpg|svg|webp|woff2?|txt)$).*)",
+      "source": "/((?!.*\\.(?:js|mjs|css|map|json|ico|png|jpe?g|gif|avif|svg|webp|woff2?|ttf|otf|eot|txt)$).*)",
       "destination": "/index.html"
     }
   ],

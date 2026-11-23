@@ -103,12 +103,16 @@ describe('buildRuntimeConfig', () => {
     );
   });
 
-  it('accepts an IPv6 address', () => {
+  it('accepts an IPv6 address only in development (CSP host sources do not allow it)', () => {
     const config = buildRuntimeConfig(
       { ...CLINIC_A, DENTASOFT_URLS_API: 'http://[::1]:8080' },
       { dev: true },
     );
     assert.equal(config.apiUrl, 'http://[::1]:8080');
+    assert.throws(
+      () => buildRuntimeConfig({ ...CLINIC_A, DENTASOFT_URLS_API: 'https://[2001:db8::1]' }),
+      /DENTASOFT_URLS_API: must have a hostname/,
+    );
   });
 });
 

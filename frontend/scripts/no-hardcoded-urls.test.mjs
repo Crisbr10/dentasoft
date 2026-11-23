@@ -13,7 +13,7 @@ const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'src');
 // ('//host', "//localhost", (//[::1]) and the current domain. Comments such as
 // "//this.http.get()" are not URLs.
 const FORBIDDEN =
-  /\b(?:https?|wss?):\/\/|(?<=['"`(])\/\/(?:[a-z0-9-]+\.[a-z0-9]|localhost|\[)|crisbr\.es/i;
+  /\b(?:https?|wss?):\/\/|(?<=['"`(=]|, )\/\/(?:[a-z0-9-]+\.[a-z0-9]|localhost|\[)|crisbr\.es/i;
 // XML namespaces are identifiers, not addresses the app connects to.
 const ALLOWED = /https?:\/\/www\.w3\.org\/[\w./-]*/gi;
 // Tests may only use the reserved .test top-level domain (AGENTS.md). A URL with "@"
@@ -77,6 +77,7 @@ describe('no hardcoded URLs', () => {
       );
       write('app/local.ts', "const a = '//localhost:8080/x';\nconst b = '//127.0.0.1:8080';\n");
       write('app/commented.ts', '//this.http.get(x);\nconst a = b; //c.d\n');
+      write('app/page.html', '<link href=//cdn.example.org/x.css>\n');
 
       assert.deepEqual(findHardcodedUrls(dir).sort(), [
         "app/api.spec.ts:2: const ko = 'https://api.test.example.org';",
@@ -86,6 +87,7 @@ describe('no hardcoded URLs', () => {
         "app/host.ts:1: const host = 'dentasoft.crisbr.es';",
         "app/local.ts:1: const a = '//localhost:8080/x';",
         "app/local.ts:2: const b = '//127.0.0.1:8080';",
+        'app/page.html:1: <link href=//cdn.example.org/x.css>',
         "app/userinfo.spec.ts:1: const ko = 'https://a.test@evil.example';",
         "app/userinfo.spec.ts:2: const ko = 'https://a.test:pw@evil.example';",
         "app/userinfo.spec.ts:3: const ko = 'https://a.test:8080@evil.example';",

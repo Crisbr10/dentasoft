@@ -67,7 +67,8 @@ function normalizeUrl(raw, { dev }) {
   }
   // WHATWG URL accepts characters such as ; " , in a hostname; they would break the CSP.
   const isName = /^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(url.hostname);
-  const isIpv6 = /^\[[0-9a-f:.]+\]$/.test(url.hostname);
+  // CSP host sources do not accept IPv6 literals, so they are only for development.
+  const isIpv6 = dev && /^\[[0-9a-f:.]+\]$/.test(url.hostname);
   if (!isName && !isIpv6) {
     throw new Error(
       'must have a hostname made of letters, digits, dots and hyphens, or an IPv6 address',
