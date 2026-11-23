@@ -26,6 +26,10 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
+  # The client IP is resolved only by ClientIpResolver, which trusts forwarding headers just from
+  # DENTASOFT_TRUSTED_PROXIES. `none` stops Spring Boot from enabling Tomcat's RemoteIpValve on its own
+  # (it does so automatically on Kubernetes), which would rewrite the remote address beforehand.
+  forward-headers-strategy: none
   max-http-request-header-size: 16KB
   tomcat:
     # Form posts are parsed by Tomcat itself; JSON bodies are limited by dentasoft.http.max-request-body-size.
