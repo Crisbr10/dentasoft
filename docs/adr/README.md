@@ -10,6 +10,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0004](0004-firma-en-tablet-expo.md) | Firma de documentos con app Expo en tablet | Aceptada |
 | [0005](0005-ia-fuera-del-mvp.md) | IA fuera del MVP y limitada a tareas administrativas | Aceptada |
 | [0006](0006-dominio-intercambiable.md) | Dominio intercambiable: ninguna URL pública en el código | Aceptada |
+| [0007](0007-s3-local-seaweedfs.md) | Almacenamiento S3 local con SeaweedFS en lugar de MinIO | Aceptada |
 
 ## Plantilla
 

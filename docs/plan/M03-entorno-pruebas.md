@@ -33,6 +33,7 @@
 - **Criterios de aceptación**:
   - [ ] El stack arranca desde cero con un solo comando
   - [ ] Secretos generados con `openssl rand` y guardados en el gestor de contraseñas
+  - [ ] En pruebas, el almacenamiento S3 es un bucket de un proveedor externo (no SeaweedFS). Si se reutilizara SeaweedFS, ningún puerto interno sin autenticación debe ser accesible fuera de su red (ver hallazgo de la revisión de M00-T03, [PR #96](https://github.com/Crisbr10/dentasoft/pull/96), y `infra/README.md`)
 
 ### M03-T03 · Cloudflare Tunnel y Access
 

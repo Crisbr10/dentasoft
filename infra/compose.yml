@@ -1,0 +1,213 @@
+# Backing services shared by every environment. Never used alone: combine it with the
+# file of the environment, which publishes ports and sets environment-specific commands.
+#   docker compose -f compose.yml -f compose.local.yml up -d --wait
+# Values come from `.env` (copy `.env.example`). `${VAR:?}` stops Compose if one is missing.
+name: dentasoft
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?set POSTGRES_IMAGE in .env}
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      # Read by postgres/init/01-init.sh on the first start only.
+      DENTASOFT_DB_OWNER_PASSWORD: ${DENTASOFT_DB_OWNER_PASSWORD:?set DENTASOFT_DB_OWNER_PASSWORD in .env}
+      DENTASOFT_DB_APP_PASSWORD: ${DENTASOFT_DB_APP_PASSWORD:?set DENTASOFT_DB_APP_PASSWORD in .env}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
+      TZ: UTC
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Over TCP on purpose: the temporary server that runs the init scripts only listens on
+      # the Unix socket, so the check cannot pass while initialisation is still running.
+      # Being reachable is not enough: if 01-init.sh failed halfway, the next
+      # start skips it, so the check also requires the objects it creates (the `dentasoft` and
+      # `keycloak` databases, the application role and the `vector` extension).
+      test:
+        - CMD-SHELL
+        - >-
+          psql -h 127.0.0.1 -U postgres -d dentasoft -tAc
+          "SELECT (SELECT count(*) FROM pg_database WHERE datname IN ('dentasoft', 'keycloak')) = 2
+          AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dentasoft_app')
+          AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+          | grep -qx t
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: unless-stopped
+
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:?set KEYCLOAK_IMAGE in .env}
+    # The command (start-dev / start) is set by each environment file.
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?set KC_BOOTSTRAP_ADMIN_USERNAME in .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?set KC_BOOTSTRAP_ADMIN_PASSWORD in .env}
+      KC_HEALTH_ENABLED: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The image has no curl: query the management port with bash's /dev/tcp.
+      test:
+        - CMD-SHELL
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '"UP"' <&3
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    restart: unless-stopped
+
+  redis:
+    image: ${REDIS_IMAGE:?set REDIS_IMAGE in .env}
+    environment:
+      DENTASOFT_REDIS_PASSWORD: ${DENTASOFT_REDIS_PASSWORD:?set DENTASOFT_REDIS_PASSWORD in .env}
+      # Lets redis-cli authenticate without the password on its command line.
+      REDISCLI_AUTH: ${DENTASOFT_REDIS_PASSWORD}
+    # maxmemory stays below the container limit so Redis refuses writes instead of being
+    # OOM-killed. `noeviction` on purpose: Redis also holds queues and rate-limit state, and
+    # an eviction policy (allkeys-lru...) would silently drop that data to make room for cache.
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --requirepass "$$DENTASOFT_REDIS_PASSWORD"
+        --appendonly yes
+        --maxmemory 96mb
+        --maxmemory-policy noeviction
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+    restart: unless-stopped
+
+  # S3-compatible storage. MinIO no longer publishes community images (ADR 0007).
+  # `weed server` runs master, volume and filer in one container plus the S3 gateway (-s3).
+  # Only the S3 gateway checks credentials: the other internal ports must never be published.
+  #   -master.volumeSizeLimitMB=1024  each storage volume file grows up to 1 GB (default 30 GB)
+  #   -volume.max=0                   number of volumes sized automatically from free disk space
+  seaweedfs:
+    image: ${SEAWEEDFS_IMAGE:?set SEAWEEDFS_IMAGE in .env}
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -master.volumeSizeLimitMB=1024
+      - -volume.max=0
+    environment:
+      # SeaweedFS creates its admin S3 identity from these variables.
+      AWS_ACCESS_KEY_ID: ${DENTASOFT_S3_ACCESS_KEY:?set DENTASOFT_S3_ACCESS_KEY in .env}
+      AWS_SECRET_ACCESS_KEY: ${DENTASOFT_S3_SECRET_KEY:?set DENTASOFT_S3_SECRET_KEY in .env}
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: unless-stopped
+
+  # Creates the documents bucket with versioning (idempotent), then stays idle and reports
+  # healthy. It does not exit on purpose: `up --wait` fails on an exited container that no
+  # service depends on, for example when only another service is recreated.
+  # If setup fails it is retried 3 times and then the container stays exited with the error:
+  # see `docker compose logs seaweedfs-init`.
+  seaweedfs-init:
+    image: ${AWS_CLI_IMAGE:?set AWS_CLI_IMAGE in .env}
+    # Runs an init process as PID 1 so `sleep` stops on SIGTERM instead of waiting for SIGKILL.
+    init: true
+    environment:
+      AWS_ACCESS_KEY_ID: ${DENTASOFT_S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${DENTASOFT_S3_SECRET_KEY}
+      AWS_DEFAULT_REGION: ${DENTASOFT_S3_REGION:?set DENTASOFT_S3_REGION in .env}
+      DENTASOFT_S3_BUCKET: ${DENTASOFT_S3_BUCKET:?set DENTASOFT_S3_BUCKET in .env}
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        set -e;
+        rm -f /tmp/ready;
+        s3="aws --endpoint-url http://seaweedfs:8333 s3api";
+        $$s3 head-bucket --bucket "$$DENTASOFT_S3_BUCKET" 2>/dev/null
+        || $$s3 create-bucket --bucket "$$DENTASOFT_S3_BUCKET";
+        $$s3 put-bucket-versioning --bucket "$$DENTASOFT_S3_BUCKET"
+        --versioning-configuration Status=Enabled;
+        $$s3 get-bucket-versioning --bucket "$$DENTASOFT_S3_BUCKET" | grep -q Enabled;
+        echo "Bucket $$DENTASOFT_S3_BUCKET ready with versioning enabled";
+        touch /tmp/ready;
+        exec sleep infinity
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    healthcheck:
+      # The marker is removed when the script starts (it would survive a container restart)
+      # and written again only after versioning has been verified.
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      # Grace period for a slow first run (cold image, SeaweedFS still warming up).
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          # Each AWS CLI call starts its own Python runtime; keep headroom for the setup phase.
+          memory: 128m
+    restart: on-failure:3
+
+  # Antivirus for uploaded files. Optional (1.5-2 GB of RAM); needed from M05-T02 on.
+  #   docker compose -f compose.yml -f compose.local.yml --profile antivirus up -d --wait
+  clamav:
+    image: ${CLAMAV_IMAGE:?set CLAMAV_IMAGE in .env}
+    profiles: ["antivirus"]
+    volumes:
+      - clamav-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # The first start downloads the signature database before clamd answers.
+      start_period: 300s
+    deploy:
+      resources:
+        limits:
+          memory: 2560m
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  seaweedfs-data:
+  clamav-data:

@@ -1,0 +1,40 @@
+# Local development. Ports are published on 127.0.0.1 only, never on the network.
+#   docker compose -f compose.yml -f compose.local.yml up -d --wait
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  keycloak:
+    command: ["start-dev"]
+    ports:
+      - "127.0.0.1:8180:8080"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  seaweedfs:
+    ports:
+      - "127.0.0.1:8333:8333"
+
+  # Catches every outgoing email in local. Other environments send through Resend.
+  mailpit:
+    image: ${MAILPIT_IMAGE:?set MAILPIT_IMAGE in .env}
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+    restart: unless-stopped
+
+  clamav:
+    ports:
+      - "127.0.0.1:3310:3310"

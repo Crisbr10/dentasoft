@@ -8,7 +8,7 @@
 
 - Repositorio base, reglas para agentes, plan y plantillas de GitHub.
 - Esqueleto de backend (Spring Boot 4, Spring Modulith) y de frontend (Angular 22, PrimeNG, Transloco).
-- Docker Compose local: PostgreSQL con pgvector, Keycloak, Redis, MinIO, Mailpit y ClamAV.
+- Docker Compose local: PostgreSQL con pgvector, Keycloak, Redis, almacenamiento S3 (SeaweedFS), Mailpit y ClamAV.
 - Calidad (formato, cobertura, tests) y CI en GitHub Actions.
 - Base de seguridad transversal: cabeceras, CORS, errores, logs y límite de peticiones.
 
@@ -70,15 +70,15 @@
 
 ### M00-T03 · Infraestructura local con Docker Compose
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T01
-- **Descripción**: `infra/compose.yml` y `infra/compose.local.yml` con PostgreSQL (`pgvector/pgvector`), roles `dentasoft_owner` y `dentasoft_app`, Keycloak, Redis, MinIO con bucket `dentasoft-docs` versionado, Mailpit y ClamAV. Versiones fijadas en `.env.example`.
+- **Descripción**: `infra/compose.yml` y `infra/compose.local.yml` con PostgreSQL (`pgvector/pgvector`), roles `dentasoft_owner` y `dentasoft_app`, Keycloak, Redis, almacenamiento S3 con bucket `dentasoft-docs` versionado, Mailpit y ClamAV (perfil opcional `antivirus`). Versiones fijadas en `.env.example`. El S3 local es SeaweedFS en lugar de MinIO, que dejó de publicar imágenes (ADR 0007).
 - **Criterios de aceptación**:
-  - [ ] `docker compose -f compose.yml -f compose.local.yml up -d` deja todos los servicios sanos
-  - [ ] Script de init crea bases, roles y la extensión `vector`
-  - [ ] `.env.example` sin valores reales y `.env` ignorado por Git
-  - [ ] Límites de memoria por servicio
-  - [ ] Tabla de URLs locales en `infra/README.md`
+  - [x] `docker compose -f compose.yml -f compose.local.yml up -d --wait` deja todos los servicios sanos
+  - [x] Script de init crea bases, roles y la extensión `vector`
+  - [x] `.env.example` sin valores reales y `.env` ignorado por Git
+  - [x] Límites de memoria por servicio
+  - [x] Tabla de URLs locales en `infra/README.md`
 
 ### M00-T04 · Imagen Docker del backend
 
