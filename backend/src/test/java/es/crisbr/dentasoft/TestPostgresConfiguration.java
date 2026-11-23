@@ -1,5 +1,7 @@
 package es.crisbr.dentasoft;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -21,13 +23,12 @@ public class TestPostgresConfiguration {
             DockerImageName.parse("pgvector/pgvector:0.8.7-pg18-trixie").asCompatibleSubstituteFor("postgres");
 
     public static final String DATABASE = "dentasoft";
-    public static final String OWNER_USER = "dentasoft_owner";
-    public static final String OWNER_PASSWORD = "test-only-owner-password";
     public static final String APP_USER = "dentasoft_app";
     public static final String APP_PASSWORD = "test-only-app-password";
+    private static final String OWNER_PASSWORD = "test-only-owner-password";
 
-    /** Run by the image on its first start, as in {@code infra/compose.yml}. Tests run from {@code backend/}. */
-    private static final String INIT_SCRIPT = "../infra/postgres/init/01-init.sh";
+    /** Run by the image on its first start, as in {@code infra/compose.yml}. */
+    private static final Path INIT_SCRIPT = Path.of("infra", "postgres", "init", "01-init.sh");
 
     @Bean
     PostgreSQLContainer postgresContainer() {
@@ -40,7 +41,22 @@ public class TestPostgresConfiguration {
                 .withEnv("KEYCLOAK_DB_PASSWORD", "test-only-keycloak-password")
                 .withEnv("TZ", "UTC")
                 .withCopyFileToContainer(
-                        MountableFile.forHostPath(INIT_SCRIPT, 0755), "/docker-entrypoint-initdb.d/01-init.sh");
+                        MountableFile.forHostPath(initScript(), 0755), "/docker-entrypoint-initdb.d/01-init.sh");
+    }
+
+    /**
+     * Finds the init script from the working directory or one of its parents, so the tests work whether they run
+     * from {@code backend/} (Maven) or from the repository root (some IDEs).
+     */
+    static Path initScript() {
+        for (Path dir = Path.of("").toAbsolutePath(); dir != null; dir = dir.getParent()) {
+            Path script = dir.resolve(INIT_SCRIPT);
+            if (Files.isRegularFile(script)) {
+                return script;
+            }
+        }
+        throw new IllegalStateException(
+                INIT_SCRIPT + " not found from " + Path.of("").toAbsolutePath() + " or its parents");
     }
 
     /** JDBC URL of the {@code dentasoft} database, the one the application uses. */

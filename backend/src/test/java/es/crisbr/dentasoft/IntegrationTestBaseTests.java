@@ -19,6 +19,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 @IntegrationTest
 class IntegrationTestBaseTests {
 
+    /** PostgreSQL error code {@code insufficient_privilege}. */
+    private static final String INSUFFICIENT_PRIVILEGE = "42501";
+
     @Autowired
     private PostgreSQLContainer postgres;
 
@@ -53,18 +56,21 @@ class IntegrationTestBaseTests {
                 PreparedStatement statement = connection.prepareStatement("CREATE TABLE intruder (id int)")) {
             assertThatExceptionOfType(SQLException.class)
                     .isThrownBy(statement::execute)
-                    .satisfies(error -> assertThat(error.getSQLState()).isEqualTo("42501"));
+                    .satisfies(error -> assertThat(error.getSQLState()).isEqualTo(INSUFFICIENT_PRIVILEGE));
         }
     }
 
     @Test
     void redisIsAvailable(@Autowired StringRedisTemplate redis) {
         String key = "integration-test:" + TestData.CLINIC_A.id();
+        try {
+            redis.opsForValue().set(key, TestData.person(0).email());
 
-        redis.opsForValue().set(key, TestData.person(0).email());
-
-        assertThat(redis.opsForValue().get(key)).isEqualTo(TestData.person(0).email());
-        redis.delete(key);
+            assertThat(redis.opsForValue().get(key))
+                    .isEqualTo(TestData.person(0).email());
+        } finally {
+            redis.delete(key);
+        }
     }
 
     private Connection connectAsApplication() throws SQLException {

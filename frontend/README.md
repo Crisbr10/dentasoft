@@ -24,7 +24,7 @@ pnpm api:gen               # regenera src/app/api desde el OpenAPI del backend l
 
 - **Cuándo regenerarlo**: en el mismo PR que cambia un endpoint o un DTO del backend. Así el cliente nunca se desfasa de la API.
 - **Cómo**: arranca el backend con el perfil local (`cd backend; .\mvnw.cmd spring-boot:run`) y ejecuta `pnpm api:gen`. Por defecto lee `http://localhost:8080/v3/api-docs`; para leer otra URL, usa la variable `DENTASOFT_API_DOCS_URL`.
-- **Sin URL en el código**: `scripts/api-gen.mjs` quita `servers` del documento antes de generar, para que no quede ninguna URL escrita. La app fija la URL base del cliente desde `config.json` con `provideApiConfiguration()` (`src/app/core/config/api-configuration.ts`). `no-hardcoded-urls` también revisa el código generado. Solo ignora en él las líneas que son enteramente comentario, como los enlaces a documentación. Para decidirlo usa el parser de TypeScript, así que una línea que mezcla un comentario y código se revisa igual.
+- **Sin URL en el código**: `scripts/api-gen.mjs` quita `servers` del documento antes de generar, para que no quede ninguna URL escrita. La app fija la URL base del cliente desde `config.json` con `provideApiClient()` (`src/app/core/config/api-client.ts`). `no-hardcoded-urls` también revisa el código generado. Solo ignora en él las líneas que son enteramente comentario, como los enlaces a documentación. Para decidirlo usa el parser de TypeScript, así que una línea que mezcla un comentario y código se revisa igual.
 - La configuración del generador está en `ng-openapi-gen.json`. Los ficheros que dejan de generarse se borran solos.
 
 ## Estructura

@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
 
 import { ApiConfiguration } from '../../api/api-configuration';
-import { provideApiConfiguration } from './api-configuration';
+import { provideApiClient } from './api-client';
 import { RuntimeConfigStore } from './runtime-config';
 
-describe('provideApiConfiguration', () => {
+describe('provideApiClient', () => {
   it('points the generated client at the API URL of config.json', () => {
     TestBed.configureTestingModule({
       providers: [
-        provideApiConfiguration(),
+        provideApiClient(),
         {
           provide: RuntimeConfigStore,
           useValue: {

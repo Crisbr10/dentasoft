@@ -8,7 +8,7 @@ import { RuntimeConfigStore } from './runtime-config';
  * is generated without a root URL (scripts/api-gen.mjs), so this provider is what sets it.
  * It is created on first use, after config.json has been loaded at startup.
  */
-export function provideApiConfiguration(): Provider {
+export function provideApiClient(): Provider {
   return {
     provide: ApiConfiguration,
     useFactory: () => {

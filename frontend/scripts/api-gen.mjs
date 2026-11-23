@@ -2,7 +2,7 @@
 // The generated code must not contain any URL (ADR 0006): the document lists the server URL
 // in `servers`, and ng-openapi-gen would write it as the default root URL. So the document is
 // fetched, `servers` is removed, and the result is passed to ng-openapi-gen. The app sets the
-// root URL at runtime from config.json (see core/config/api-configuration.ts).
+// root URL at runtime from config.json (see core/config/api-client.ts).
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -55,8 +55,14 @@ async function main() {
       [cli, '--config', 'ng-openapi-gen.json', '--input', input],
       { cwd: FRONTEND, stdio: 'inherit' },
     );
+    if (result.error) {
+      throw new Error(`Cannot run ng-openapi-gen (run pnpm install): ${result.error.message}`, {
+        cause: result.error,
+      });
+    }
     if (result.status !== 0) {
-      throw new Error(`ng-openapi-gen failed with exit code ${result.status}`);
+      const reason = result.signal ? `signal ${result.signal}` : `exit code ${result.status}`;
+      throw new Error(`ng-openapi-gen failed with ${reason}`);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
