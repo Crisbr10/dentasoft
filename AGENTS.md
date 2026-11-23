@@ -112,7 +112,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 
 ## Flujo de trabajo con GitHub Issues
 
-Cada tarea del plan tiene un issue en GitHub (título `Mxx-Tyy · …`, etiqueta `modulo:Mxx`, milestone del módulo) y aparece en el Project **Dentasoft MVP**. **Obligatorio**: todo trabajo parte de un issue y termina cerrándolo con un pull request. Se usa GitHub CLI (`gh`).
+Cada tarea del plan tiene un issue en GitHub (título `Mxx-Tyy · …`, etiqueta `modulo:Mxx`, milestone del módulo) y aparece en el Project **Dentasoft MVP**. **Obligatorio**: todo trabajo parte de un issue y termina cerrándolo con un pull request. Se usa GitHub CLI (`gh`). En Claude Code, este flujo está automatizado con las skills `/tarea` y `/terminar-tarea` (`.claude/skills/`).
 
 1. **Elegir la tarea**: la siguiente abierta del módulo en curso cuyas dependencias estén cerradas.
    ```powershell
