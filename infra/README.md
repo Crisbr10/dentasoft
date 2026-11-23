@@ -35,6 +35,21 @@ docker compose -f compose.yml -f compose.local.yml --profile antivirus up -d --w
 
 El primer arranque descarga la base de firmas y puede tardar varios minutos.
 
+### Backend en contenedor (opcional)
+
+El perfil `app` construye la imagen del backend desde `backend/` y la arranca junto a la infraestructura, con el perfil `local` de Spring. Usa el puerto 8080, igual que `mvnw spring-boot:run`: arranca solo uno de los dos.
+
+```powershell
+docker compose -f compose.yml -f compose.local.yml --profile app up -d --wait --build
+curl http://localhost:8080/actuator/health/readiness   # {"status":"UP"}
+```
+
+- Las URL públicas (`DENTASOFT_URLS_*`) apuntan a `localhost`, que es desde donde las ve el navegador. Los servicios de apoyo se alcanzan por su nombre dentro de la red de Docker (`postgres`, `redis`, `seaweedfs`, `mailpit`). Esas variables quedan preparadas aunque el backend aún no las use: llegan con M01-T01 (base de datos), M00-T08 (Redis), M05 (S3) y M07 (email), y esas tareas pueden renombrarlas.
+- El contenedor corre con el UID 10001, el sistema de ficheros en solo lectura (solo `/tmp` es escribible), sin *capabilities* y con `no-new-privileges`.
+- `stop_grace_period` (40 s) es mayor que el apagado ordenado del backend (`SHUTDOWN_TIMEOUT`, 30 s).
+
+Fuera de local no se construye la imagen: se usa la publicada en GHCR (M00-T07). La imagen se describe en [backend/README.md](../backend/README.md#imagen-docker).
+
 ## URLs locales
 
 | Servicio | URL | Acceso |
