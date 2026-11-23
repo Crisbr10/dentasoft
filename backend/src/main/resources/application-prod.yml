@@ -1,0 +1,11 @@
+# Production. Kept explicit so that no other profile can re-enable these by accident.
+management:
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

@@ -69,6 +69,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 - **Obligatorio**: nada de SQL concatenado. JPA, Spring Data o `JdbcClient` con parámetros.
 - **Obligatorio**: validación con Bean Validation en todos los DTO de entrada; autorización con `@PreAuthorize` en los servicios.
 - **Obligatorio**: ningún secreto en el código, en tests ni en ejemplos. Solo variables de entorno; en el repo, solo `.env.example` con valores falsos.
+- **Obligatorio**: nada de dominios fijos. Ningún dominio ni URL pública en el código ni en `application*.yml` fuera del perfil `local`: el dominio actual es temporal. Las URLs salen de `dentasoft.urls.app`, `dentasoft.urls.api` y `dentasoft.urls.auth` (variables `DENTASOFT_URLS_APP`, `DENTASOFT_URLS_API` y `DENTASOFT_URLS_AUTH`), y los orígenes CORS de `dentasoft.cors.allowed-origins` (`DENTASOFT_CORS_ALLOWED_ORIGINS`). `NoHardcodedUrlsTests` lo verifica. En los tests, usa dominios reservados `.test`.
 - **Obligatorio**: nunca uses datos reales de pacientes, ni siquiera en local. Datos de prueba inventados.
 - **Obligatorio**: los logs no contienen datos personales ni clínicos (nombres, teléfonos, diagnósticos, notas). Usa identificadores.
 - Errores hacia el cliente con `ProblemDetail`, sin trazas ni mensajes internos.

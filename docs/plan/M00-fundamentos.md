@@ -33,15 +33,40 @@
 
 ### M00-T02 · Esqueleto del backend
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T01
 - **Descripción**: generar el proyecto Spring Boot 4 con Java 25 (dependencias de la guía), paquete raíz `es.crisbr.dentasoft`, Spring Modulith con `ModularityTests`, Actuator, configuración por variables de entorno con valores locales por defecto, hilos virtuales y apagado ordenado.
 - **Criterios de aceptación**:
-  - [ ] `.\mvnw.cmd verify` en verde
-  - [ ] `ModularityTests` verifica los módulos y genera su documentación
-  - [ ] `application.yml` sin secretos; perfil `local`
-  - [ ] Manejador global de errores con `ProblemDetail`
-  - [ ] springdoc expone `/v3/api-docs` y Swagger UI solo en perfiles no productivos
+  - [x] `.\mvnw.cmd verify` en verde
+  - [x] `ModularityTests` verifica los módulos y genera su documentación
+  - [x] `application.yml` sin secretos; perfil `local`
+  - [x] Manejador global de errores con `ProblemDetail`
+  - [x] springdoc expone `/v3/api-docs` y Swagger UI solo en perfiles no productivos
+  - [x] Ningún dominio ni URL pública en el código ni en `application*.yml` fuera del perfil `local`; un test falla si encuentra `crisbr.es` o una URL `https://` fija en `backend/src/main`
+  - [x] `dentasoft.urls` (`app`, `api`, `auth`) como record validado; valores por defecto solo en `local` y obligatorias por variables de entorno en el resto: sin ellas la app no arranca y el error dice cuál falta
+  - [x] `dentasoft.cors.allowed-origins` preparada para M00-T08, por defecto `dentasoft.urls.app`; la URL del servidor en OpenAPI sale de `dentasoft.urls.api`
+- **URLs públicas** (requisito añadido el 2026-11-23: el dominio actual, `crisbr.es`, es temporal y cambiará):
+
+  | Variable | Propiedad | Valor en `local` |
+  | --- | --- | --- |
+  | `DENTASOFT_URLS_APP` | `dentasoft.urls.app` (frontend) | `http://localhost:4200` |
+  | `DENTASOFT_URLS_API` | `dentasoft.urls.api` (backend) | `http://localhost:8080` |
+  | `DENTASOFT_URLS_AUTH` | `dentasoft.urls.auth` (Keycloak) | `http://localhost:8180` |
+  | `DENTASOFT_CORS_ALLOWED_ORIGINS` | `dentasoft.cors.allowed-origins` (lista separada por comas) | `dentasoft.urls.app` |
+
+- **Reparto de dependencias del backend**: cada dependencia entra con la tarea que la usa por primera vez.
+
+  | Tarea | Dependencias |
+  | --- | --- |
+  | M00-T02 | Web, Actuator, Validation, Spring Modulith, springdoc-openapi y Configuration Processor |
+  | M00-T06 | Testcontainers (PostgreSQL y Redis), Spotless y JaCoCo |
+  | M00-T08 | Spring Data Redis y Bucket4j |
+  | M01-T01 | Spring Data JPA, PostgreSQL y Flyway (con `flyway-database-postgresql`) |
+  | M02-T02 | Spring Security y OAuth2 Resource Server |
+  | M05 | AWS SDK v2 S3, Apache Tika, OpenHTMLtoPDF y Thymeleaf |
+  | M07-T02 | Spring Mail |
+
+  No se usa `spring-boot-docker-compose`: los servicios se levantan a mano desde `infra/`.
 
 ### M00-T03 · Infraestructura local con Docker Compose
 
