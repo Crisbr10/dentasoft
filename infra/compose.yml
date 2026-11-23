@@ -21,8 +21,17 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # Over TCP on purpose: the temporary server that runs the init scripts only listens on
-      # the Unix socket, so the service turns healthy once initialisation has finished.
-      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "dentasoft"]
+      # the Unix socket. Being reachable is not enough: if 01-init.sh failed halfway, the next
+      # start skips it, so the check also requires the objects it creates (the `dentasoft` and
+      # `keycloak` databases, the application role and the `vector` extension).
+      test:
+        - CMD-SHELL
+        - >-
+          psql -h 127.0.0.1 -U postgres -d dentasoft -tAc
+          "SELECT (SELECT count(*) FROM pg_database WHERE datname IN ('dentasoft', 'keycloak')) = 2
+          AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dentasoft_app')
+          AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+          | grep -qx t
       interval: 5s
       timeout: 5s
       retries: 10
@@ -71,6 +80,9 @@ services:
       DENTASOFT_REDIS_PASSWORD: ${DENTASOFT_REDIS_PASSWORD:?set DENTASOFT_REDIS_PASSWORD in .env}
       # Lets redis-cli authenticate without the password on its command line.
       REDISCLI_AUTH: ${DENTASOFT_REDIS_PASSWORD}
+    # maxmemory stays below the container limit so Redis refuses writes instead of being
+    # OOM-killed. `noeviction` on purpose: Redis also holds queues and rate-limit state, and
+    # an eviction policy (allkeys-lru...) would silently drop that data to make room for cache.
     command:
       - sh
       - -c
@@ -93,7 +105,11 @@ services:
           memory: 128m
     restart: unless-stopped
 
-  # S3-compatible storage. MinIO no longer publishes community images (see infra/README.md).
+  # S3-compatible storage. MinIO no longer publishes community images (ADR 0007).
+  # `weed server` runs master, volume and filer in one container plus the S3 gateway (-s3).
+  # Only the S3 gateway checks credentials: the other internal ports must never be published.
+  #   -master.volumeSizeLimitMB=1024  each storage volume file grows up to 1 GB (default 30 GB)
+  #   -volume.max=0                   number of volumes sized automatically from free disk space
   seaweedfs:
     image: ${SEAWEEDFS_IMAGE:?set SEAWEEDFS_IMAGE in .env}
     command:

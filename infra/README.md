@@ -69,15 +69,11 @@ Las tablas y sus permisos son cosa de las migraciones de Flyway (M01-T01), y el 
 
 ## Almacenamiento S3: SeaweedFS en lugar de MinIO
 
-El plan preveía MinIO, pero MinIO dejó de publicar imágenes de su edición comunitaria: a fecha de esta tarea (2026-11-23), `minio/minio` y `minio/mc` ya no existen en Docker Hub y no hay ninguna imagen pública mantenida en Quay. Fijar una etiqueta antigua supondría usar software sin parches de seguridad.
+En local, el almacenamiento S3 es SeaweedFS en lugar de MinIO. El motivo y las alternativas están en el [ADR 0007](../docs/adr/0007-s3-local-seaweedfs.md).
 
-Se usa **SeaweedFS** (Apache 2.0, con publicación activa; ver [ADR 0007](../docs/adr/0007-s3-local-seaweedfs.md)) porque:
+El contenedor de un solo uso `seaweedfs-init` (AWS CLI) crea el bucket `dentasoft-docs` y activa el versionado; se puede repetir sin problemas.
 
-- Expone una API compatible con S3, así que el backend usará el AWS SDK v2 sin cambios, solo con otro endpoint.
-- Soporta el **versionado de buckets**, que exige la tarea. Garage, la otra alternativa considerada, no lo soporta.
-- Lee las credenciales del entorno (`AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`) y rechaza las incorrectas.
-
-El contenedor de un solo uso `seaweedfs-init` (AWS CLI) crea el bucket `dentasoft-docs` y activa el versionado. Se puede repetir sin problemas. En producción el almacenamiento puede ser cualquier servicio compatible con S3: este cambio solo afecta al entorno local.
+Solo la API S3 (puerto 8333) comprueba las credenciales. Los demás componentes que arranca SeaweedFS (master, volume y filer) escuchan sin autenticación dentro de la red de Docker. Por eso `compose.local.yml` publica solo el 8333, y en `127.0.0.1`: no publiques ningún otro puerto de SeaweedFS.
 
 ## Comprobaciones
 
