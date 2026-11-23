@@ -177,6 +177,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+      # Grace period for a slow first run (cold image, SeaweedFS still warming up).
+      start_period: 60s
     deploy:
       resources:
         limits:

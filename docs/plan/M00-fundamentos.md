@@ -74,7 +74,7 @@
 - **Depende de**: M00-T01
 - **Descripción**: `infra/compose.yml` y `infra/compose.local.yml` con PostgreSQL (`pgvector/pgvector`), roles `dentasoft_owner` y `dentasoft_app`, Keycloak, Redis, almacenamiento S3 con bucket `dentasoft-docs` versionado, Mailpit y ClamAV (perfil opcional `antivirus`). Versiones fijadas en `.env.example`. El S3 local es SeaweedFS en lugar de MinIO, que dejó de publicar imágenes (ADR 0007).
 - **Criterios de aceptación**:
-  - [x] `docker compose -f compose.yml -f compose.local.yml up -d` deja todos los servicios sanos
+  - [x] `docker compose -f compose.yml -f compose.local.yml up -d --wait` deja todos los servicios sanos
   - [x] Script de init crea bases, roles y la extensión `vector`
   - [x] `.env.example` sin valores reales y `.env` ignorado por Git
   - [x] Límites de memoria por servicio
