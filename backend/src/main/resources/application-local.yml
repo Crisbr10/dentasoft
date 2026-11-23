@@ -1,0 +1,11 @@
+# Local development (activated by `mvnw spring-boot:run` or SPRING_PROFILES_ACTIVE=local).
+management:
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
