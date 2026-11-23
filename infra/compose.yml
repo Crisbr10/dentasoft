@@ -21,7 +21,8 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       # Over TCP on purpose: the temporary server that runs the init scripts only listens on
-      # the Unix socket. Being reachable is not enough: if 01-init.sh failed halfway, the next
+      # the Unix socket, so the check cannot pass while initialisation is still running.
+      # Being reachable is not enough: if 01-init.sh failed halfway, the next
       # start skips it, so the check also requires the objects it creates (the `dentasoft` and
       # `keycloak` databases, the application role and the `vector` extension).
       test:
@@ -140,8 +141,12 @@ services:
   # Creates the documents bucket with versioning (idempotent), then stays idle and reports
   # healthy. It does not exit on purpose: `up --wait` fails on an exited container that no
   # service depends on, for example when only another service is recreated.
+  # If setup fails it is retried 3 times and then the container stays exited with the error:
+  # see `docker compose logs seaweedfs-init`.
   seaweedfs-init:
     image: ${AWS_CLI_IMAGE:?set AWS_CLI_IMAGE in .env}
+    # Runs an init process as PID 1 so `sleep` stops on SIGTERM instead of waiting for SIGKILL.
+    init: true
     environment:
       AWS_ACCESS_KEY_ID: ${DENTASOFT_S3_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${DENTASOFT_S3_SECRET_KEY}
@@ -177,7 +182,7 @@ services:
         limits:
           # Each AWS CLI call starts its own Python runtime; keep headroom for the setup phase.
           memory: 128m
-    restart: unless-stopped
+    restart: on-failure:3
 
   # Antivirus for uploaded files. Optional (1.5-2 GB of RAM); needed from M05-T02 on.
   #   docker compose -f compose.yml -f compose.local.yml --profile antivirus up -d --wait

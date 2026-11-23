@@ -71,7 +71,7 @@ Las tablas y sus permisos son cosa de las migraciones de Flyway (M01-T01), y el 
 
 En local, el almacenamiento S3 es SeaweedFS en lugar de MinIO. El motivo y las alternativas están en el [ADR 0007](../docs/adr/0007-s3-local-seaweedfs.md).
 
-El contenedor `seaweedfs-init` (AWS CLI) crea el bucket `dentasoft-docs`, activa el versionado y se queda en reposo; está sano cuando el bucket está listo. Se puede repetir sin problemas.
+El contenedor `seaweedfs-init` (AWS CLI) crea el bucket `dentasoft-docs`, activa el versionado y se queda en reposo; está sano cuando el bucket está listo. Se puede repetir sin problemas. Si la configuración falla, lo reintenta 3 veces y después se queda parado con el error: míralo con `docker compose -f compose.yml -f compose.local.yml logs seaweedfs-init`.
 
 Solo la API S3 (puerto 8333) comprueba las credenciales. Los demás componentes que arranca SeaweedFS (master, volume y filer) escuchan sin autenticación dentro de la red de Docker. Por eso `compose.local.yml` publica solo el 8333, y en `127.0.0.1`: no publiques ningún otro puerto de SeaweedFS.
 
