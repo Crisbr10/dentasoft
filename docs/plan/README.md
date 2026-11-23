@@ -83,7 +83,8 @@ gh auth login                 # una sola vez
 
 El script no duplica: si ya existe un issue cuyo título empieza por el ID de la tarea, lo salta.
 
-- Al terminar una tarea: el PR referencia el issue (`Closes #12`) y cambia el **Estado** de la tarea a `hecho` en su fichero. Al terminar un módulo, se actualiza su fila en la tabla de arriba.
+- El ciclo de cada tarea (tomar el issue, rama, PR en borrador con `Closes #N`, cierre al fusionar) está en [`AGENTS.md`](../../AGENTS.md#flujo-de-trabajo-con-github-issues). En el mismo PR se cambia el **Estado** de la tarea a `hecho` en su fichero; al terminar un módulo, se actualiza su fila en la tabla de arriba.
+- El tablero es el Project **Dentasoft MVP** (columnas Pendiente, En curso, En revisión y Hecho), que se mueve solo con los issues y PR.
 
 ## Definición de terminado
 

@@ -20,7 +20,7 @@
 
 ### M00-T01 · Base del repositorio y documentación
 
-- **Estado**: en curso
+- **Estado**: hecho
 - **Depende de**: —
 - **Descripción**: estructura de carpetas, ficheros base (`.gitattributes`, `.gitignore`, `.editorconfig`, `LICENSE`, `README`), `AGENTS.md`, `CLAUDE.md`, ADR iniciales, plan por módulos, plantillas de issue y PR, y script de sincronización con GitHub Issues.
 - **Criterios de aceptación**:
@@ -28,8 +28,8 @@
   - [x] `AGENTS.md` con reglas obligatorias y definición de terminado
   - [x] ADR 0001–0005 y plan M00–M13 con tareas
   - [x] Plantillas de issue y pull request
-  - [ ] Primer commit en `main` subido a GitHub
-  - [ ] Issues creados con `scripts/sync-issues.ps1` y un Project de GitHub con el tablero
+  - [x] Primer commit en `main` subido a GitHub
+  - [x] Issues creados con `scripts/sync-issues.ps1` y un Project de GitHub con el tablero
 
 ### M00-T02 · Esqueleto del backend
 

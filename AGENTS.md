@@ -110,12 +110,26 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 - Cada tarea entrega sus tests. Unitarios para la lógica, integración con Testcontainers para repositorios, seguridad y RLS.
 - Un bug corregido lleva un test que lo reproduce.
 
-## Flujo de trabajo
+## Flujo de trabajo con GitHub Issues
 
-1. Rama por tarea: `feature/M04-T02-busqueda-pacientes` (o `fix/…`, `chore/…`).
-2. Commits con Conventional Commits y el ID de la tarea: `feat(patients): búsqueda por nombre y teléfono [M04-T02]`.
-3. Pull request contra `main` usando la plantilla; la CI tiene que estar en verde.
-4. Al terminar, actualiza el estado de la tarea en `docs/plan/` y, si tomaste una decisión de arquitectura, añade un ADR.
+Cada tarea del plan tiene un issue en GitHub (título `Mxx-Tyy · …`, etiqueta `modulo:Mxx`, milestone del módulo) y aparece en el Project **Dentasoft MVP**. **Obligatorio**: todo trabajo parte de un issue y termina cerrándolo con un pull request. Se usa GitHub CLI (`gh`).
+
+1. **Elegir la tarea**: la siguiente abierta del módulo en curso cuyas dependencias estén cerradas.
+   ```powershell
+   gh issue list --label modulo:M04 --state open
+   gh issue view 12
+   ```
+   Si no hay issue para lo que se va a hacer, se crea antes (y se añade la tarea al fichero del módulo en `docs/plan/`).
+2. **Tomarla**: `gh issue edit 12 --add-assignee "@me"`.
+3. **Rama** con el número del issue y el ID de la tarea: `feature/12-M04-T02-busqueda-pacientes` (o `fix/…`, `chore/…`).
+4. **Pull request en borrador al empezar**, con `Closes #12` en la descripción. Así el Project mueve la tarjeta a «En curso» automáticamente.
+   ```powershell
+   gh pr create --draft --title "feat(patients): búsqueda de pacientes [M04-T02]" --body "Closes #12"
+   ```
+5. **Commits** con Conventional Commits y el ID de la tarea: `feat(patients): búsqueda por nombre y teléfono [M04-T02]`.
+6. **Decisiones, bloqueos o cambios de alcance**: se dejan como comentario en el issue (`gh issue comment 12 --body "…"`), no solo en el chat.
+7. **Trabajo nuevo descubierto** (un bug, algo que falta): issue nuevo con `gh issue create`, etiqueta del módulo y referencia al issue original. No se mezcla en el PR actual.
+8. **Terminar**: marcar el PR como listo (`gh pr ready`), CI en verde y, en el mismo PR, cambiar el **Estado** de la tarea a `hecho` en `docs/plan/`. Al fusionar, el issue se cierra solo y la tarjeta pasa a «Hecho». Si hubo una decisión de arquitectura, añadir un ADR.
 
 ## Definición de terminado
 
