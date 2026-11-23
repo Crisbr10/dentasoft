@@ -50,7 +50,8 @@ class RateLimitWithoutRedisTests {
         assertThat(mvc.get().uri("/api/v1/test/ping")).hasStatusOk();
         assertThat(mvc.get().uri("/api/v1/test/ping")).hasStatus(HttpStatus.TOO_MANY_REQUESTS);
 
-        assertThat(registry.get(RateLimiter.REDIS_AVAILABLE_METRIC).gauge().value()).isZero();
+        assertThat(registry.get(RateLimiter.REDIS_AVAILABLE_METRIC).gauge().value())
+                .isZero();
         assertThat(registry.get(RateLimiter.FALLBACK_METRIC).counter().count()).isEqualTo(3);
     }
 

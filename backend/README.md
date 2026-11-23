@@ -5,11 +5,19 @@ Spring Boot 4 sobre Java 25, monolito modular con Spring Modulith. Paquete raíz
 ## Comandos
 
 ```powershell
-.\mvnw.cmd verify           # compila, pasa los tests y genera la documentación de módulos
+.\mvnw.cmd verify           # compila, pasa los tests, comprueba el formato y genera la cobertura
+.\mvnw.cmd spotless:apply   # corrige el formato (palantir-java-format)
 .\mvnw.cmd spring-boot:run  # arranca en http://localhost:8080 con el perfil local
 ```
 
 La documentación de módulos (PlantUML y AsciiDoc) queda en `target/spring-modulith-docs` tras ejecutar `ModularityTests`.
+
+## Calidad y tests
+
+- **Formato**: `verify` falla si algún fichero Java no tiene el formato de palantir-java-format. Se corrige con `spotless:apply`.
+- **Cobertura**: JaCoCo deja el informe en `target/site/jacoco/index.html`. Todavía no hay umbral mínimo. El informe excluye la clase de arranque (`DentasoftApplication`) y el código generado (`*MapperImpl` de MapStruct), así que la cifra solo mide código escrito a mano.
+- **Integración**: los tests anotados con `@IntegrationTest` levantan la aplicación con PostgreSQL y Redis en Testcontainers (hace falta Docker). PostgreSQL usa la misma imagen y el mismo script `infra/postgres/init/01-init.sh` que el entorno local, así que tiene los mismos roles y la extensión `vector`. Si cambias la imagen en `.env.example`, cámbiala también en `TestPostgresConfiguration` y `TestRedisConfiguration`. El ejemplo es `IntegrationTestBaseTests`.
+- **Datos de prueba**: siempre inventados, desde `TestData` (personas ficticias, correos con dominio `.test` y dos clínicas, A y B, para los tests de aislamiento). Nunca datos reales de pacientes.
 
 ## Imagen Docker
 

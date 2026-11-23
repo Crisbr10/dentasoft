@@ -50,8 +50,8 @@ class WebConfiguration {
         CorsConfiguration cors = new CorsConfiguration();
         cors.setAllowedOrigins(properties.allowedOrigins());
         cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
-        cors.setAllowedHeaders(List.of(
-                HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, "X-Clinic-Id", RequestIdFilter.HEADER));
+        cors.setAllowedHeaders(
+                List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, "X-Clinic-Id", RequestIdFilter.HEADER));
         cors.setExposedHeaders(List.of(RequestIdFilter.HEADER, HttpHeaders.RETRY_AFTER));
         cors.setAllowCredentials(false);
         cors.setMaxAge(Duration.ofHours(1));

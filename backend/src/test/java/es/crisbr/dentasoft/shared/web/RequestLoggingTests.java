@@ -68,7 +68,11 @@ class RequestLoggingTests {
         assertThat(mvc.get().uri("/api/v1/test/failure").header("X-Request-Id", REQUEST_ID))
                 .hasStatus(HttpStatus.INTERNAL_SERVER_ERROR);
 
-        List<String> lines = output.getOut().substring(start).lines().filter(line -> !line.isBlank()).toList();
+        List<String> lines = output.getOut()
+                .substring(start)
+                .lines()
+                .filter(line -> !line.isBlank())
+                .toList();
         assertThat(lines).hasSizeGreaterThanOrEqualTo(2);
         assertThat(lines).allSatisfy(line -> {
             JsonNode entry = json.readTree(line);

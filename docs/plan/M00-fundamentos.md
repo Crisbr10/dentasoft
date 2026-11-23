@@ -104,13 +104,13 @@
 
 ### M00-T06 · Calidad y tests base
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T02
-- **Descripción**: Spotless (formato), JaCoCo (cobertura), clase base de integración con Testcontainers (PostgreSQL, Redis; el contenedor de Redis ya existe desde M00-T08 en `TestRedisConfiguration`) y datos de prueba inventados; scripts `api:gen` (ng-openapi-gen) y formato en el frontend.
+- **Descripción**: Spotless (formato), JaCoCo (cobertura), clase base de integración con Testcontainers (PostgreSQL, Redis; el contenedor de Redis ya existe desde M00-T08 en `TestRedisConfiguration`) y datos de prueba inventados; scripts `api:gen` (ng-openapi-gen) y formato en el frontend. La base es la anotación `@IntegrationTest`. Su PostgreSQL usa la imagen y el script de init de `infra/`, y el driver queda en scope test hasta que M01-T01 añada JDBC, Flyway y `@ServiceConnection`. El cliente generado (`src/app/api`) va en el repositorio sin ninguna URL escrita: la URL base sale de `config.json`.
 - **Criterios de aceptación**:
-  - [ ] `mvnw verify` falla si el formato no es correcto
-  - [ ] Test de integración de ejemplo usando Testcontainers
-  - [ ] `pnpm api:gen` genera el cliente desde el backend local
+  - [x] `mvnw verify` falla si el formato no es correcto
+  - [x] Test de integración de ejemplo usando Testcontainers
+  - [x] `pnpm api:gen` genera el cliente desde el backend local
 
 ### M00-T07 · Integración continua
 

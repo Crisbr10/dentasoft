@@ -54,7 +54,8 @@ class SecurityHeadersAndCorsTests {
 
         @Test
         void isGeneratedWhenTheClientSendsNone() {
-            String id = mvc.get().uri("/api/v1/test/ping").exchange().getResponse().getHeader("X-Request-Id");
+            String id =
+                    mvc.get().uri("/api/v1/test/ping").exchange().getResponse().getHeader("X-Request-Id");
 
             assertThat(id).isNotNull();
             assertThat(UUID.fromString(id)).isNotNull();
@@ -67,14 +68,15 @@ class SecurityHeadersAndCorsTests {
         }
 
         @ParameterizedTest
-        @ValueSource(strings = {
-            "has space",
-            "line\r\nX-Injected: 1",
-            "ñandú",
-            "{\"json\":1}",
-            "${jndi:ldap://x}",
-            "0123456789012345678901234567890123456789012345678901234567890123456789"
-        })
+        @ValueSource(
+                strings = {
+                    "has space",
+                    "line\r\nX-Injected: 1",
+                    "ñandú",
+                    "{\"json\":1}",
+                    "${jndi:ldap://x}",
+                    "0123456789012345678901234567890123456789012345678901234567890123456789"
+                })
         void replacesAnInvalidIdInsteadOfEchoingIt(String invalid) {
             String id = mvc.get()
                     .uri("/api/v1/test/ping")
@@ -131,7 +133,9 @@ class SecurityHeadersAndCorsTests {
                     .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
                     .exchange();
 
-            assertThat(result).hasStatus(HttpStatus.FORBIDDEN).doesNotContainHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN);
+            assertThat(result)
+                    .hasStatus(HttpStatus.FORBIDDEN)
+                    .doesNotContainHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN);
         }
 
         @Test
@@ -151,7 +155,9 @@ class SecurityHeadersAndCorsTests {
                     .header(HttpHeaders.ORIGIN, WithTestEnvironment.APP)
                     .exchange();
 
-            assertThat(result).hasStatusOk().hasHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, WithTestEnvironment.APP);
+            assertThat(result)
+                    .hasStatusOk()
+                    .hasHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, WithTestEnvironment.APP);
             assertThat(result.getResponse().getHeader(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS))
                     .contains("X-Request-Id")
                     .contains("Retry-After");

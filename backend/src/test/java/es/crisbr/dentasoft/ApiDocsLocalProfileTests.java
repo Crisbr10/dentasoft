@@ -43,8 +43,8 @@ class ApiDocsLocalProfileTests {
     @Test
     void localProfileProvidesLocalhostUrls(@Autowired DentasoftUrls urls) {
         assertThat(urls)
-                .isEqualTo(new DentasoftUrls(
-                        "http://localhost:4200", "http://localhost:8080", "http://localhost:8180"));
+                .isEqualTo(
+                        new DentasoftUrls("http://localhost:4200", "http://localhost:8080", "http://localhost:8180"));
     }
 
     @Test
@@ -54,11 +54,8 @@ class ApiDocsLocalProfileTests {
 
     @Test
     void swaggerUiGetsAPolicyThatLetsItRenderButNotBeFramed() {
-        String policy = mvc.get()
-                .uri("/swagger-ui/index.html")
-                .exchange()
-                .getResponse()
-                .getHeader("Content-Security-Policy");
+        String policy =
+                mvc.get().uri("/swagger-ui/index.html").exchange().getResponse().getHeader("Content-Security-Policy");
 
         assertThat(policy)
                 .contains("default-src 'self'")
@@ -70,7 +67,9 @@ class ApiDocsLocalProfileTests {
     @Test
     void theApiDocumentKeepsTheStrictPolicy() {
         assertThat(mvc.get().uri("/v3/api-docs"))
-                .hasHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+                .hasHeader(
+                        "Content-Security-Policy",
+                        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     }
 
     @Test

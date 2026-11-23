@@ -30,7 +30,8 @@ class RateLimiterTests {
 
     @Test
     void usesRedisWhileItAnswers() {
-        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed()).isTrue();
+        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .isTrue();
 
         assertThat(redis.calls).isEqualTo(1);
         assertThat(gauge()).isEqualTo(1.0);
@@ -42,15 +43,19 @@ class RateLimiterTests {
         redis.down = true;
 
         for (int i = 0; i < 3; i++) {
-            assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed()).isTrue();
+            assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                    .isTrue();
         }
         ConsumptionProbe fourth = limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS);
 
         assertThat(fourth.isConsumed()).isFalse();
         assertThat(fourth.getNanosToWaitForRefill()).isPositive();
-        assertThat(limiter.tryConsume("b", RateLimiter.Scope.ANONYMOUS).isConsumed()).isTrue();
+        assertThat(limiter.tryConsume("b", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .isTrue();
         assertThat(registry.counter(RateLimiter.FALLBACK_METRIC).count()).isEqualTo(5);
-        assertThat(registry.counter(RateLimiter.REJECTED_METRIC, "scope", "anonymous").count()).isEqualTo(1);
+        assertThat(registry.counter(RateLimiter.REJECTED_METRIC, "scope", "anonymous")
+                        .count())
+                .isEqualTo(1);
         assertThat(gauge()).isZero();
     }
 
@@ -59,7 +64,8 @@ class RateLimiterTests {
         redis.down = true;
 
         for (int i = 0; i < 5; i++) {
-            assertThat(limiter.tryConsume("u", RateLimiter.Scope.USER).isConsumed()).isTrue();
+            assertThat(limiter.tryConsume("u", RateLimiter.Scope.USER).isConsumed())
+                    .isTrue();
         }
 
         assertThat(limiter.tryConsume("u", RateLimiter.Scope.USER).isConsumed()).isFalse();

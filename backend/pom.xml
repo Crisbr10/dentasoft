@@ -21,6 +21,9 @@
     <spring-modulith.version>2.2.0</spring-modulith.version>
     <springdoc.version>3.2.1</springdoc.version>
     <bucket4j.version>8.22.0</bucket4j.version>
+    <spotless.version>3.11.0</spotless.version>
+    <palantir-java-format.version>2.103.0</palantir-java-format.version>
+    <jacoco.version>0.8.16</jacoco.version>
   </properties>
 
   <!--
@@ -99,6 +102,17 @@
       <artifactId>testcontainers</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- Test scope until M01-T01 adds JDBC, Flyway and @ServiceConnection to the application. -->
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <dependencyManagement>
@@ -142,6 +156,58 @@
                   <artifactId>spring-boot-configuration-processor</artifactId>
                 </path>
               </annotationProcessorPaths>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Formatting: `mvnw spotless:apply` fixes it; `check` runs in `verify` and fails the build. -->
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <java>
+            <palantirJavaFormat>
+              <version>${palantir-java-format.version}</version>
+            </palantirJavaFormat>
+            <removeUnusedImports/>
+          </java>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <!--
+        Coverage report in target/site/jacoco/ (no minimum yet). The excluded classes have no logic of
+        our own, so the figure only measures code we write: the bootstrap class and generated code
+        (MapStruct's @Generated has SOURCE retention, so JaCoCo cannot filter it by itself).
+      -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <excludes>
+                <exclude>es/crisbr/dentasoft/DentasoftApplication.class</exclude>
+                <exclude>**/*MapperImpl.class</exclude>
+              </excludes>
             </configuration>
           </execution>
         </executions>

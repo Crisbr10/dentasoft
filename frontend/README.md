@@ -14,7 +14,18 @@ pnpm start                 # http://localhost:4200, con la API en localhost:8080
 pnpm lint                  # ESLint, incluida la regla de textos sin Transloco
 pnpm test --watch=false    # tests de los scripts (node --test) y de la app (Vitest)
 pnpm build                 # exige las variables de «Configuración»; no admite argumentos
+pnpm format                # aplica Prettier (pnpm format:check solo comprueba)
+pnpm api:gen               # regenera src/app/api desde el OpenAPI del backend local
 ```
+
+## Cliente de la API
+
+`src/app/api/` es código generado con [ng-openapi-gen](https://github.com/cyclosproject/ng-openapi-gen) a partir del OpenAPI del backend. **Va en el repositorio y no se edita a mano**. ESLint, Prettier y las revisiones de código no lo incluyen.
+
+- **Cuándo regenerarlo**: en el mismo PR que cambia un endpoint o un DTO del backend. Así el cliente nunca se desfasa de la API.
+- **Cómo**: arranca el backend con el perfil local (`cd backend; .\mvnw.cmd spring-boot:run`) y ejecuta `pnpm api:gen`. Por defecto lee `http://localhost:8080/v3/api-docs`; para leer otra URL, usa la variable `DENTASOFT_API_DOCS_URL`.
+- **Sin URL en el código**: `scripts/api-gen.mjs` quita `servers` del documento antes de generar, para que no quede ninguna URL escrita. La app fija la URL base del cliente desde `config.json` con `provideApiClient()` (`src/app/core/config/api-client.ts`). `no-hardcoded-urls` también revisa el código generado. Solo ignora en él las líneas que son enteramente comentario, como los enlaces a documentación. Para decidirlo usa el parser de TypeScript, así que una línea que mezcla un comentario y código se revisa igual.
+- La configuración del generador está en `ng-openapi-gen.json`. Los ficheros que dejan de generarse se borran solos.
 
 ## Estructura
 
@@ -22,13 +33,13 @@ pnpm build                 # exige las variables de «Configuración»; no admit
 | ------------------- | --------------------------------------------------------------------------------------- |
 | `src/app/core/`     | Configuración, i18n, iconos y layout base (cabecera, barra lateral y área de contenido) |
 | `src/app/shared/`   | Componentes, directivas y pipes reutilizables                                           |
-| `src/app/api/`      | Cliente generado con `pnpm api:gen` (M00-T06)                                           |
+| `src/app/api/`      | Cliente generado con `pnpm api:gen` (ver «Cliente de la API»)                           |
 | `src/app/features/` | Una carpeta por módulo funcional, con carga diferida                                    |
 | `src/assets/i18n/`  | Textos (`es.json`)                                                                      |
 | `src/assets/icons/` | Iconos SVG servidos desde el propio build                                               |
 | `src/styles.scss`   | Tema de Material 3 (`mat.theme`)                                                        |
 | `src/styles/`       | Paletas generadas y tokens de diseño (`--ds-*`)                                         |
-| `scripts/`          | Generación de `config.json` y de la CSP, y sus tests                                    |
+| `scripts/`          | Generación de `config.json`, de la CSP y del cliente de la API, y sus tests             |
 
 ## Configuración
 

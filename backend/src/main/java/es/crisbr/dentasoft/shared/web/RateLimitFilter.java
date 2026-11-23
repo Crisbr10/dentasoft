@@ -61,7 +61,8 @@ class RateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return EXEMPT_PATHS.contains(request.getRequestURI().substring(request.getContextPath().length()));
+        return EXEMPT_PATHS.contains(
+                request.getRequestURI().substring(request.getContextPath().length()));
     }
 
     @Override
@@ -69,9 +70,11 @@ class RateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         Principal user = request.getUserPrincipal();
         ConsumptionProbe probe = user != null
-                ? limiter.tryConsume(KEY_PREFIX + "user:" + hmac(user.getName().getBytes(StandardCharsets.UTF_8)),
+                ? limiter.tryConsume(
+                        KEY_PREFIX + "user:" + hmac(user.getName().getBytes(StandardCharsets.UTF_8)),
                         RateLimiter.Scope.USER)
-                : limiter.tryConsume(KEY_PREFIX + "ip:" + hmac(clientBytes(clientIpResolver.resolve(request))),
+                : limiter.tryConsume(
+                        KEY_PREFIX + "ip:" + hmac(clientBytes(clientIpResolver.resolve(request))),
                         RateLimiter.Scope.ANONYMOUS);
         if (probe.isConsumed()) {
             chain.doFilter(request, response);

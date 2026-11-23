@@ -50,17 +50,19 @@ class RateLimitPropertiesTests {
 
     @Test
     void rejectsANonPositiveLimit() {
-        runner.withPropertyValues(VALID_KEY, "dentasoft.rate-limit.anonymous-per-minute=0").run(context -> {
-            assertThat(context).hasFailed();
-            assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("anonymousPerMinute");
-        });
+        runner.withPropertyValues(VALID_KEY, "dentasoft.rate-limit.anonymous-per-minute=0")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("anonymousPerMinute");
+                });
     }
 
     @Test
     void neverPrintsTheKey() {
-        runner.withPropertyValues(VALID_KEY).run(context -> assertThat(
-                        context.getBean(RateLimitProperties.class).toString())
-                .doesNotContain("unit-test-key"));
+        runner.withPropertyValues(VALID_KEY)
+                .run(context -> assertThat(
+                                context.getBean(RateLimitProperties.class).toString())
+                        .doesNotContain("unit-test-key"));
     }
 
     @Configuration(proxyBeanMethods = false)
