@@ -4,6 +4,23 @@ dentasoft:
     app: http://localhost:4200
     api: http://localhost:8080
     auth: http://localhost:8180
+  rate-limit:
+    # Not a secret: it only hashes the IPs of the local Redis. Real environments must set their own.
+    key: ${DENTASOFT_RATE_LIMIT_KEY:local-development-only-not-a-secret}
+
+spring:
+  data:
+    redis:
+      # Same variable as infra/.env, so `mvnw spring-boot:run` reaches the local Redis.
+      password: ${DENTASOFT_REDIS_PASSWORD:}
+
+# Readable text instead of JSON, with the request ID in brackets.
+logging:
+  structured:
+    format:
+      console: ${DENTASOFT_LOG_FORMAT:}
+  pattern:
+    correlation: "[%X{requestId:-}] "
 
 management:
   endpoint:

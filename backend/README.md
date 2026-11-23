@@ -58,7 +58,16 @@ El jar empaquetado no activa ningún perfil por sí mismo: se elige con `SPRING_
 | `DENTASOFT_URLS_APP` | solo en `local`: `http://localhost:4200` | URL pública del frontend (`dentasoft.urls.app`) |
 | `DENTASOFT_URLS_API` | solo en `local`: `http://localhost:8080` | URL pública del backend (`dentasoft.urls.api`); es el servidor del documento OpenAPI |
 | `DENTASOFT_URLS_AUTH` | solo en `local`: `http://localhost:8180` | URL pública de Keycloak (`dentasoft.urls.auth`) |
-| `DENTASOFT_CORS_ALLOWED_ORIGINS` | `dentasoft.urls.app` | Orígenes CORS permitidos, separados por comas (`dentasoft.cors.allowed-origins`); el filtro llega con M00-T08 |
+| `DENTASOFT_CORS_ALLOWED_ORIGINS` | `dentasoft.urls.app` | Orígenes CORS permitidos, separados por comas (`dentasoft.cors.allowed-origins`) |
+| `SPRING_DATA_REDIS_HOST`, `SPRING_DATA_REDIS_PORT` | `localhost`, `6379` | Redis, donde se guardan los límites de peticiones |
+| `SPRING_DATA_REDIS_PASSWORD` | en `local`: `DENTASOFT_REDIS_PASSWORD` | Contraseña de Redis |
+| `DENTASOFT_RATE_LIMIT_KEY` | solo en `local`: un valor de desarrollo | Clave secreta (32 caracteres o más) del HMAC con el que se guardan IPs y usuarios en Redis. **Obligatoria fuera de `local`** |
+| `DENTASOFT_RATE_LIMIT_ANONYMOUS_PER_MINUTE` | `120` | Peticiones por minuto de cada IP sin usuario (`dentasoft.rate-limit.anonymous-per-minute`) |
+| `DENTASOFT_RATE_LIMIT_USER_PER_MINUTE` | `600` | Peticiones por minuto de cada usuario autenticado (`dentasoft.rate-limit.user-per-minute`) |
+| `DENTASOFT_RATE_LIMIT_ENABLED` | `true` | Desactiva el límite (solo para diagnosticar problemas); desactivado, no hace falta `DENTASOFT_RATE_LIMIT_KEY` |
+| `DENTASOFT_TRUSTED_PROXIES` | *(vacía)* | IPs o rangos CIDR de los proxies de confianza, separados por comas (`dentasoft.http.trusted-proxies`) |
+| `DENTASOFT_HTTP_MAX_REQUEST_BODY_SIZE` | `1MB` | Tamaño máximo del cuerpo de las peticiones que no son multipart (`dentasoft.http.max-request-body-size`) |
+| `DENTASOFT_LOG_FORMAT` | `ecs`; en `local`, texto | Formato de los logs: `ecs`, `logstash`, `gelf` o vacío para texto |
 
 `application.yml` no contiene secretos: cada valor que cambie por entorno se lee de una variable de entorno.
 
@@ -72,6 +81,22 @@ Reason: is required: set the DENTASOFT_URLS_API environment variable
 ```
 
 `NoHardcodedUrlsTests` falla si encuentra `crisbr.es` o una URL `https://` en `src/main`.
+
+## Seguridad transversal
+
+Filtros de `shared.web`, en este orden: ID de petición, cabeceras de seguridad, CORS, tamaño máximo, (Spring Security, desde M02-T02) y límite de peticiones.
+
+- **ID de petición**: cada petición lleva un `X-Request-Id`, que va al MDC (`requestId`) y vuelve en la respuesta. El que manda el cliente solo se acepta si tiene de 1 a 64 caracteres de `[A-Za-z0-9._-]`; si no, se genera uno nuevo y nunca se devuelve el recibido.
+- **Cabeceras**: CSP `default-src 'none'` (Swagger UI recibe la mínima para funcionar), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, HSTS, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, `Permissions-Policy` y `Cache-Control: no-store`.
+- **CORS** en `/api/**` y `/actuator/health/**`, solo para `DENTASOFT_CORS_ALLOWED_ORIGINS`. Sin credenciales (la API usa token Bearer). Cabeceras permitidas: `Authorization`, `Content-Type`, `X-Clinic-Id` y `X-Request-Id`; expuestas: `X-Request-Id` y `Retry-After`. El preflight se cachea una hora.
+- **Tamaño máximo**: un cuerpo de más de `DENTASOFT_HTTP_MAX_REQUEST_BODY_SIZE` devuelve 413 con `ProblemDetail`, también si llega sin `Content-Length`. Las subidas multipart se limitan con `spring.servlet.multipart.*`.
+- **Límite de peticiones** (Bucket4j sobre Redis): por usuario si la petición está autenticada y por IP si es anónima. Superarlo devuelve 429 con `ProblemDetail` y `Retry-After`. Las sondas `/actuator/health/liveness` y `/readiness` no cuentan. Las claves de Redis son HMAC-SHA256 con `DENTASOFT_RATE_LIMIT_KEY`: nunca guardan la IP ni el usuario en claro. Las IPv6 se agrupan por su prefijo /64.
+- **IP del cliente**: se usa la de la conexión. `CF-Connecting-IP` y `X-Forwarded-For` solo se leen si la conexión viene de un proxy de `DENTASOFT_TRUSTED_PROXIES`; en `X-Forwarded-For` el cliente es el primer salto que no es de confianza, leyendo de derecha a izquierda. Pon en la lista solo proxies que reescriben esas cabeceras.
+- **Si Redis no responde**, las peticiones no se bloquean: se aplica el mismo límite en memoria en cada instancia y tras el primer fallo, cada 5 segundos una sola petición vuelve a probar Redis y las demás no esperan. Cada llamada a Redis se corta al segundo, así que solo esperan las peticiones en curso cuando Redis se cuelga y, después, una por intervalo. Se escribe un aviso como mucho una vez por minuto, y la métrica `dentasoft.rate.limit.redis.available` baja a 0 (también hay `dentasoft.rate.limit.fallback`, `dentasoft.rate.limit.fallback.evicted` y `dentasoft.rate.limit.rejected`). `/actuator/health` no incluye Redis (`management.health.redis.enabled: false`), así que una caída de Redis no lo pone en `DOWN`; si más adelante Redis pasa a ser imprescindible, por ejemplo para colas, habrá que volver a incluirlo.
+
+### Logs
+
+En JSON, un objeto por línea ([Elastic Common Schema](https://www.elastic.co/guide/en/ecs/current/)), con el campo `requestId` en cada línea de una petición. En `local` se escriben en texto, con el ID entre corchetes. **Nunca se registran datos personales ni clínicos**: usa identificadores. Los errores 500 se registran con las clases y la traza de la excepción, pero sin sus mensajes, que pueden contener los datos que causaron el error.
 
 ## Endpoints de operación
 

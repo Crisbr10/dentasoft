@@ -7,7 +7,7 @@ import org.springframework.validation.annotation.Validated;
 
 /**
  * Origins allowed to call the API from a browser ({@code DENTASOFT_CORS_ALLOWED_ORIGINS}, comma separated).
- * Defaults to {@code dentasoft.urls.app}. The CORS filter that uses it arrives with M00-T08.
+ * Defaults to {@code dentasoft.urls.app}. Used by the CORS configuration in {@link WebConfiguration}.
  */
 @Validated
 @ConfigurationProperties("dentasoft.cors")

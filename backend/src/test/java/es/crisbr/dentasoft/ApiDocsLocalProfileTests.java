@@ -7,12 +7,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
+import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
+@Import(TestRedisConfiguration.class)
 class ApiDocsLocalProfileTests {
 
     @Autowired
@@ -47,5 +50,31 @@ class ApiDocsLocalProfileTests {
     @Test
     void exposesSwaggerUi() {
         assertThat(mvc.get().uri("/swagger-ui/index.html")).hasStatusOk();
+    }
+
+    @Test
+    void swaggerUiGetsAPolicyThatLetsItRenderButNotBeFramed() {
+        String policy = mvc.get()
+                .uri("/swagger-ui/index.html")
+                .exchange()
+                .getResponse()
+                .getHeader("Content-Security-Policy");
+
+        assertThat(policy)
+                .contains("default-src 'self'")
+                .contains("style-src 'self' 'unsafe-inline'")
+                .contains("frame-ancestors 'none'")
+                .doesNotContain("script-src");
+    }
+
+    @Test
+    void theApiDocumentKeepsTheStrictPolicy() {
+        assertThat(mvc.get().uri("/v3/api-docs"))
+                .hasHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+    }
+
+    @Test
+    void localProfileHasADevelopmentRateLimitKey(@Autowired Environment environment) {
+        assertThat(environment.getProperty("dentasoft.rate-limit.key")).hasSizeGreaterThanOrEqualTo(32);
     }
 }
