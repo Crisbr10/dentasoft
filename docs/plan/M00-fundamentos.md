@@ -42,6 +42,19 @@
   - [ ] `application.yml` sin secretos; perfil `local`
   - [ ] Manejador global de errores con `ProblemDetail`
   - [ ] springdoc expone `/v3/api-docs` y Swagger UI solo en perfiles no productivos
+- **Reparto de dependencias del backend**: cada dependencia entra con la tarea que la usa por primera vez.
+
+  | Tarea | Dependencias |
+  | --- | --- |
+  | M00-T02 | Web, Actuator, Validation, Spring Modulith, springdoc-openapi y Configuration Processor |
+  | M00-T06 | Testcontainers (PostgreSQL y Redis), Spotless y JaCoCo |
+  | M00-T08 | Spring Data Redis y Bucket4j |
+  | M01-T01 | Spring Data JPA, PostgreSQL y Flyway (con `flyway-database-postgresql`) |
+  | M02-T02 | Spring Security y OAuth2 Resource Server |
+  | M05 | AWS SDK v2 S3, Apache Tika, OpenHTMLtoPDF y Thymeleaf |
+  | M07-T02 | Spring Mail |
+
+  No se usa `spring-boot-docker-compose`: los servicios se levantan a mano desde `infra/`.
 
 ### M00-T03 · Infraestructura local con Docker Compose
 
