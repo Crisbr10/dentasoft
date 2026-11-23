@@ -1,0 +1,24 @@
+.home__title {
+  margin-block: 0 var(--ds-space-4);
+  font: var(--mat-sys-headline-small);
+}
+
+.home__health {
+  max-width: 32rem;
+}
+
+.home__status {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  margin: 0;
+
+  &[data-status='up'] mat-icon {
+    color: var(--ds-color-success);
+  }
+
+  &[data-status='down'] mat-icon,
+  &[data-status='unreachable'] mat-icon {
+    color: var(--mat-sys-error);
+  }
+}

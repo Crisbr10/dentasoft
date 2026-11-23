@@ -1,0 +1,37 @@
+@use '@angular/material' as mat;
+@use './styles/theme-colors' as colors;
+@use './styles/tokens';
+
+html {
+  @include tokens.tokens;
+
+  color-scheme: light;
+
+  @include mat.theme(
+    (
+      color: (
+        primary: colors.$primary-palette,
+        tertiary: colors.$tertiary-palette,
+        theme-type: light,
+      ),
+      typography: (
+        plain-family: var(--ds-font-family),
+        brand-family: var(--ds-font-family),
+      ),
+      density: 0,
+    )
+  );
+
+  @include mat.sidenav-overrides(
+    (
+      container-shape: 0,
+    )
+  );
+}
+
+body {
+  margin: 0;
+  font: var(--mat-sys-body-medium);
+  color: var(--mat-sys-on-surface);
+  background: var(--mat-sys-surface);
+}

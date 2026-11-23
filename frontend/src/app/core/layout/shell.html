@@ -1,0 +1,43 @@
+<mat-sidenav-container class="shell">
+  <mat-sidenav
+    #sidenav
+    class="shell__sidenav"
+    [mode]="isHandset() ? 'over' : 'side'"
+    [opened]="!isHandset()"
+  >
+    <nav [attr.aria-label]="'layout.mainNavigation' | transloco">
+      <mat-nav-list>
+        <a
+          mat-list-item
+          routerLink="/"
+          routerLinkActive
+          #home="routerLinkActive"
+          [routerLinkActiveOptions]="{ exact: true }"
+          [activated]="home.isActive"
+          (click)="isHandset() && sidenav.close()"
+        >
+          <mat-icon matListItemIcon svgIcon="home" />
+          <span matListItemTitle>{{ 'layout.nav.home' | transloco }}</span>
+        </a>
+      </mat-nav-list>
+    </nav>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="shell__main">
+    <mat-toolbar class="shell__header">
+      <button
+        mat-icon-button
+        type="button"
+        [attr.aria-label]="'layout.toggleMenu' | transloco"
+        (click)="sidenav.toggle()"
+      >
+        <mat-icon svgIcon="menu" />
+      </button>
+      <span class="shell__brand">{{ 'app.name' | transloco }}</span>
+    </mat-toolbar>
+
+    <main class="shell__content">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

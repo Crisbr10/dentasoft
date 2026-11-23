@@ -1,0 +1,23 @@
+.shell {
+  height: 100dvh;
+}
+
+.shell__sidenav {
+  width: var(--ds-sidebar-width);
+  padding-block: var(--ds-space-2);
+}
+
+.shell__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  gap: var(--ds-space-2);
+}
+
+.shell__brand {
+  font-weight: 600;
+}
+
+.shell__content {
+  padding: var(--ds-space-4);
+}
