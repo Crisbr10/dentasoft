@@ -23,8 +23,10 @@ import org.slf4j.LoggerFactory;
  * Token buckets shared by every instance through Redis, with a per-instance fallback.
  *
  * <p>If Redis fails, requests are not blocked: they are counted against an in-memory bucket of this instance
- * until Redis answers again. Every {@link #REDIS_RETRY_INTERVAL} a single request probes Redis; the others keep
- * using the local bucket, so a stalled Redis never holds more than one request at a time. Meanwhile a warning is
+ * until Redis answers again. Once a call has failed, a single request probes Redis every
+ * {@link #REDIS_RETRY_INTERVAL} and the others keep using the local bucket without waiting. Each Redis call times out
+ * after 1 second ({@link RedisBuckets}), so only the requests in flight when Redis starts to hang, and then one probe
+ * per interval, wait for it. Meanwhile a warning is
  * logged at most once per {@link #WARNING_INTERVAL} and the {@value #REDIS_AVAILABLE_METRIC} gauge drops to 0.
  */
 class RateLimiter {
