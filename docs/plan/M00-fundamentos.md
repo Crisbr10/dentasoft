@@ -42,6 +42,18 @@
   - [ ] `application.yml` sin secretos; perfil `local`
   - [ ] Manejador global de errores con `ProblemDetail`
   - [ ] springdoc expone `/v3/api-docs` y Swagger UI solo en perfiles no productivos
+  - [ ] Ningún dominio ni URL pública en el código ni en `application*.yml` fuera del perfil `local`; un test falla si encuentra `crisbr.es` o una URL `https://` fija en `backend/src/main`
+  - [ ] `dentasoft.urls` (`app`, `api`, `auth`) como record validado; valores por defecto solo en `local` y obligatorias por variables de entorno en el resto: sin ellas la app no arranca y el error dice cuál falta
+  - [ ] `dentasoft.cors.allowed-origins` preparada para M00-T08, por defecto `dentasoft.urls.app`; la URL del servidor en OpenAPI sale de `dentasoft.urls.api`
+- **URLs públicas** (requisito añadido el 2026-11-23: el dominio actual, `crisbr.es`, es temporal y cambiará):
+
+  | Variable | Propiedad | Valor en `local` |
+  | --- | --- | --- |
+  | `DENTASOFT_URLS_APP` | `dentasoft.urls.app` (frontend) | `http://localhost:4200` |
+  | `DENTASOFT_URLS_API` | `dentasoft.urls.api` (backend) | `http://localhost:8080` |
+  | `DENTASOFT_URLS_AUTH` | `dentasoft.urls.auth` (Keycloak) | `http://localhost:8180` |
+  | `DENTASOFT_CORS_ALLOWED_ORIGINS` | `dentasoft.cors.allowed-origins` (lista separada por comas) | `dentasoft.urls.app` |
+
 - **Reparto de dependencias del backend**: cada dependencia entra con la tarea que la usa por primera vez.
 
   | Tarea | Dependencias |

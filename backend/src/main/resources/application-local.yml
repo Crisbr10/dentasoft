@@ -1,4 +1,10 @@
 # Local development (activated by `mvnw spring-boot:run` or SPRING_PROFILES_ACTIVE=local).
+dentasoft:
+  urls:
+    app: http://localhost:4200
+    api: http://localhost:8080
+    auth: http://localhost:8180
+
 management:
   endpoint:
     health:

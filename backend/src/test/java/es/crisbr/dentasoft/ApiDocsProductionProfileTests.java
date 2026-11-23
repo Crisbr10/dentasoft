@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
+@WithTestUrls
 class ApiDocsProductionProfileTests {
 
     @Autowired
