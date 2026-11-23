@@ -7,7 +7,7 @@ SaaS de gestión para clínicas dentales: pacientes, agenda, odontograma 3D, cat
 | Carpeta | Contenido |
 | --- | --- |
 | `backend/` | Spring Boot 4 (Java 25), monolito modular con Spring Modulith |
-| `frontend/` | Angular 22 con PrimeNG y Transloco, desplegado en Vercel |
+| `frontend/` | Angular 22 con Angular Material y Transloco, desplegado en Vercel |
 | `mobile/` | App Expo de firma en tablet |
 | `infra/` | Docker Compose, Keycloak, PostgreSQL |
 | `docs/` | [Plan por módulos](docs/plan/README.md) y [decisiones de arquitectura](docs/adr/README.md) |

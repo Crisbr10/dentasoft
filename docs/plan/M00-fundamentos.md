@@ -7,7 +7,7 @@
 ## Alcance
 
 - Repositorio base, reglas para agentes, plan y plantillas de GitHub.
-- Esqueleto de backend (Spring Boot 4, Spring Modulith) y de frontend (Angular 22, PrimeNG, Transloco).
+- Esqueleto de backend (Spring Boot 4, Spring Modulith) y de frontend (Angular 22, Angular Material, Transloco).
 - Docker Compose local: PostgreSQL con pgvector, Keycloak, Redis, almacenamiento S3 (SeaweedFS), Mailpit y ClamAV.
 - Calidad (formato, cobertura, tests) y CI en GitHub Actions.
 - Base de seguridad transversal: cabeceras, CORS, errores, logs y límite de peticiones.
@@ -94,7 +94,7 @@
 
 - **Estado**: pendiente
 - **Depende de**: M00-T01
-- **Descripción**: Angular 22 sin SSR con pnpm, PrimeNG (tema y tokens de diseño), Transloco con `es.json`, ESLint y Prettier, estructura `core/shared/api/features`, layout base (barra lateral, cabecera, área de contenido) y página de inicio que llama a `/actuator/health`. Las URL de la API y de Keycloak no van escritas en el código: se generan en el build desde variables de entorno (`DENTASOFT_URLS_API`, `DENTASOFT_URLS_AUTH`), con `localhost` solo para desarrollo (ADR 0006).
+- **Descripción**: Angular 22 sin SSR con pnpm, Angular Material y CDK (tema y tokens de diseño, ADR 0008), Transloco con `es.json`, ESLint y Prettier, estructura `core/shared/api/features`, layout base (barra lateral, cabecera, área de contenido) y página de inicio que llama a `/actuator/health`. Las URL de la API y de Keycloak no van escritas en el código: se generan en el build desde variables de entorno (`DENTASOFT_URLS_API`, `DENTASOFT_URLS_AUTH`), con `localhost` solo para desarrollo (ADR 0006).
 - **Criterios de aceptación**:
   - [ ] `pnpm lint`, `pnpm test --watch=false` y `pnpm build` en verde
   - [ ] Ningún texto visible sin Transloco

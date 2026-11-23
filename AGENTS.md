@@ -23,7 +23,7 @@ SaaS multi-clínica de gestión para clínicas dentales: pacientes, agenda, odon
 | Ficheros | S3 compatible (SeaweedFS en local, ver ADR 0007) con AWS SDK v2 |
 | Email | SMTP: Mailpit en local, Resend en pruebas y producción |
 | WhatsApp | WhatsApp Cloud API de Meta |
-| Frontend | Angular 22 (standalone + signals), PrimeNG, Transloco (i18n), pnpm |
+| Frontend | Angular 22 (standalone + signals), Angular Material y CDK, Transloco (i18n), pnpm |
 | Tablet de firma | Expo (React Native) en `mobile/` |
 | Contenedores | Docker y Docker Compose, preparados para Kubernetes |
 
@@ -103,7 +103,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 - Una carpeta por módulo funcional en `src/app/features/` con carga diferida.
 - **Obligatorio**: ningún texto visible escrito a mano en plantillas o componentes: todo con Transloco (`src/assets/i18n/es.json`), aunque de momento solo haya español.
 - El cliente de la API se genera con `pnpm api:gen`; no escribas a mano DTO que ya existen en el backend.
-- Componentes de UI de PrimeNG; no mezcles otras librerías de componentes.
+- Componentes de UI de Angular Material y CDK (ADR 0008); no mezcles otras librerías de componentes.
 - La seguridad real está en el backend: ocultar un botón no es control de acceso.
 
 ### Tests

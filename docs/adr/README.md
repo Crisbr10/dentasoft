@@ -6,11 +6,12 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | --- | --- | --- |
 | [0001](0001-arquitectura-inicial.md) | Arquitectura inicial: monolito modular en contenedores | Aceptada |
 | [0002](0002-multi-clinica-rls.md) | Multi-clínica con una base de datos, `tenant_id` y Row Level Security | Aceptada |
-| [0003](0003-frontend-primeng-i18n.md) | Frontend Angular con PrimeNG e internacionalización con Transloco | Aceptada |
+| [0003](0003-frontend-primeng-i18n.md) | Frontend Angular con PrimeNG e internacionalización con Transloco | Sustituida por 0008 |
 | [0004](0004-firma-en-tablet-expo.md) | Firma de documentos con app Expo en tablet | Aceptada |
 | [0005](0005-ia-fuera-del-mvp.md) | IA fuera del MVP y limitada a tareas administrativas | Aceptada |
 | [0006](0006-dominio-intercambiable.md) | Dominio intercambiable: ninguna URL pública en el código | Aceptada |
 | [0007](0007-s3-local-seaweedfs.md) | Almacenamiento S3 local con SeaweedFS en lugar de MinIO | Aceptada |
+| [0008](0008-frontend-angular-material.md) | Frontend con Angular Material en lugar de PrimeNG (se mantiene Transloco) | Aceptada |
 
 ## Plantilla
 
