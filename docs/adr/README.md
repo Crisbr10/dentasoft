@@ -9,6 +9,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0003](0003-frontend-primeng-i18n.md) | Frontend Angular con PrimeNG e internacionalización con Transloco | Aceptada |
 | [0004](0004-firma-en-tablet-expo.md) | Firma de documentos con app Expo en tablet | Aceptada |
 | [0005](0005-ia-fuera-del-mvp.md) | IA fuera del MVP y limitada a tareas administrativas | Aceptada |
+| [0006](0006-dominio-intercambiable.md) | Dominio intercambiable: ninguna URL pública en el código | Aceptada |
 
 ## Plantilla
 

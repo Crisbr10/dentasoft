@@ -57,3 +57,12 @@
 - **Descripción**: listado por paciente y global con filtros de estado, editor de borrador, vista previa del PDF, historial de versiones y acciones de envío y aceptación.
 - **Criterios de aceptación**:
   - [ ] Las versiones enviadas se muestran en solo lectura
+
+### M11-T06 · Configuración de presupuestos
+
+- **Estado**: pendiente
+- **Depende de**: M11-T01, M02-T09
+- **Descripción**: sección «Presupuestos» del apartado de Configuración: validez por defecto, condiciones y texto legal del pie, prefijo de numeración e impuestos por defecto.
+- **Criterios de aceptación**:
+  - [ ] Los cambios solo afectan a presupuestos nuevos
+  - [ ] Editable por `ADMIN_CLINICA` y `FACTURACION`

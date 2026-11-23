@@ -27,7 +27,7 @@
 
 - **Estado**: pendiente
 - **Depende de**: M03-T04
-- **Descripción**: VPS en la UE (Hetzner u OVHcloud) endurecido, Traefik con HTTPS, `compose.prod.yml`, almacenamiento S3 de producción con versionado y bloqueo de objeto, y dominios definitivos.
+- **Descripción**: VPS en la UE (Hetzner u OVHcloud) endurecido, Traefik con HTTPS, `compose.prod.yml`, almacenamiento S3 de producción con versionado y bloqueo de objeto, y dominio definitivo siguiendo `docs/operaciones/cambio-de-dominio.md`.
 - **Criterios de aceptación**:
   - [ ] Solo los puertos 80 y 443 abiertos
   - [ ] Despliegue desde la CI con aprobación manual
@@ -54,10 +54,10 @@
 
 - **Estado**: pendiente
 - **Depende de**: —
-- **Descripción**: alta como autónomo; contrato de encargo del tratamiento con cada clínica y lista de subencargados; registro de actividades de tratamiento; política de privacidad y condiciones del servicio; valoración de la EIPD con un experto; procedimiento de brechas (72 horas); verificación del negocio en Meta, Tech Provider y Embedded Signup.
+- **Descripción**: alta como autónomo cuando la app esté completa (hasta entonces, las clínicas piloto usan WhatsApp con sus propias credenciales de Meta, M07-T07); contrato de encargo del tratamiento con cada clínica y lista de subencargados; registro de actividades de tratamiento; política de privacidad y condiciones del servicio; valoración de la EIPD con un experto; procedimiento de brechas (72 horas); verificación del negocio en Meta, Tech Provider y Embedded Signup.
 - **Criterios de aceptación**:
   - [ ] Documentos legales revisados por un profesional
-  - [ ] Una clínica conecta su número de WhatsApp con Embedded Signup
+  - [ ] Una clínica conecta su número de WhatsApp con Embedded Signup (nuevo modo en M07-T07)
 
 ### M13-T07 · Puesta en marcha de la primera clínica
 

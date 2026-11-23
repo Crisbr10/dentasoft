@@ -97,3 +97,12 @@
 - **Criterios de aceptación**:
   - [ ] Test con dos instancias: la tarea se ejecuta una vez
   - [ ] Un fallo en una clínica no detiene el proceso para las demás
+
+### M01-T09 · Consulta del registro de auditoría
+
+- **Estado**: pendiente
+- **Depende de**: M01-T07, M02-T09
+- **Descripción**: sección «Seguridad y auditoría» del apartado de Configuración para `ADMIN_CLINICA`: consulta paginada y filtrable del `audit_log` de su clínica (usuario, acción, entidad, fechas) y exportación a CSV.
+- **Criterios de aceptación**:
+  - [ ] Solo `ADMIN_CLINICA` y solo los registros de su clínica
+  - [ ] Consultar el registro también queda registrado

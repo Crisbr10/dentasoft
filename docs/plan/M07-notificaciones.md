@@ -2,6 +2,7 @@
 
 **Objetivo**: avisar a los pacientes por email y WhatsApp (recordatorios, confirmaciones, documentos) respetando su consentimiento, con reintentos y trazabilidad.
 **Depende de**: M03 (URL pública para webhooks), M06
+**Configuración**: sección «Comunicaciones» del [apartado de Configuración](configuracion.md)
 **Paquete backend**: `notifications` · **Frontend**: `features/settings/notifications`
 **FHIR**: Communication
 
@@ -9,7 +10,8 @@
 
 | Tabla | Campos principales |
 | --- | --- |
-| `channel_config` | `tenant_id`, `channel`, `enabled`, configuración (WhatsApp: `phone_number_id`, `waba_id`, token cifrado; email: remitente y `reply_to`) |
+| `channel_config` | `tenant_id`, `channel`, `enabled`, `verified_at` (última prueba correcta); email: `sender_name`, `reply_to`, pie; WhatsApp: `mode` (prueba de plataforma, credenciales propias, Embedded Signup), `phone_number_id`, `waba_id`, token cifrado (solo escritura) |
+| `notification_settings` | `tenant_id`, tipos de mensaje activos, horas de recordatorio, canal preferido y alternativo, horario permitido |
 | `message_template` | `tenant_id` (o global), `code`, `channel`, `locale`, contenido o nombre de plantilla de Meta |
 | `message_log` | `tenant_id`, `patient_id`, `channel`, `template_code`, `provider_message_id`, `status` (en cola, enviado, entregado, leído, fallido), `error`, fechas |
 
@@ -39,10 +41,11 @@ Regla: los mensajes llevan los datos justos (fecha y hora de la cita, nombre de 
 
 - **Estado**: pendiente
 - **Depende de**: M07-T01
-- **Descripción**: cliente de la WhatsApp Cloud API (versión por variable, ahora `v25.0`), envío de plantillas con variables y botones, y configuración por clínica (en el MVP, el número de prueba).
+- **Descripción**: cliente de la WhatsApp Cloud API (versión por variable, ahora `v25.0`), envío de plantillas con variables y botones, y envío con las credenciales de la clínica según su modo: número de prueba de la plataforma (solo desarrollo y pruebas) o **credenciales propias de la clínica** (su app de Meta). Embedded Signup queda para cuando Dentasoft sea Tech Provider (M13-T06). Versión de la API por variable de entorno.
 - **Criterios de aceptación**:
   - [ ] Token guardado cifrado y nunca en logs
   - [ ] Plantilla `recordatorio_cita` creada y aprobada en Meta (en español)
+  - [ ] Dos clínicas con credenciales distintas envían cada una desde su número (test con el cliente simulado)
 
 ### M07-T04 · Webhooks de WhatsApp y Resend
 
@@ -66,7 +69,20 @@ Regla: los mensajes llevan los datos justos (fecha y hora de la cita, nombre de 
 
 - **Estado**: pendiente
 - **Depende de**: M07-T05
-- **Descripción**: configuración de canales y horas de recordatorio por clínica, y pestaña de mensajes enviados en la ficha del paciente con su estado.
+- **Descripción**: pestaña de mensajes enviados en la ficha del paciente y listado general de envíos con su estado. La configuración de canales está en M07-T07.
 - **Criterios de aceptación**:
-  - [ ] Solo `ADMIN_CLINICA` configura canales
-  - [ ] Historial filtrable por canal y estado
+  - [ ] Historial filtrable por canal, tipo y estado
+  - [ ] `RECEPCION` puede reenviar un mensaje fallido
+
+### M07-T07 · Configuración de comunicaciones por clínica
+
+- **Estado**: pendiente
+- **Depende de**: M07-T03, M02-T09
+- **Descripción**: sección «Comunicaciones» del apartado de Configuración (ver `configuracion.md`): activar email y WhatsApp por clínica, remitente y `Reply-To`, modo de WhatsApp y credenciales propias (token de solo escritura), tipos de mensaje activos, horas de recordatorio, canal preferido y alternativo, horario permitido, plantillas y botón «Enviar prueba». A nivel de plataforma, `PLATFORM_ADMIN` configura el proveedor de email común, la app de Meta (webhook) y las plantillas por defecto.
+- **Criterios de aceptación**:
+  - [ ] Un canal no se puede activar sin una prueba de envío correcta
+  - [ ] El token de WhatsApp nunca vuelve al navegador; solo se muestra «configurado · ••••1234»
+  - [ ] Validación de las credenciales contra la API de Meta al guardarlas
+  - [ ] Desactivar un canal o un tipo de mensaje detiene los envíos pendientes de ese tipo
+  - [ ] Cada cambio queda en `audit_log` sin valores secretos
+  - [ ] Solo `ADMIN_CLINICA` edita; `RECEPCION` ve el estado de los canales

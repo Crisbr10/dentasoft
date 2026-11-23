@@ -94,12 +94,13 @@
 
 - **Estado**: pendiente
 - **Depende de**: M00-T01
-- **Descripción**: Angular 22 sin SSR con pnpm, PrimeNG (tema y tokens de diseño), Transloco con `es.json`, ESLint y Prettier, estructura `core/shared/api/features`, layout base (barra lateral, cabecera, área de contenido) y página de inicio que llama a `/actuator/health`.
+- **Descripción**: Angular 22 sin SSR con pnpm, PrimeNG (tema y tokens de diseño), Transloco con `es.json`, ESLint y Prettier, estructura `core/shared/api/features`, layout base (barra lateral, cabecera, área de contenido) y página de inicio que llama a `/actuator/health`. Las URL de la API y de Keycloak no van escritas en el código: se generan en el build desde variables de entorno (`DENTASOFT_URLS_API`, `DENTASOFT_URLS_AUTH`), con `localhost` solo para desarrollo (ADR 0006).
 - **Criterios de aceptación**:
   - [ ] `pnpm lint`, `pnpm test --watch=false` y `pnpm build` en verde
   - [ ] Ningún texto visible sin Transloco
   - [ ] `.nvmrc` con la versión de Node
   - [ ] `vercel.json` con reescrituras de SPA y cabeceras de seguridad
+  - [ ] Ningún dominio escrito en `src/`; un build con otras variables apunta a otro dominio sin tocar código
 
 ### M00-T06 · Calidad y tests base
 

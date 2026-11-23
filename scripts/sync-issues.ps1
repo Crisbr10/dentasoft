@@ -8,6 +8,8 @@
   - Un issue por cada tarea "### Mxx-Tyy <punto medio> Titulo" de la seccion de tareas.
   - Idempotente: si ya existe un issue cuyo titulo empieza por el ID de la tarea, no lo crea otra vez.
   - Las tareas con "Estado: hecho" se crean cerradas.
+  - Con -Update, ademas, reescribe el cuerpo de los issues que ya existen con el texto actual del plan
+    (util cuando se cambia la descripcion o los criterios de una tarea). No toca titulo, estado ni etiquetas.
 
   Requiere GitHub CLI autenticado:  winget install GitHub.cli ;  gh auth login
 
@@ -15,10 +17,12 @@
   .\scripts\sync-issues.ps1 -DryRun
   .\scripts\sync-issues.ps1
   .\scripts\sync-issues.ps1 -Modulo M04
+  .\scripts\sync-issues.ps1 -Update -DryRun
 #>
 param(
   [string]$Modulo = "",
-  [switch]$DryRun
+  [switch]$DryRun,
+  [switch]$Update
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,7 +41,7 @@ if (-not $repo) { throw "No se pudo identificar el repositorio. Ejecuta el scrip
 
 $script:labels     = @(gh label list --limit 500 --json name -q ".[].name")
 $script:milestones = @(gh api "repos/$repo/milestones?state=all&per_page=100" | ConvertFrom-Json)
-$existingTitles    = @(gh issue list --state all --limit 2000 --json title -q ".[].title")
+$existingIssues    = @(gh issue list --state all --limit 2000 --json number,title | ConvertFrom-Json)
 
 function Ensure-Label([string]$name, [string]$color, [string]$desc) {
   if ($script:labels -contains $name) { return }
@@ -82,7 +86,7 @@ $files = Get-ChildItem $planDir -Filter "M*.md" | Sort-Object Name
 if ($Modulo) { $files = $files | Where-Object { $_.Name -like "$Modulo-*" } }
 if (-not $files) { throw "No hay ficheros de modulo que coincidan." }
 
-$created = 0; $skipped = 0
+$created = 0; $skipped = 0; $updated = 0
 foreach ($file in $files) {
   $lines = Get-Content $file.FullName -Encoding UTF8
   $moduleTitle = (($lines | Where-Object { $_ -match "^# " } | Select-Object -First 1) -replace "^# ", "").Trim()
@@ -95,9 +99,22 @@ foreach ($file in $files) {
 
   foreach ($task in (Get-Tasks $lines)) {
     $issueTitle = "$($task.Id) $dot $($task.Title)"
-    if ($existingTitles | Where-Object { $_.StartsWith($task.Id) }) { $skipped++; continue }
     $done = $task.Body -match "\*\*Estado\*\*:\s*hecho"
     $issueBody = "$($task.Body)`n`n---`nModulo: **$moduleTitle** - especificacion en [docs/plan/$($file.Name)]($fileUrl)."
+    $existing = $existingIssues | Where-Object { $_.title.StartsWith($task.Id) } | Select-Object -First 1
+    if ($existing) {
+      if ($Update) {
+        if ($DryRun) { Write-Host "[dry-run] actualizar #$($existing.number) $($task.Id)"; continue }
+        $tmpU = New-TemporaryFile
+        [System.IO.File]::WriteAllText($tmpU.FullName, $issueBody, (New-Object System.Text.UTF8Encoding($false)))
+        gh issue edit $existing.number --body-file $tmpU.FullName | Out-Null
+        Remove-Item $tmpU.FullName
+        Write-Host "~ actualizado #$($existing.number) $($task.Id)"
+        $updated++
+      }
+      else { $skipped++ }
+      continue
+    }
     if ($DryRun) { Write-Host "[dry-run] issue $issueTitle$(if ($done) { ' (cerrado)' })"; continue }
     $tmp = New-TemporaryFile
     [System.IO.File]::WriteAllText($tmp.FullName, $issueBody, (New-Object System.Text.UTF8Encoding($false)))
@@ -109,4 +126,4 @@ foreach ($file in $files) {
   }
 }
 Write-Host ""
-Write-Host "Issues creados: $created. Ya existentes: $skipped."
+Write-Host "Issues creados: $created. Actualizados: $updated. Ya existentes sin cambios: $skipped."

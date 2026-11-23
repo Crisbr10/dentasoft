@@ -72,3 +72,12 @@
 - **Criterios de aceptación**:
   - [ ] Alerta visible de alergias graves en la cabecera de la ficha
   - [ ] Formularios accesibles (teclado, etiquetas) y textos con Transloco
+
+### M04-T07 · Privacidad y RGPD de la clínica
+
+- **Estado**: pendiente
+- **Depende de**: M04-T04, M02-T09
+- **Descripción**: sección «Privacidad y RGPD» del apartado de Configuración: textos legales de la clínica (información de privacidad para pacientes), finalidades de consentimiento disponibles, plazo de conservación aplicable y acceso a la exportación de datos de un paciente.
+- **Criterios de aceptación**:
+  - [ ] Los textos legales tienen versión y fecha, y el consentimiento guarda qué versión aceptó el paciente
+  - [ ] El plazo de conservación no puede ser inferior al mínimo legal configurado por la plataforma

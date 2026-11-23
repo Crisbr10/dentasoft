@@ -2,7 +2,7 @@
 
 **Objetivo**: que el personal entre con Keycloak (con doble factor), trabaje en una o varias clínicas y solo pueda hacer lo que su rol permite en cada una.
 **Depende de**: M01
-**Paquete backend**: `identity` · **Frontend**: `core/auth`, `features/users`
+**Paquete backend**: `identity` · **Frontend**: `core/auth`, `features/users`, `features/settings`
 
 ## Alcance
 
@@ -37,11 +37,12 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 - **Estado**: pendiente
 - **Depende de**: M00-T03
-- **Descripción**: realm `dentasoft` con cliente público `dentasoft-web` (PKCE S256), scope `dentasoft-api` con audiencia, organizaciones activadas, OTP obligatorio, protección contra fuerza bruta, política de contraseñas y SMTP a Mailpit; exportado a `infra/keycloak/realm-dentasoft.json` e importado al arrancar.
+- **Descripción**: realm `dentasoft` con cliente público `dentasoft-web` (PKCE S256), scope `dentasoft-api` con audiencia, organizaciones activadas, OTP obligatorio, protección contra fuerza bruta, política de contraseñas y SMTP a Mailpit; exportado a `infra/keycloak/realm-dentasoft.json` e importado al arrancar. Redirect URIs, orígenes web y SMTP se parametrizan con variables de entorno (ADR 0006).
 - **Criterios de aceptación**:
   - [ ] `docker compose up` deja el realm listo sin pasos manuales
   - [ ] El fichero exportado no contiene contraseñas de usuarios reales
   - [ ] Usuarios de prueba (inventados) documentados para local
+  - [ ] Ningún dominio escrito en el JSON del realm: redirect URIs y orígenes salen de variables
 
 ### M02-T02 · Spring Security como Resource Server
 
@@ -108,3 +109,22 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Criterios de aceptación**:
   - [ ] Textos con Transloco y formularios validados
   - [ ] Flujo completo: crear clínica → invitar administrador → el administrador invita a un odontólogo
+
+### M02-T09 · Apartado de Configuración
+
+- **Estado**: pendiente
+- **Depende de**: M02-T07, M01-T06
+- **Descripción**: marco del apartado de Configuración (ver `configuracion.md`): ruta `/configuracion` con menú de secciones filtrado por rol, guardias por sección, patrón común de formulario (guardar, descartar, validación del servidor) y componente para secretos de solo escritura. En el backend, endpoint que devuelve las secciones visibles para el usuario y auditoría de cambios de configuración.
+- **Criterios de aceptación**:
+  - [ ] Cada rol ve exactamente las secciones de la matriz de `configuracion.md` (test por rol)
+  - [ ] Acceder por URL a una sección no permitida → página de «sin acceso» y 403 en la API
+  - [ ] Las secciones ya existentes (clínica, gabinetes, usuarios, profesionales) cuelgan de este apartado
+
+### M02-T10 · Preferencias personales
+
+- **Estado**: pendiente
+- **Depende de**: M02-T09
+- **Descripción**: preferencias de cada usuario (idioma de la interfaz, vista de agenda por defecto, profesional o gabinete por defecto) guardadas en el backend y aplicadas al iniciar sesión.
+- **Criterios de aceptación**:
+  - [ ] Las preferencias siguen al usuario en cualquier navegador
+  - [ ] Valores por defecto de la clínica cuando el usuario no ha elegido

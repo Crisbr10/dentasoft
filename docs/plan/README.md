@@ -1,6 +1,6 @@
 # Plan del MVP de Dentasoft
 
-El MVP se construye en **14 módulos funcionales** que se desarrollan en orden. Cada módulo tiene su fichero en esta carpeta con objetivo, alcance, modelo de datos y tareas numeradas con criterios de aceptación. Lo que queda fuera del MVP está en [`backlog-post-mvp.md`](backlog-post-mvp.md).
+El MVP se construye en **14 módulos funcionales** que se desarrollan en orden. Cada módulo tiene su fichero en esta carpeta con objetivo, alcance, modelo de datos y tareas numeradas con criterios de aceptación. Lo que queda fuera del MVP está en [`backlog-post-mvp.md`](backlog-post-mvp.md). El apartado de Configuración (secciones, permisos por rol y qué tarea construye cada sección) está en [`configuracion.md`](configuracion.md).
 
 ## Orden de desarrollo
 
@@ -81,7 +81,7 @@ gh auth login                 # una sola vez
 .\scripts\sync-issues.ps1 -Modulo M04    # solo un módulo
 ```
 
-El script no duplica: si ya existe un issue cuyo título empieza por el ID de la tarea, lo salta.
+El script no duplica: si ya existe un issue cuyo título empieza por el ID de la tarea, lo salta. Si has cambiado la descripción o los criterios de tareas que ya tienen issue, añade `-Update` para reescribir sus cuerpos con el texto actual del plan (no toca título, estado ni etiquetas).
 
 - El ciclo de cada tarea (tomar el issue, rama, PR en borrador con `Closes #N`, cierre al fusionar) está en [`AGENTS.md`](../../AGENTS.md#flujo-de-trabajo-con-github-issues). En el mismo PR se cambia el **Estado** de la tarea a `hecho` en su fichero; al terminar un módulo, se actualiza su fila en la tabla de arriba.
 - El tablero es el Project **Dentasoft MVP** (columnas Pendiente, En curso, En revisión y Hecho), que se mueve solo con los issues y PR.

@@ -2,10 +2,11 @@
 
 **Objetivo**: tener la app desplegada en el servidor de casa y en Vercel con cada fusión en `main`, accesible por HTTPS, para probar de extremo a extremo y recibir webhooks.
 **Depende de**: M02
-**Infra**: servidor Ubuntu 24.04 con Docker 29 (ya instalados), Cloudflare (`crisbr.es`), Vercel
+**Infra**: servidor Ubuntu 24.04 con Docker 29 (ya instalados), Cloudflare, Vercel
+**Dominio**: temporal (`crisbr.es`). Todo hostname se configura por variables; para cambiarlo, sigue [`docs/operaciones/cambio-de-dominio.md`](../operaciones/cambio-de-dominio.md)
 **Solo datos inventados**: este entorno nunca tiene datos de pacientes reales.
 
-## Hostnames
+## Hostnames actuales (dominio temporal)
 
 | Servicio | URL |
 | --- | --- |
