@@ -1,0 +1,32 @@
+name: Tarea del plan
+description: Tarea de un módulo del plan (normalmente la crea scripts/sync-issues.ps1)
+title: "Mxx-Tyy · "
+labels: ["tipo:tarea"]
+body:
+  - type: input
+    id: modulo
+    attributes:
+      label: Módulo
+      placeholder: "M04 · Pacientes"
+    validations:
+      required: true
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Descripción
+      description: Qué hay que construir.
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: input
+    id: depende
+    attributes:
+      label: Depende de
+      placeholder: "M04-T01"
