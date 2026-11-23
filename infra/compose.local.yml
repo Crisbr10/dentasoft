@@ -50,6 +50,8 @@ services:
     image: dentasoft-backend:local
     environment:
       SPRING_PROFILES_ACTIVE: local
+      # Graceful shutdown timeout: keep it below stop_grace_period.
+      SHUTDOWN_TIMEOUT: 30s
       # Public URLs: what the browser sees, so localhost even inside Docker.
       DENTASOFT_URLS_APP: http://localhost:4200
       DENTASOFT_URLS_API: http://localhost:8080
@@ -94,11 +96,13 @@ services:
     cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    # Longer than the graceful shutdown timeout (SHUTDOWN_TIMEOUT, 30s) so Docker does not
-    # kill the JVM while it is still finishing requests.
+    # Longer than SHUTDOWN_TIMEOUT (above) so Docker does not kill the JVM while it is still
+    # finishing requests. If you raise one, raise the other.
     stop_grace_period: 40s
     deploy:
       resources:
         limits:
+          # With -XX:MaxRAMPercentage=75 (Dockerfile) the heap gets about 576 MB; the rest is
+          # for metaspace, thread stacks and the 64 MB /tmp tmpfs, which also counts here.
           memory: 768m
     restart: unless-stopped
