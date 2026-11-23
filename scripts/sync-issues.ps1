@@ -4,12 +4,15 @@
 
 .DESCRIPTION
   - Un milestone por modulo (titulo = primera linea "# ..." del fichero).
-  - Una etiqueta por modulo (modulo:M04) y la etiqueta comun tipo:tarea.
+  - Una etiqueta por modulo (modulo:M04) y las etiquetas comunes tipo:tarea y tipo:bug.
   - Un issue por cada tarea "### Mxx-Tyy <punto medio> Titulo" de la seccion de tareas.
   - Idempotente: si ya existe un issue cuyo titulo empieza por el ID de la tarea, no lo crea otra vez.
   - Las tareas con "Estado: hecho" se crean cerradas.
   - Con -Update, ademas, reescribe el cuerpo de los issues que ya existen con el texto actual del plan
     (util cuando se cambia la descripcion o los criterios de una tarea). No toca titulo, estado ni etiquetas.
+
+  Usa solo la API REST de GitHub (no GraphQL) y espera entre escrituras para no superar los limites
+  de GitHub (incluido el limite secundario de creacion de contenido).
 
   Requiere GitHub CLI autenticado:  winget install GitHub.cli ;  gh auth login
 
@@ -17,17 +20,19 @@
   .\scripts\sync-issues.ps1 -DryRun
   .\scripts\sync-issues.ps1
   .\scripts\sync-issues.ps1 -Modulo M04
-  .\scripts\sync-issues.ps1 -Update -DryRun
+  .\scripts\sync-issues.ps1 -Update -Modulo M07
 #>
 param(
   [string]$Modulo = "",
   [switch]$DryRun,
-  [switch]$Update
+  [switch]$Update,
+  [int]$PauseSeconds = 3
 )
 
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
+$utf8 = New-Object System.Text.UTF8Encoding($false)
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
   throw "Falta GitHub CLI. Instala con 'winget install GitHub.cli' y ejecuta 'gh auth login'."
@@ -36,27 +41,58 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
 $root    = Split-Path -Parent $PSScriptRoot
 $planDir = Join-Path $root "docs\plan"
 $dot     = [char]0x00B7
-$repo    = gh repo view --json nameWithOwner -q .nameWithOwner
-if (-not $repo) { throw "No se pudo identificar el repositorio. Ejecuta el script dentro del repo." }
 
-$script:labels     = @(gh label list --limit 500 --json name -q ".[].name")
-$script:milestones = @(gh api "repos/$repo/milestones?state=all&per_page=100" | ConvertFrom-Json)
-$existingIssues    = @(gh issue list --state all --limit 2000 --json number,title | ConvertFrom-Json)
+# Repositorio a partir del remoto de git (sin llamar a la API)
+$remote = git -C $root remote get-url origin
+if ($remote -notmatch "github\.com[:/](?<repo>[^/]+/[^/]+?)(\.git)?$") {
+  throw "No se pudo leer el repositorio del remoto 'origin': $remote"
+}
+$repo = $Matches["repo"]
+Write-Host "Repositorio: $repo"
+
+function Invoke-Gh {
+  # Ejecuta gh y falla con un mensaje claro si devuelve error
+  $out = & gh @args
+  if ($LASTEXITCODE -ne 0) { throw "Fallo: gh $($args -join ' ')" }
+  return $out
+}
+
+function Write-JsonFile($obj) {
+  $tmp = New-TemporaryFile
+  [System.IO.File]::WriteAllText($tmp.FullName, ($obj | ConvertTo-Json -Depth 5), $utf8)
+  return $tmp.FullName
+}
+
+function Get-Paged([string]$path, [string]$jq) {
+  $lines = Invoke-Gh api $path --paginate --jq $jq
+  $items = @()
+  foreach ($l in $lines) { if ("$l".Trim()) { $items += ("$l" | ConvertFrom-Json) } }
+  return $items
+}
+
+$labels     = @(Get-Paged "repos/$repo/labels?per_page=100" ".[] | {name}") | ForEach-Object { $_.name }
+$milestones = @(Get-Paged "repos/$repo/milestones?state=all&per_page=100" ".[] | {number, title}")
+$issues     = @(Get-Paged "repos/$repo/issues?state=all&per_page=100" ".[] | select(.pull_request | not) | {number, title}")
+Write-Host "Etiquetas: $($labels.Count) - Milestones: $($milestones.Count) - Issues: $($issues.Count)"
 
 function Ensure-Label([string]$name, [string]$color, [string]$desc) {
   if ($script:labels -contains $name) { return }
   if ($DryRun) { Write-Host "[dry-run] etiqueta $name"; return }
-  gh label create $name --color $color --description $desc | Out-Null
+  Invoke-Gh api "repos/$repo/labels" -f "name=$name" -f "color=$color" -f "description=$desc" | Out-Null
   $script:labels += $name
   Write-Host "+ etiqueta $name"
+  Start-Sleep -Seconds $PauseSeconds
 }
 
 function Ensure-Milestone([string]$title, [string]$desc) {
-  if ($script:milestones | Where-Object { $_.title -eq $title }) { return }
-  if ($DryRun) { Write-Host "[dry-run] milestone $title"; return }
-  $created = gh api "repos/$repo/milestones" -f "title=$title" -f "description=$desc" | ConvertFrom-Json
-  $script:milestones += $created
+  $found = $script:milestones | Where-Object { $_.title -eq $title } | Select-Object -First 1
+  if ($found) { return $found.number }
+  if ($DryRun) { Write-Host "[dry-run] milestone $title"; return 0 }
+  $created = Invoke-Gh api "repos/$repo/milestones" -f "title=$title" -f "description=$desc" | ConvertFrom-Json
+  $script:milestones += [pscustomobject]@{ number = $created.number; title = $created.title }
   Write-Host "+ milestone $title"
+  Start-Sleep -Seconds $PauseSeconds
+  return $created.number
 }
 
 function Get-Tasks([string[]]$lines) {
@@ -95,34 +131,38 @@ foreach ($file in $files) {
   $fileUrl = "https://github.com/$repo/blob/main/docs/plan/$($file.Name)"
 
   Ensure-Label $label "1D76DB" $moduleTitle
-  Ensure-Milestone $moduleTitle "Especificacion: $fileUrl"
+  $milestoneNumber = Ensure-Milestone $moduleTitle "Especificacion: $fileUrl"
 
   foreach ($task in (Get-Tasks $lines)) {
     $issueTitle = "$($task.Id) $dot $($task.Title)"
     $done = $task.Body -match "\*\*Estado\*\*:\s*hecho"
     $issueBody = "$($task.Body)`n`n---`nModulo: **$moduleTitle** - especificacion en [docs/plan/$($file.Name)]($fileUrl)."
-    $existing = $existingIssues | Where-Object { $_.title.StartsWith($task.Id) } | Select-Object -First 1
+    $existing = $issues | Where-Object { $_.title.StartsWith($task.Id) } | Select-Object -First 1
+
     if ($existing) {
-      if ($Update) {
-        if ($DryRun) { Write-Host "[dry-run] actualizar #$($existing.number) $($task.Id)"; continue }
-        $tmpU = New-TemporaryFile
-        [System.IO.File]::WriteAllText($tmpU.FullName, $issueBody, (New-Object System.Text.UTF8Encoding($false)))
-        gh issue edit $existing.number --body-file $tmpU.FullName | Out-Null
-        Remove-Item $tmpU.FullName
-        Write-Host "~ actualizado #$($existing.number) $($task.Id)"
-        $updated++
-      }
-      else { $skipped++ }
+      if (-not $Update) { $skipped++; continue }
+      if ($DryRun) { Write-Host "[dry-run] actualizar #$($existing.number) $($task.Id)"; continue }
+      $json = Write-JsonFile @{ body = $issueBody }
+      Invoke-Gh api -X PATCH "repos/$repo/issues/$($existing.number)" --input $json | Out-Null
+      Remove-Item $json
+      Write-Host "~ actualizado #$($existing.number) $($task.Id)"
+      $updated++
+      Start-Sleep -Seconds $PauseSeconds
       continue
     }
+
     if ($DryRun) { Write-Host "[dry-run] issue $issueTitle$(if ($done) { ' (cerrado)' })"; continue }
-    $tmp = New-TemporaryFile
-    [System.IO.File]::WriteAllText($tmp.FullName, $issueBody, (New-Object System.Text.UTF8Encoding($false)))
-    $url = gh issue create --title $issueTitle --body-file $tmp.FullName --label $label --label "tipo:tarea" --milestone $moduleTitle
-    Remove-Item $tmp.FullName
-    if ($done) { gh issue close $url --reason completed | Out-Null }
-    Write-Host "+ $issueTitle"
+    $payload = @{ title = $issueTitle; body = $issueBody; labels = @($label, "tipo:tarea"); milestone = $milestoneNumber }
+    $json = Write-JsonFile $payload
+    $new = Invoke-Gh api "repos/$repo/issues" --input $json | ConvertFrom-Json
+    Remove-Item $json
+    if ($done) {
+      Invoke-Gh api -X PATCH "repos/$repo/issues/$($new.number)" -f "state=closed" -f "state_reason=completed" | Out-Null
+    }
+    $issues += [pscustomobject]@{ number = $new.number; title = $issueTitle }
+    Write-Host "+ #$($new.number) $issueTitle"
     $created++
+    Start-Sleep -Seconds $PauseSeconds
   }
 }
 Write-Host ""
