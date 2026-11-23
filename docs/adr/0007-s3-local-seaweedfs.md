@@ -11,7 +11,7 @@ ADR 0001 preveía MinIO como almacenamiento S3 compatible en local. MinIO dejó 
 ## Decisión
 
 - En local, el almacenamiento S3 es **SeaweedFS** (`chrislusf/seaweedfs`, Apache 2.0), con la versión fijada en `infra/.env.example`.
-- Un contenedor de un solo uso con AWS CLI crea el bucket y activa el versionado.
+- Un contenedor con AWS CLI crea el bucket, activa el versionado y se queda en reposo, sano, cuando el bucket está listo.
 - El backend sigue hablando S3 con AWS SDK v2 y un endpoint configurable: ningún código depende de SeaweedFS.
 
 ## Consecuencias

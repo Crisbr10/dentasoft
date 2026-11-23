@@ -71,7 +71,7 @@ Las tablas y sus permisos son cosa de las migraciones de Flyway (M01-T01), y el 
 
 En local, el almacenamiento S3 es SeaweedFS en lugar de MinIO. El motivo y las alternativas están en el [ADR 0007](../docs/adr/0007-s3-local-seaweedfs.md).
 
-El contenedor de un solo uso `seaweedfs-init` (AWS CLI) crea el bucket `dentasoft-docs` y activa el versionado; se puede repetir sin problemas.
+El contenedor `seaweedfs-init` (AWS CLI) crea el bucket `dentasoft-docs`, activa el versionado y se queda en reposo; está sano cuando el bucket está listo. Se puede repetir sin problemas.
 
 Solo la API S3 (puerto 8333) comprueba las credenciales. Los demás componentes que arranca SeaweedFS (master, volume y filer) escuchan sin autenticación dentro de la red de Docker. Por eso `compose.local.yml` publica solo el 8333, y en `127.0.0.1`: no publiques ningún otro puerto de SeaweedFS.
 
@@ -97,5 +97,5 @@ docker compose @c exec postgres psql -U postgres -d dentasoft -c "SELECT extname
 "CREATE TABLE probe (id int);" | docker compose @c exec -T postgres sh -c 'PGPASSWORD=$DENTASOFT_DB_APP_PASSWORD psql -h 127.0.0.1 -U dentasoft_app -d dentasoft -v ON_ERROR_STOP=1'
 
 # Versionado del bucket (debe responder "Enabled")
-docker compose @c run --rm --entrypoint aws seaweedfs-init --endpoint-url http://seaweedfs:8333 s3api get-bucket-versioning --bucket dentasoft-docs
+docker compose @c exec seaweedfs-init aws --endpoint-url http://seaweedfs:8333 s3api get-bucket-versioning --bucket dentasoft-docs
 ```

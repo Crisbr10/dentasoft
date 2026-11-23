@@ -137,7 +137,9 @@ services:
           memory: 512m
     restart: unless-stopped
 
-  # One-shot job: creates the documents bucket with versioning. Idempotent.
+  # Creates the documents bucket with versioning (idempotent), then stays idle and reports
+  # healthy. It does not exit on purpose: `up --wait` fails on an exited container that no
+  # service depends on, for example when only another service is recreated.
   seaweedfs-init:
     image: ${AWS_CLI_IMAGE:?set AWS_CLI_IMAGE in .env}
     environment:
@@ -156,15 +158,23 @@ services:
         $$s3 put-bucket-versioning --bucket "$$DENTASOFT_S3_BUCKET"
         --versioning-configuration Status=Enabled;
         $$s3 get-bucket-versioning --bucket "$$DENTASOFT_S3_BUCKET" | grep -q Enabled;
-        echo "Bucket $$DENTASOFT_S3_BUCKET ready with versioning enabled"
+        echo "Bucket $$DENTASOFT_S3_BUCKET ready with versioning enabled";
+        touch /tmp/ready;
+        exec sleep infinity
     depends_on:
       seaweedfs:
         condition: service_healthy
+    healthcheck:
+      # The marker is written only after versioning has been verified.
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     deploy:
       resources:
         limits:
-          memory: 128m
-    restart: "no"
+          memory: 64m
+    restart: unless-stopped
 
   # Antivirus for uploaded files. Optional (1.5-2 GB of RAM); needed from M05-T02 on.
   #   docker compose -f compose.yml -f compose.local.yml --profile antivirus up -d --wait
