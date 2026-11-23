@@ -92,15 +92,15 @@
 
 ### M00-T05 · Esqueleto del frontend
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T01
 - **Descripción**: Angular 22 sin SSR con pnpm, Angular Material y CDK (tema y tokens de diseño, ADR 0008), Transloco con `es.json`, ESLint y Prettier, estructura `core/shared/api/features`, layout base (barra lateral, cabecera, área de contenido) y página de inicio que llama a `/actuator/health`. Las URL de la API y de Keycloak no van escritas en el código: se generan en el build desde variables de entorno (`DENTASOFT_URLS_API`, `DENTASOFT_URLS_AUTH`), con `localhost` solo para desarrollo (ADR 0006).
 - **Criterios de aceptación**:
-  - [ ] `pnpm lint`, `pnpm test --watch=false` y `pnpm build` en verde
-  - [ ] Ningún texto visible sin Transloco
-  - [ ] `.nvmrc` con la versión de Node
-  - [ ] `vercel.json` con reescrituras de SPA y cabeceras de seguridad
-  - [ ] Ningún dominio escrito en `src/`; un build con otras variables apunta a otro dominio sin tocar código
+  - [x] `pnpm lint`, `pnpm test --watch=false` y `pnpm build` en verde
+  - [x] Ningún texto visible sin Transloco
+  - [x] `.nvmrc` con la versión de Node
+  - [x] `vercel.json` con reescrituras de SPA y cabeceras de seguridad
+  - [x] Ningún dominio escrito en `src/`; un build con otras variables apunta a otro dominio sin tocar código
 
 ### M00-T06 · Calidad y tests base
 
