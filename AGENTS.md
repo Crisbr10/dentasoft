@@ -42,8 +42,8 @@ scripts/    Utilidades (sincronizar tareas con GitHub Issues…)
 ## Comandos (Windows, PowerShell)
 
 ```powershell
-# Servicios locales
-cd infra; docker compose -f compose.yml -f compose.local.yml up -d
+# Servicios locales (la primera vez: Copy-Item .env.example .env; ver infra/README.md)
+cd infra; docker compose -f compose.yml -f compose.local.yml up -d --wait
 
 # Backend
 cd backend; .\mvnw.cmd verify          # compila y pasa todos los tests
