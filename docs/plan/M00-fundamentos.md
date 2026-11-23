@@ -59,8 +59,8 @@
   | Tarea | Dependencias |
   | --- | --- |
   | M00-T02 | Web, Actuator, Validation, Spring Modulith, springdoc-openapi y Configuration Processor |
-  | M00-T06 | Testcontainers (PostgreSQL y Redis), Spotless y JaCoCo |
-  | M00-T08 | Spring Data Redis y Bucket4j |
+  | M00-T06 | Testcontainers (PostgreSQL), Spotless y JaCoCo |
+  | M00-T08 | Spring Data Redis, Bucket4j y Testcontainers (Redis, adelantado de M00-T06 para probar el límite de peticiones) |
   | M01-T01 | Spring Data JPA, PostgreSQL y Flyway (con `flyway-database-postgresql`) |
   | M02-T02 | Spring Security y OAuth2 Resource Server |
   | M05 | AWS SDK v2 S3, Apache Tika, OpenHTMLtoPDF y Thymeleaf |
@@ -106,7 +106,7 @@
 
 - **Estado**: pendiente
 - **Depende de**: M00-T02
-- **Descripción**: Spotless (formato), JaCoCo (cobertura), clase base de integración con Testcontainers (PostgreSQL, Redis) y datos de prueba inventados; scripts `api:gen` (ng-openapi-gen) y formato en el frontend.
+- **Descripción**: Spotless (formato), JaCoCo (cobertura), clase base de integración con Testcontainers (PostgreSQL, Redis; el contenedor de Redis ya existe desde M00-T08 en `TestRedisConfiguration`) y datos de prueba inventados; scripts `api:gen` (ng-openapi-gen) y formato en el frontend.
 - **Criterios de aceptación**:
   - [ ] `mvnw verify` falla si el formato no es correcto
   - [ ] Test de integración de ejemplo usando Testcontainers
