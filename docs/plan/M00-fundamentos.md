@@ -132,3 +132,15 @@
   - [ ] Tests de las cabeceras y de CORS
   - [ ] Superar el límite devuelve 429 con `ProblemDetail`
   - [ ] Cada línea de log lleva el ID de petición y ningún dato personal
+
+### M00-T09 · Ajustes de la revisión de M00-T02
+
+- **Estado**: pendiente
+- **Depende de**: M00-T02
+- **Descripción**: hallazgos informativos de la revisión de Gentle AI del PR #87 (M00-T02). Refuerzo de la comprobación de dominios fijos, tests que faltan en el manejador de errores y en la configuración, y un comentario que exagera lo que garantiza. El log de los errores 500 con la excepción completa queda fuera: es de M00-T08.
+- **Criterios de aceptación**:
+  - [ ] `NoHardcodedUrlsTests` también falla con una URL `http://` fija en `backend/src/main`, salvo `localhost` en `application-local.yml`
+  - [ ] Test de `ConstraintViolationException` con violaciones reales: `errors` lleva el nombre del campo (último nodo de la ruta) y nunca el valor rechazado
+  - [ ] El test de URL no válida comprueba que falla `dentasoft.urls.app` por la restricción de URL, no cualquier error de `dentasoft.urls`
+  - [ ] Test de un origen CORS no válido en `DENTASOFT_CORS_ALLOWED_ORIGINS`: la app no arranca
+  - [ ] El comentario de `application-prod.yml` no promete que otro perfil no pueda cambiar esos valores
