@@ -20,7 +20,7 @@ SaaS multi-clínica de gestión para clínicas dentales: pacientes, agenda, odon
 | Base de datos | PostgreSQL (imagen con `pgvector`), Row Level Security por clínica |
 | Identidad | Keycloak (realm `dentasoft`, organizaciones = clínicas) |
 | Caché y colas | Redis |
-| Ficheros | S3 compatible (MinIO en local) con AWS SDK v2 |
+| Ficheros | S3 compatible (SeaweedFS en local, ver ADR 0007) con AWS SDK v2 |
 | Email | SMTP: Mailpit en local, Resend en pruebas y producción |
 | WhatsApp | WhatsApp Cloud API de Meta |
 | Frontend | Angular 22 (standalone + signals), PrimeNG, Transloco (i18n), pnpm |
