@@ -49,7 +49,7 @@ Estados: `programada` → `confirmada` → `en_sala` → `en_curso` → `finaliz
 
 - **Estado**: pendiente
 - **Depende de**: M00-T05
-- **Descripción**: prueba técnica breve para elegir el calendario: FullCalendar (la vista por profesionales en columnas es de pago), angular-calendar (gratuito, sin vista de recursos) o una rejilla propia sobre PrimeNG. Resultado en un ADR.
+- **Descripción**: prueba técnica breve para elegir el calendario: FullCalendar (la vista por profesionales en columnas es de pago), angular-calendar (gratuito, sin vista de recursos) o una rejilla propia sobre Angular CDK. Resultado en un ADR.
 - **Criterios de aceptación**:
   - [ ] ADR con licencia, coste, rendimiento con 200 citas y soporte de arrastrar y soltar
   - [ ] Decisión validada con un caso real: día con 4 profesionales y 3 gabinetes

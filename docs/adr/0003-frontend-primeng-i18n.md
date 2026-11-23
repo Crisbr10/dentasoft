@@ -1,6 +1,6 @@
 # 0003 — Frontend Angular con PrimeNG e internacionalización con Transloco
 
-Fecha: 2026-11-23 · Estado: aceptada
+Fecha: 2026-11-23 · Estado: sustituida por [0008](0008-frontend-angular-material.md)
 
 ## Contexto
 

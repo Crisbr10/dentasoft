@@ -23,7 +23,7 @@ SaaS multi-clínica de gestión para clínicas dentales: pacientes, agenda, odon
 | Ficheros | S3 compatible (SeaweedFS en local, ver ADR 0007) con AWS SDK v2 |
 | Email | SMTP: Mailpit en local, Resend en pruebas y producción |
 | WhatsApp | WhatsApp Cloud API de Meta |
-| Frontend | Angular 22 (standalone + signals), PrimeNG, Transloco (i18n), pnpm |
+| Frontend | Angular 22 (standalone + signals), Angular Material y CDK, Transloco (i18n), pnpm |
 | Tablet de firma | Expo (React Native) en `mobile/` |
 | Contenedores | Docker y Docker Compose, preparados para Kubernetes |
 
@@ -103,7 +103,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 - Una carpeta por módulo funcional en `src/app/features/` con carga diferida.
 - **Obligatorio**: ningún texto visible escrito a mano en plantillas o componentes: todo con Transloco (`src/assets/i18n/es.json`), aunque de momento solo haya español.
 - El cliente de la API se genera con `pnpm api:gen`; no escribas a mano DTO que ya existen en el backend.
-- Componentes de UI de PrimeNG; no mezcles otras librerías de componentes.
+- Componentes de UI de Angular Material y CDK (ADR 0008); no mezcles otras librerías de componentes.
 - La seguridad real está en el backend: ocultar un botón no es control de acceso.
 
 ### Tests
@@ -132,7 +132,9 @@ Cada tarea del plan tiene un issue en GitHub (título `Mxx-Tyy · …`, etiqueta
 7. **Trabajo nuevo descubierto** (un bug, algo que falta): issue nuevo con `gh issue create`, etiqueta del módulo y referencia al issue original. No se mezcla en el PR actual.
 8. **Terminar**: marcar el PR como listo (`gh pr ready`), CI en verde y, en el mismo PR, cambiar el **Estado** de la tarea a `hecho` en `docs/plan/`. Al fusionar, el issue se cierra solo y la tarjeta pasa a «Hecho». Si hubo una decisión de arquitectura, añadir un ADR.
 
-**Revisiones de código**: una sola ronda de revisión por tarea (como mucho una segunda si la primera encuentra un bloqueo). Los hallazgos informativos se arreglan en el momento si llevan menos de 15 minutos; si no, se anotan en la descripción del PR o se añaden como tarea al plan. No se encadenan rondas de revisión sobre hallazgos menores.
+**Revisiones de código**: se repite la revisión mientras una ronda encuentre hallazgos de gravedad media o alta, o cuando las correcciones toquen seguridad, permisos, datos de pacientes, migraciones o multi-clínica. Se para cuando una ronda solo devuelve hallazgos bajos o informativos: se arreglan si llevan menos de 15 minutos o se anotan en el PR o como tarea del plan. Máximo 3 rondas; si a la tercera sigue habiendo hallazgos importantes, se para y se consulta a Cristhian.
+
+Las revisiones de código excluyen los ficheros generados (pnpm-lock.yaml, código en src/app/api/); los lockfiles se verifican con --frozen-lockfile, audit y revisión de licencias.
 
 ## Definición de terminado
 

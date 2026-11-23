@@ -1,0 +1,23 @@
+{
+  "app": {
+    "name": "Dentasoft"
+  },
+  "layout": {
+    "toggleMenu": "Mostrar u ocultar el menú",
+    "mainNavigation": "Navegación principal",
+    "nav": {
+      "home": "Inicio"
+    }
+  },
+  "home": {
+    "title": "Inicio",
+    "health": {
+      "title": "Estado del servidor",
+      "checking": "Comprobando el servidor…",
+      "up": "El servidor funciona correctamente.",
+      "down": "El servidor responde, pero no está disponible.",
+      "unreachable": "No se puede conectar con el servidor.",
+      "retry": "Volver a comprobar"
+    }
+  }
+}
