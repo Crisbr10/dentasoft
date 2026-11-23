@@ -125,13 +125,13 @@
 
 ### M00-T08 · Base de seguridad transversal
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T02
 - **Descripción**: cabeceras de seguridad, CORS por variable de entorno, logs en JSON sin datos personales (con ID de petición), límite de peticiones por IP y por usuario con Bucket4j sobre Redis, y tamaño máximo de petición.
 - **Criterios de aceptación**:
-  - [ ] Tests de las cabeceras y de CORS
-  - [ ] Superar el límite devuelve 429 con `ProblemDetail`
-  - [ ] Cada línea de log lleva el ID de petición y ningún dato personal
+  - [x] Tests de las cabeceras y de CORS
+  - [x] Superar el límite devuelve 429 con `ProblemDetail`
+  - [x] Cada línea de log lleva el ID de petición y ningún dato personal
 
 ### M00-T09 · Ajustes de la revisión de M00-T02
 
