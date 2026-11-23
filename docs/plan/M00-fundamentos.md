@@ -33,18 +33,18 @@
 
 ### M00-T02 · Esqueleto del backend
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T01
 - **Descripción**: generar el proyecto Spring Boot 4 con Java 25 (dependencias de la guía), paquete raíz `es.crisbr.dentasoft`, Spring Modulith con `ModularityTests`, Actuator, configuración por variables de entorno con valores locales por defecto, hilos virtuales y apagado ordenado.
 - **Criterios de aceptación**:
-  - [ ] `.\mvnw.cmd verify` en verde
-  - [ ] `ModularityTests` verifica los módulos y genera su documentación
-  - [ ] `application.yml` sin secretos; perfil `local`
-  - [ ] Manejador global de errores con `ProblemDetail`
-  - [ ] springdoc expone `/v3/api-docs` y Swagger UI solo en perfiles no productivos
-  - [ ] Ningún dominio ni URL pública en el código ni en `application*.yml` fuera del perfil `local`; un test falla si encuentra `crisbr.es` o una URL `https://` fija en `backend/src/main`
-  - [ ] `dentasoft.urls` (`app`, `api`, `auth`) como record validado; valores por defecto solo en `local` y obligatorias por variables de entorno en el resto: sin ellas la app no arranca y el error dice cuál falta
-  - [ ] `dentasoft.cors.allowed-origins` preparada para M00-T08, por defecto `dentasoft.urls.app`; la URL del servidor en OpenAPI sale de `dentasoft.urls.api`
+  - [x] `.\mvnw.cmd verify` en verde
+  - [x] `ModularityTests` verifica los módulos y genera su documentación
+  - [x] `application.yml` sin secretos; perfil `local`
+  - [x] Manejador global de errores con `ProblemDetail`
+  - [x] springdoc expone `/v3/api-docs` y Swagger UI solo en perfiles no productivos
+  - [x] Ningún dominio ni URL pública en el código ni en `application*.yml` fuera del perfil `local`; un test falla si encuentra `crisbr.es` o una URL `https://` fija en `backend/src/main`
+  - [x] `dentasoft.urls` (`app`, `api`, `auth`) como record validado; valores por defecto solo en `local` y obligatorias por variables de entorno en el resto: sin ellas la app no arranca y el error dice cuál falta
+  - [x] `dentasoft.cors.allowed-origins` preparada para M00-T08, por defecto `dentasoft.urls.app`; la URL del servidor en OpenAPI sale de `dentasoft.urls.api`
 - **URLs públicas** (requisito añadido el 2026-11-23: el dominio actual, `crisbr.es`, es temporal y cambiará):
 
   | Variable | Propiedad | Valor en `local` |
