@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -49,6 +50,17 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(ex, null, headers, status, request);
     }
 
+    /** A body without {@code Content-Length} that passed the size limit while it was being read. */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        RequestBodyTooLargeException tooLarge = findCause(ex, RequestBodyTooLargeException.class);
+        if (tooLarge != null) {
+            return handleErrorResponseException(tooLarge, tooLarge.getHeaders(), tooLarge.getStatusCode(), request);
+        }
+        return super.handleHttpMessageNotReadable(ex, headers, status, request);
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
     @Nullable ResponseEntity<Object> handleConstraintViolation(ConstraintViolationException ex, WebRequest request) {
         HttpStatus status = HttpStatus.BAD_REQUEST;
@@ -66,7 +78,8 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         HttpStatus status = statusOf(ex);
         ProblemDetail body;
         if (status.is5xxServerError()) {
-            log.error("Unhandled exception {}", ex.getClass().getName(), ex);
+            // Messages are dropped: they may carry personal or clinical data. The request ID is in the MDC.
+            log.error("Unhandled exception {}", ex.getClass().getName(), RedactedException.of(ex));
             body = ErrorResponse.builder(ex, status, "Unexpected error.")
                     .titleMessageCode("problemDetail.internal-error.title")
                     .detailMessageCode("problemDetail.internal-error.detail")
@@ -77,6 +90,18 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             body = ProblemDetail.forStatus(status);
         }
         return handleExceptionInternal(ex, body, new HttpHeaders(), status, request);
+    }
+
+    private static <T extends Throwable> @Nullable T findCause(Throwable ex, Class<T> type) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return type.cast(cause);
+            }
+            if (cause.getCause() == cause) {
+                break;
+            }
+        }
+        return null;
     }
 
     private static HttpStatus statusOf(Exception ex) {

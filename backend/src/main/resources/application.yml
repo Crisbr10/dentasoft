@@ -13,10 +13,23 @@ spring:
     fallback-to-system-locale: false
   web:
     locale: es
+  data:
+    redis:
+      # Short timeouts: if Redis stalls, rate limiting falls back to the per-instance limit quickly
+      # instead of holding requests. Host, port and password: SPRING_DATA_REDIS_HOST, _PORT, _PASSWORD.
+      timeout: 1s
+      connect-timeout: 1s
+      # Redis holds rate-limit buckets (and later queues), not Spring Data repositories.
+      repositories:
+        enabled: false
 
 server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
+  max-http-request-header-size: 16KB
+  tomcat:
+    # Form posts are parsed by Tomcat itself; JSON bodies are limited by dentasoft.http.max-request-body-size.
+    max-http-form-post-size: ${dentasoft.http.max-request-body-size}
   error:
     include-stacktrace: never
     include-message: never
@@ -41,6 +54,23 @@ management:
 dentasoft:
   cors:
     allowed-origins: ${DENTASOFT_CORS_ALLOWED_ORIGINS:${dentasoft.urls.app:}}
+  http:
+    max-request-body-size: ${DENTASOFT_HTTP_MAX_REQUEST_BODY_SIZE:1MB}
+    # Proxies allowed to set X-Forwarded-For and CF-Connecting-IP. Empty: the connection address is used.
+    trusted-proxies: ${DENTASOFT_TRUSTED_PROXIES:}
+  rate-limit:
+    enabled: ${DENTASOFT_RATE_LIMIT_ENABLED:true}
+    anonymous-per-minute: ${DENTASOFT_RATE_LIMIT_ANONYMOUS_PER_MINUTE:120}
+    user-per-minute: ${DENTASOFT_RATE_LIMIT_USER_PER_MINUTE:600}
+    # Secret for the HMAC of IPs and user IDs in Redis keys. No default: required outside local.
+    key: ${DENTASOFT_RATE_LIMIT_KEY:}
+
+# One JSON object per line (Elastic Common Schema), with the request ID from the MDC.
+# Never log personal or clinical data: use identifiers.
+logging:
+  structured:
+    format:
+      console: ${DENTASOFT_LOG_FORMAT:ecs}
 
 # OpenAPI and Swagger UI are off unless a non-production profile turns them on.
 springdoc:

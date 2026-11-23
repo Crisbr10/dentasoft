@@ -2,7 +2,7 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import es.crisbr.dentasoft.WithTestUrls;
+import es.crisbr.dentasoft.WithTestEnvironment;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +13,7 @@ class CorsPropertiesTests {
 
     @Nested
     @SpringBootTest
-    @WithTestUrls
+    @WithTestEnvironment
     class ByDefault {
 
         @Autowired
@@ -21,13 +21,13 @@ class CorsPropertiesTests {
 
         @Test
         void allowsOnlyTheFrontendUrl() {
-            assertThat(cors.allowedOrigins()).containsExactly(WithTestUrls.APP);
+            assertThat(cors.allowedOrigins()).containsExactly(WithTestEnvironment.APP);
         }
     }
 
     @Nested
     @SpringBootTest
-    @WithTestUrls
+    @WithTestEnvironment
     @TestPropertySource(
             properties = "DENTASOFT_CORS_ALLOWED_ORIGINS=https://one.dentasoft.test,https://two.dentasoft.test")
     class FromEnvironmentVariable {

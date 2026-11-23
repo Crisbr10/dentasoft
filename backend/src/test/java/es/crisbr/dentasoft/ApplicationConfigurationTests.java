@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 /** Default configuration, with no profile active. */
 @SpringBootTest
 @AutoConfigureMockMvc
-@WithTestUrls
+@WithTestEnvironment
 class ApplicationConfigurationTests {
 
     @Autowired
