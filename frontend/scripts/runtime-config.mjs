@@ -66,8 +66,12 @@ function normalizeUrl(raw, { dev }) {
     throw new Error('must not contain credentials, a query string or a fragment');
   }
   // WHATWG URL accepts characters such as ; " , in a hostname; they would break the CSP.
-  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(url.hostname)) {
-    throw new Error('must have a hostname made of letters, digits, dots and hyphens');
+  const isName = /^[a-z0-9-]+(\.[a-z0-9-]+)*$/.test(url.hostname);
+  const isIpv6 = /^\[[0-9a-f:.]+\]$/.test(url.hostname);
+  if (!isName && !isIpv6) {
+    throw new Error(
+      'must have a hostname made of letters, digits, dots and hyphens, or an IPv6 address',
+    );
   }
   return url.href.replace(/\/+$/, '');
 }

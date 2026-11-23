@@ -18,35 +18,35 @@ pnpm build                 # exige las variables de «Configuración»; no admit
 
 ## Estructura
 
-| Carpeta | Contenido |
-| --- | --- |
-| `src/app/core/` | Configuración, i18n, iconos y layout base (cabecera, barra lateral y área de contenido) |
-| `src/app/shared/` | Componentes, directivas y pipes reutilizables |
-| `src/app/api/` | Cliente generado con `pnpm api:gen` (M00-T06) |
-| `src/app/features/` | Una carpeta por módulo funcional, con carga diferida |
-| `src/assets/i18n/` | Textos (`es.json`) |
-| `src/assets/icons/` | Iconos SVG servidos desde el propio build |
-| `src/styles.scss` | Tema de Material 3 (`mat.theme`) |
-| `src/styles/` | Paletas generadas y tokens de diseño (`--ds-*`) |
-| `scripts/` | Generación de `config.json` y de la CSP, y sus tests |
+| Carpeta             | Contenido                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------- |
+| `src/app/core/`     | Configuración, i18n, iconos y layout base (cabecera, barra lateral y área de contenido) |
+| `src/app/shared/`   | Componentes, directivas y pipes reutilizables                                           |
+| `src/app/api/`      | Cliente generado con `pnpm api:gen` (M00-T06)                                           |
+| `src/app/features/` | Una carpeta por módulo funcional, con carga diferida                                    |
+| `src/assets/i18n/`  | Textos (`es.json`)                                                                      |
+| `src/assets/icons/` | Iconos SVG servidos desde el propio build                                               |
+| `src/styles.scss`   | Tema de Material 3 (`mat.theme`)                                                        |
+| `src/styles/`       | Paletas generadas y tokens de diseño (`--ds-*`)                                         |
+| `scripts/`          | Generación de `config.json` y de la CSP, y sus tests                                    |
 
 ## Configuración
 
 Ninguna URL ni dominio se escribe en `src/` ([ADR 0006](../docs/adr/0006-dominio-intercambiable.md)); un test (`scripts/no-hardcoded-urls.test.mjs`) detecta URL absolutas (`http`, `https`, `ws`, `wss`), URL sin protocolo (`//host`) y el dominio actual. En los tests solo valen dominios `.test`. Las URL salen de variables de entorno:
 
-| Variable | Uso | En desarrollo |
-| --- | --- | --- |
-| `DENTASOFT_URLS_API` | URL base de la API | `http://localhost:8080` |
-| `DENTASOFT_URLS_AUTH` | URL de Keycloak | `http://localhost:8180` |
+| Variable              | Uso                | En desarrollo           |
+| --------------------- | ------------------ | ----------------------- |
+| `DENTASOFT_URLS_API`  | URL base de la API | `http://localhost:8080` |
+| `DENTASOFT_URLS_AUTH` | URL de Keycloak    | `http://localhost:8180` |
 
 - `scripts/runtime-config.mjs` escribe `public/config.json` con esas URL (el fichero no se versiona) y la app lo carga al arrancar. Cambiar de dominio es cambiar las variables y volver a desplegar, sin tocar código.
 - `pnpm start` usa `localhost` si faltan las variables. **`pnpm build` falla si falta alguna**, si no es una URL absoluta o si no usa `https`.
-- **Vercel**: define las dos variables en *Settings → Environment Variables* para **Production y también para Preview**; si no, los despliegues de vista previa fallan en el build.
+- **Vercel**: define las dos variables en _Settings → Environment Variables_ para **Production y también para Preview**; si no, los despliegues de vista previa fallan en el build.
 - **CI** (M00-T07): el build usará dominios reservados `.test`, por ejemplo `https://api.dentasoft.test`.
 
 ## Seguridad en Vercel
 
-`vercel.json` define la reescritura de SPA a `index.html` y las cabeceras de seguridad. La reescritura excluye las rutas con extensión (`.js`, `.css`, `.json`…): un fichero que no existe, como un chunk de una versión anterior, da 404 en lugar de devolver `index.html` con la caché larga de los ficheros con hash.
+`vercel.json` define la reescritura de SPA a `index.html` y las cabeceras de seguridad. La reescritura excluye las rutas que acaban en una extensión de fichero del build (`.js`, `.css`, `.json`, `.svg`, `.woff2`…; la lista está en `vercel.json`), así que ninguna ruta de la app debe acabar así: un fichero que no existe, como un chunk de una versión anterior, da 404 en lugar de devolver `index.html` con la caché larga de los ficheros con hash.
 
 - **CSP en dos capas**. La cabecera de `vercel.json` no nombra ningún dominio (Vercel no lee variables en ese fichero) y lleva `frame-ancestors 'none'`, que solo funciona en cabecera. Tras el build, `scripts/csp.mjs` añade a `index.html` una CSP en `<meta>`, lo primero de `<head>`, que limita `connect-src` a la API y a Keycloak de ese build. El navegador aplica las dos: una petición debe cumplir ambas.
 - `config.json` y la CSP del `<meta>` se generan juntos en el build. Si algún día se cambia `config.json` después del build (por ejemplo, en una imagen de contenedor), hay que regenerar también la CSP, o el navegador bloqueará los dominios nuevos.

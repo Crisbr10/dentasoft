@@ -3,7 +3,12 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm build",
   "outputDirectory": "dist/dentasoft/browser",
-  "rewrites": [{ "source": "/((?!.*\\.[a-zA-Z0-9]+$).*)", "destination": "/index.html" }],
+  "rewrites": [
+    {
+      "source": "/((?!.*\\.(?:js|mjs|css|map|json|ico|png|jpg|svg|webp|woff2?|txt)$).*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

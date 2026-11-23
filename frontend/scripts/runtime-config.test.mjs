@@ -102,6 +102,14 @@ describe('buildRuntimeConfig', () => {
       { apiUrl: 'https://api.dentasoft.test:8443/base', authUrl: 'http://localhost:8180' },
     );
   });
+
+  it('accepts an IPv6 address', () => {
+    const config = buildRuntimeConfig(
+      { ...CLINIC_A, DENTASOFT_URLS_API: 'http://[::1]:8080' },
+      { dev: true },
+    );
+    assert.equal(config.apiUrl, 'http://[::1]:8080');
+  });
 });
 
 describe('writeRuntimeConfig', () => {
