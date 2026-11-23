@@ -19,10 +19,10 @@ Clave de almacenamiento: `{tenant_id}/patients/{patient_id}/{document_id}`. El b
 
 - **Estado**: pendiente
 - **Depende de**: M00-T03
-- **Descripción**: interfaz `DocumentStorage` con implementación AWS SDK v2 (`endpointOverride`) que funciona con MinIO, Hetzner, OVHcloud o AWS; subida, descarga, URL firmada y borrado lógico.
+- **Descripción**: interfaz `DocumentStorage` con implementación AWS SDK v2 (`endpointOverride`) que funciona con SeaweedFS (local, ADR 0007), Hetzner, OVHcloud o AWS; subida, descarga, URL firmada y borrado lógico.
 - **Criterios de aceptación**:
   - [ ] Cambiar de proveedor es solo cambiar variables de entorno
-  - [ ] Test de integración con MinIO en Testcontainers
+  - [ ] Test de integración con un S3 compatible en Testcontainers (SeaweedFS, la misma imagen que en local)
 
 ### M05-T02 · Subida segura
 

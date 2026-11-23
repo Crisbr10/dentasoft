@@ -132,6 +132,8 @@ Cada tarea del plan tiene un issue en GitHub (título `Mxx-Tyy · …`, etiqueta
 7. **Trabajo nuevo descubierto** (un bug, algo que falta): issue nuevo con `gh issue create`, etiqueta del módulo y referencia al issue original. No se mezcla en el PR actual.
 8. **Terminar**: marcar el PR como listo (`gh pr ready`), CI en verde y, en el mismo PR, cambiar el **Estado** de la tarea a `hecho` en `docs/plan/`. Al fusionar, el issue se cierra solo y la tarjeta pasa a «Hecho». Si hubo una decisión de arquitectura, añadir un ADR.
 
+**Revisiones de código**: una sola ronda de revisión por tarea (como mucho una segunda si la primera encuentra un bloqueo). Los hallazgos informativos se arreglan en el momento si llevan menos de 15 minutos; si no, se anotan en la descripción del PR o se añaden como tarea al plan. No se encadenan rondas de revisión sobre hallazgos menores.
+
 ## Definición de terminado
 
 Una tarea está terminada cuando:
