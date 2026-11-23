@@ -46,13 +46,15 @@ scripts/    Utilidades (sincronizar tareas con GitHub Issues…)
 cd infra; docker compose -f compose.yml -f compose.local.yml up -d --wait
 
 # Backend
-cd backend; .\mvnw.cmd verify          # compila y pasa todos los tests
+cd backend; .\mvnw.cmd verify          # compila, pasa todos los tests y comprueba el formato
+cd backend; .\mvnw.cmd spotless:apply   # corrige el formato Java (palantir-java-format)
 cd backend; .\mvnw.cmd spring-boot:run  # arranca en http://localhost:8080
 
 # Frontend
 cd frontend; pnpm install; pnpm start   # http://localhost:4200
 cd frontend; pnpm lint; pnpm test --watch=false; pnpm build
-cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI del backend
+cd frontend; pnpm format                # aplica Prettier (pnpm format:check solo comprueba)
+cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI del backend (con el backend arrancado)
 ```
 
 ## Reglas obligatorias
