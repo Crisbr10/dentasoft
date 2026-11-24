@@ -74,3 +74,4 @@ Los iconos de `src/assets/icons/` son de Material Icons (Google, Apache License 
 
 - `lang="es"` en `index.html`, locale `es` registrado para fechas y números (`LOCALE_ID`) y euro como moneda por defecto.
 - Transloco con `es` como idioma por defecto y de reserva. Ningún texto visible se escribe a mano: la regla `@angular-eslint/template/i18n` falla con texto o atributos literales en las plantillas. Es la regla de la i18n nativa de Angular: arréglalo con una clave de Transloco, **nunca** con un atributo `i18n` ni con `pnpm lint --fix`. No detecta literales dentro de `{{ }}`.
+
