@@ -12,7 +12,7 @@ Dentasoft es un SaaS para varias clínicas. Una fuga de datos entre clínicas se
 - **Dos capas de aislamiento**:
   1. Aplicación: Hibernate `@TenantId` con un `CurrentTenantIdentifierResolver` que lee el `TenantContext`.
   2. Base de datos: `ENABLE` y `FORCE ROW LEVEL SECURITY` con la política `tenant_isolation`, que compara `tenant_id` con `NULLIF(current_setting('app.tenant_id', true), '')::uuid` en `USING` y `WITH CHECK`. Sin clínica activa (o con el valor vacío) las lecturas y los `UPDATE` no ven ninguna fila, sin error, y un `INSERT` falla con `42501`. Un valor que no es UUID da error `22P02` en cualquier consulta. Se crea con la función `enable_tenant_isolation` (M01-T01).
-- Dos roles de base de datos: `dentasoft_owner` (migraciones) y `dentasoft_app` (aplicación, `NOBYPASSRLS`, sin `DELETE` en datos clínicos ni `UPDATE` en registros inmutables).
+- Dos roles de base de datos: `dentasoft_owner` (migraciones) y `dentasoft_app` (aplicación, `NOBYPASSRLS`, sin `DELETE` en datos clínicos ni `UPDATE` en registros inmutables). Un tercero, `dentasoft_platform`, para la administración de clínicas de la plataforma: ver ADR 0011.
 - La clínica activa llega en la cabecera `X-Clinic-Id` y se valida contra la membresía del usuario en cada petición.
 - Cada módulo incluye un test de aislamiento con Testcontainers.
 

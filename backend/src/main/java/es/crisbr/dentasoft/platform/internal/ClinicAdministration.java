@@ -29,6 +29,9 @@ public class ClinicAdministration {
     /** Larger pages are cut to this size. */
     public static final int MAX_PAGE_SIZE = 100;
 
+    /** Far beyond any real number of clinics, and low enough that the offset always fits in an int. */
+    public static final int MAX_PAGE_NUMBER = 100_000;
+
     private final PlatformClinics clinics;
     private final ApplicationEventPublisher events;
 
@@ -63,6 +66,9 @@ public class ClinicAdministration {
             if (!PlatformClinics.SORTABLE.containsKey(order.getProperty())) {
                 throw new UnsupportedSortException();
             }
+        }
+        if (pageable.getPageNumber() > MAX_PAGE_NUMBER) {
+            throw new PageOutOfRangeException();
         }
         Pageable bounded = pageable.getPageSize() > MAX_PAGE_SIZE
                 ? PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort())

@@ -79,7 +79,12 @@ class PlatformApiClosedTests {
                         .uri(parts[1])
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(VALID_CLINIC))
-                .hasStatus(HttpStatus.FORBIDDEN);
+                .hasStatus(HttpStatus.FORBIDDEN)
+                // Written by the MVC exception resolvers, not by a forward to Spring Boot's error page.
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .bodyJson()
+                .extractingPath("$.title")
+                .isEqualTo("Acceso denegado");
 
         assertThat(clinicCount()).isEqualTo(clinicsBefore);
     }

@@ -181,6 +181,16 @@ class ClinicAdministrationTests {
     }
 
     @Test
+    void rejectsAPageNumberTooHighForTheOffset() {
+        assertThatThrownBy(() -> administration.list(PageRequest.of(ClinicAdministration.MAX_PAGE_NUMBER + 1, 100)))
+                .isInstanceOf(PageOutOfRangeException.class);
+        assertThat(administration
+                        .list(PageRequest.of(ClinicAdministration.MAX_PAGE_NUMBER, 100))
+                        .getContent())
+                .isEmpty();
+    }
+
+    @Test
     void rejectsSortingByAPropertyThatIsNotSortable() {
         assertThatThrownBy(() -> administration.list(PageRequest.of(0, 10, Sort.by("keycloakOrgId"))))
                 .isInstanceOf(UnsupportedSortException.class);

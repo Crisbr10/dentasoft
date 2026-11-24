@@ -51,7 +51,7 @@ class ClinicAdministrationControllerTests {
         String body = result.getResponse().getContentAsString();
         UUID id = UUID.fromString(JsonPath.read(body, "$.id"));
         created.add(id);
-        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION)).endsWith(CLINICS + "/" + id);
+        assertThat(result.getResponse().getHeader(HttpHeaders.LOCATION)).isEqualTo(CLINICS + "/" + id);
         assertThat((String) JsonPath.read(body, "$.name")).isEqualTo("Clínica Web");
         assertThat((String) JsonPath.read(body, "$.status")).isEqualTo("ACTIVE");
         assertThat((String) JsonPath.read(body, "$.timezone")).isEqualTo("Europe/Madrid");

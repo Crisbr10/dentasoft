@@ -16,15 +16,16 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * Clinic administration API for {@code PLATFORM_ADMIN} (M01-T05). Closed to every request until M02-T02 (see {@code
  * PlatformSecurityConfiguration}); authorization lives in {@link ClinicAdministration}.
  */
 @RestController
-@RequestMapping("/api/v1/platform/clinics")
+@RequestMapping(ClinicAdministrationController.PATH)
 class ClinicAdministrationController {
+
+    static final String PATH = "/api/v1/platform/clinics";
 
     private final ClinicAdministration administration;
 
@@ -35,11 +36,8 @@ class ClinicAdministrationController {
     @PostMapping
     ResponseEntity<ClinicDetails> create(@Valid @RequestBody CreateClinicRequest request) {
         ClinicDetails clinic = administration.create(request.toNewClinic());
-        URI location = ServletUriComponentsBuilder.fromCurrentRequestUri()
-                .path("/{id}")
-                .buildAndExpand(clinic.id())
-                .toUri();
-        return ResponseEntity.created(location).body(clinic);
+        // Relative: never built from the request's Host header.
+        return ResponseEntity.created(URI.create(PATH + "/" + clinic.id())).body(clinic);
     }
 
     @GetMapping
