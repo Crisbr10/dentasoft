@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.tenancy;
 
+import es.crisbr.dentasoft.TestPostgresConfiguration;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads the catalog of one schema and lists every table that is not isolated by clinic as AGENTS.md requires: Row
@@ -25,6 +27,30 @@ final class TenantIsolationInspector {
     private final String schema;
     private final Map<String, String> tenantColumnExceptions;
     private final Set<String> excludedTables;
+    private final Set<AllowedPolicy> allowedPolicies;
+
+    /**
+     * A policy allowed next to {@code tenant_isolation}, compared in full. It must name a single role that is neither
+     * {@code PUBLIC} nor the application role: PostgreSQL ORs permissive policies, so a policy that reached the
+     * application role would widen what it sees.
+     *
+     * @param using the {@code USING} expression as PostgreSQL prints it, {@code null} for an INSERT policy
+     * @param withCheck the {@code WITH CHECK} expression as PostgreSQL prints it, {@code null} for a SELECT policy
+     */
+    record AllowedPolicy(
+            String table,
+            String name,
+            String role,
+            String command,
+            @Nullable String using,
+            @Nullable String withCheck) {
+
+        AllowedPolicy {
+            if (role.equals("public") || role.equals(TestPostgresConfiguration.APP_USER)) {
+                throw new IllegalArgumentException(table + "." + name + ": cannot be allowed for role " + role);
+            }
+        }
+    }
 
     /**
      * @param tenantColumnExceptions tables whose policy compares a column other than {@code tenant_id}
@@ -35,10 +61,21 @@ final class TenantIsolationInspector {
             String schema,
             Map<String, String> tenantColumnExceptions,
             Set<String> excludedTables) {
+        this(connection, schema, tenantColumnExceptions, excludedTables, Set.of());
+    }
+
+    /** @param allowedPolicies policies allowed next to {@code tenant_isolation}, each exactly as declared */
+    TenantIsolationInspector(
+            Connection connection,
+            String schema,
+            Map<String, String> tenantColumnExceptions,
+            Set<String> excludedTables,
+            Set<AllowedPolicy> allowedPolicies) {
         this.connection = connection;
         this.schema = schema;
         this.tenantColumnExceptions = tenantColumnExceptions;
         this.excludedTables = excludedTables;
+        this.allowedPolicies = allowedPolicies;
     }
 
     /** The policy expression {@code enable_tenant_isolation} creates for {@code column}, as PostgreSQL prints it. */
@@ -119,9 +156,10 @@ final class TenantIsolationInspector {
     }
 
     /**
-     * Exactly one policy, the one {@code enable_tenant_isolation} creates. Comparing the whole expression (and not
-     * only the name) rejects {@code USING (true)} or an added {@code OR}; allowing a single policy rejects a second
-     * permissive policy, which PostgreSQL would OR with this one.
+     * The policy {@code enable_tenant_isolation} creates, and no other except the allowed ones. Comparing the whole
+     * expression (and not only the name) rejects {@code USING (true)} or an added {@code OR}; rejecting any other
+     * policy rejects a second permissive policy, which PostgreSQL would OR with this one. An allowed policy must match
+     * its declaration in full, role included, so it can never reach the application role.
      */
     private void checkPolicy(String table, String column, List<String> problems) throws SQLException {
         String expected = expectedExpression(column);
@@ -134,13 +172,15 @@ final class TenantIsolationInspector {
                 boolean found = false;
                 while (result.next()) {
                     String name = result.getString("policyname");
+                    List<Object> roles =
+                            List.of((Object[]) result.getArray("roles").getArray());
                     if (!"tenant_isolation".equals(name)) {
-                        problems.add(table + ": unexpected policy " + name);
+                        if (!isAllowed(table, name, roles, result)) {
+                            problems.add(table + ": unexpected policy " + name);
+                        }
                         continue;
                     }
                     found = true;
-                    List<Object> roles =
-                            List.of((Object[]) result.getArray("roles").getArray());
                     if (!"PERMISSIVE".equals(result.getString("permissive"))
                             || !"ALL".equals(result.getString("cmd"))
                             || !roles.equals(List.of("public"))) {
@@ -160,6 +200,19 @@ final class TenantIsolationInspector {
                 }
             }
         }
+    }
+
+    private boolean isAllowed(String table, String name, List<Object> roles, ResultSet policy) throws SQLException {
+        if (!"PERMISSIVE".equals(policy.getString("permissive")) || roles.size() != 1) {
+            return false;
+        }
+        String role = (String) roles.getFirst();
+        if (role.equals("public") || role.equals(TestPostgresConfiguration.APP_USER)) {
+            return false;
+        }
+        AllowedPolicy found = new AllowedPolicy(
+                table, name, role, policy.getString("cmd"), policy.getString("qual"), policy.getString("with_check"));
+        return allowedPolicies.contains(found);
     }
 
     private void checkTenantColumn(String table, String column, List<String> problems) throws SQLException {

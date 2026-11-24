@@ -16,7 +16,7 @@
 | Tabla | Campos principales |
 | --- | --- |
 | `clinic` | `id`, `name`, `legal_name`, `tax_id`, `timezone`, `locale`, `status` (activa, suspendida), `keycloak_org_id` |
-| `clinic_settings` | `tenant_id`, horario de apertura, duración de cita por defecto, datos de contacto, logo |
+| `clinic_settings` | `id`, `tenant_id` (único: una fila por clínica), `default_appointment_minutes`, `contact_email`, `contact_phone` (M01-T05); horario de apertura y logo (M01-T06). Nunca secretos: las credenciales de los canales van cifradas en su propia tabla (M07-T07) |
 | `treatment_room` | `tenant_id`, `name`, `color`, `active` (gabinete) |
 | `audit_log` | `tenant_id`, `occurred_at`, `actor_id`, `action`, `entity`, `entity_id`, `ip`, `details` (sin datos clínicos) |
 
@@ -24,10 +24,11 @@
 
 - **`dentasoft_owner`** es dueño del esquema y ejecuta las migraciones (`SPRING_FLYWAY_USER`, `SPRING_FLYWAY_PASSWORD`).
 - **`dentasoft_app`** es el rol con el que se conecta la aplicación (`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`). Es `NOBYPASSRLS`, no es dueño de nada y no puede crear objetos.
+- **`dentasoft_platform`** es el rol del módulo `platform`, la administración de clínicas de `PLATFORM_ADMIN` (`DENTASOFT_PLATFORM_DATASOURCE_USERNAME`, `DENTASOFT_PLATFORM_DATASOURCE_PASSWORD`; ADR 0011). Es `NOBYPASSRLS`, ningún rol es miembro suyo y solo tiene, en `V002`, `SELECT`, el alta y el cambio de estado en `clinic` y el alta de `clinic_settings`, con políticas `TO dentasoft_platform`. Lo crea el superusuario fuera de Flyway ([`docs/operaciones/rol-de-plataforma.md`](../operaciones/rol-de-plataforma.md)). Ninguna tabla nueva le da permisos: si un módulo los necesita, se conceden en su migración y se añaden a `PlatformRoleTests`.
 - **Permisos por defecto** (`V001`): toda tabla nueva de `dentasoft_owner` en `public` da a `dentasoft_app` `SELECT`, `INSERT` y `UPDATE`. Nunca `DELETE` ni `TRUNCATE`, porque lo clínico se borra de forma lógica. `dentasoft_app` no tiene acceso a `flyway_schema_history`.
 - **Política `tenant_isolation`**: compara la columna de clínica con `NULLIF(current_setting('app.tenant_id', true), '')::uuid`, en `USING` y en `WITH CHECK`. Falla cerrado: sin clínica activa, o con el valor vacío tras limpiarlo, las lecturas, los `UPDATE` y los `DELETE` no ven ninguna fila, sin error; un `INSERT` (o un `UPDATE` que mueva una fila a otra clínica) incumple el `WITH CHECK` y falla con `42501`. Un valor que no es UUID da error `22P02` en cualquier consulta.
-- **`clinic`** es la excepción: su política compara `id`, no `tenant_id`, porque la fila es la clínica misma.
-- **`RowLevelSecurityGuardTests`** recorre todas las tablas del esquema y falla si alguna no cumple. Las excepciones a la columna `tenant_id` se declaran en ese test, cada una con su motivo.
+- **`clinic`** es la excepción: su política compara `id`, no `tenant_id`, porque la fila es la clínica misma. Una clínica nunca puede tener el UUID nulo (`clinic_id_not_nil`, V002), que es el centinela «sin clínica».
+- **`RowLevelSecurityGuardTests`** recorre todas las tablas del esquema y falla si alguna no cumple. Las excepciones a la columna `tenant_id` y las políticas permitidas además de `tenant_isolation` (solo las de `dentasoft_platform`) se declaran en ese test, cada una con su motivo.
 
 ### Cómo añadir una tabla con RLS
 
@@ -60,6 +61,7 @@ SELECT enable_tenant_isolation('patient');
 
 - No escribas la política a mano: el test guardián compara la expresión exacta y rechaza cualquier otra, además de cualquier segunda política.
 - La entidad JPA extiende `TenantScopedEntity` (M01-T02).
+- La primera entidad de un módulo añade el paquete del módulo a `EntityPackagesConfiguration` (`shared.persistence`): la unidad de persistencia principal no escanea toda la aplicación (ADR 0011), y `PersistenceUnitsTests` falla si una entidad no está en ninguna unidad.
 - Cada módulo con datos añade su test de aislamiento (M01-T04).
 
 ### Migraciones que tocan datos
@@ -220,13 +222,13 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T05 · Alta y gestión de clínicas (administración de plataforma)
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T02
 - **Descripción**: API para el rol `PLATFORM_ADMIN`: crear, listar, suspender y reactivar clínicas, con su `clinic_settings` inicial.
 - **Criterios de aceptación**:
-  - [ ] Solo `PLATFORM_ADMIN` puede usar estos endpoints
-  - [ ] Una clínica suspendida no permite iniciar sesión en ella (comprobado en M02)
-  - [ ] Evento `ClinicaCreada` publicado para que otros módulos creen sus datos iniciales
+  - [x] Solo `PLATFORM_ADMIN` puede usar estos endpoints. El servicio exige el rol con `@PreAuthorize`, y `/api/v1/platform/**` deniega todas las peticiones hasta M02-T02 (ADR 0011).
+  - [x] Una clínica suspendida no permite iniciar sesión en ella (comprobado en M02). Esta tarea guarda el estado `SUSPENDED`; el rechazo del acceso es de M02-T04.
+  - [x] Evento `ClinicCreated` (antes «`ClinicaCreada`», en inglés como el resto del código) publicado para que otros módulos creen sus datos iniciales
 
 ### M01-T06 · Configuración de la clínica y gabinetes
 

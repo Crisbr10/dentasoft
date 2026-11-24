@@ -3,13 +3,16 @@ package es.crisbr.dentasoft.tenancy;
 import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsOwner;
 import static es.crisbr.dentasoft.tenancy.TenantIsolationInspector.expectedExpression;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.AllowedPolicy;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,6 +125,45 @@ class TenantIsolationInspectorTests {
                         "renamed: unexpected policy isolation",
                         "renamed: no tenant_isolation policy",
                         "no_policy: no tenant_isolation policy");
+    }
+
+    @Test
+    void acceptsAnAllowedPolicyOnlyAsDeclared() throws SQLException {
+        isolatedTable("allowed");
+        execute("CREATE POLICY platform_select ON guard_probe.allowed FOR SELECT TO dentasoft_platform USING (true)");
+        isolatedTable("other_role");
+        execute("CREATE POLICY platform_select ON guard_probe.other_role FOR SELECT TO dentasoft_app USING (true)");
+        isolatedTable("other_command");
+        execute("CREATE POLICY platform_select ON guard_probe.other_command TO dentasoft_platform USING (true)");
+        isolatedTable("two_roles");
+        execute("CREATE POLICY platform_select ON guard_probe.two_roles FOR SELECT"
+                + " TO dentasoft_platform, dentasoft_app USING (true)");
+        isolatedTable("restrictive_allowed");
+        execute("CREATE POLICY platform_select ON guard_probe.restrictive_allowed AS RESTRICTIVE FOR SELECT"
+                + " TO dentasoft_platform USING (true)");
+        Set<AllowedPolicy> allowed =
+                Set.of("allowed", "other_role", "other_command", "two_roles", "restrictive_allowed").stream()
+                        .map(table -> new AllowedPolicy(
+                                table, "platform_select", "dentasoft_platform", "SELECT", "true", null))
+                        .collect(Collectors.toSet());
+
+        TenantIsolationInspector inspector =
+                new TenantIsolationInspector(connection, SCHEMA, Map.of(), Set.of(), allowed);
+
+        assertThat(inspector.problems())
+                .containsExactlyInAnyOrder(
+                        "other_role: unexpected policy platform_select",
+                        "other_command: unexpected policy platform_select",
+                        "two_roles: unexpected policy platform_select",
+                        "restrictive_allowed: unexpected policy platform_select");
+    }
+
+    @Test
+    void neverAllowsAPolicyForEveryRoleOrTheApplicationRole() {
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new AllowedPolicy("clinic", "open", "public", "SELECT", "true", null));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new AllowedPolicy("clinic", "open", "dentasoft_app", "SELECT", "true", null));
     }
 
     @Test

@@ -11,10 +11,11 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: postgres
-      # Read by postgres/init/01-init.sh on the first start only.
+      # Read by postgres/init/01-init.sh and 02-platform-role.sh on the first start only.
       DENTASOFT_DB_OWNER_PASSWORD: ${DENTASOFT_DB_OWNER_PASSWORD:?set DENTASOFT_DB_OWNER_PASSWORD in .env}
       DENTASOFT_DB_APP_PASSWORD: ${DENTASOFT_DB_APP_PASSWORD:?set DENTASOFT_DB_APP_PASSWORD in .env}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
+      DENTASOFT_DB_PLATFORM_PASSWORD: ${DENTASOFT_DB_PLATFORM_PASSWORD:?set DENTASOFT_DB_PLATFORM_PASSWORD in .env}
       TZ: UTC
     volumes:
       - postgres-data:/var/lib/postgresql
@@ -22,15 +23,16 @@ services:
     healthcheck:
       # Over TCP on purpose: the temporary server that runs the init scripts only listens on
       # the Unix socket, so the check cannot pass while initialisation is still running.
-      # Being reachable is not enough: if 01-init.sh failed halfway, the next
-      # start skips it, so the check also requires the objects it creates (the `dentasoft` and
-      # `keycloak` databases, the application role and the `vector` extension).
+      # Being reachable is not enough: if an init script failed halfway, the next
+      # start skips it, so the check also requires the objects they create (the `dentasoft` and
+      # `keycloak` databases, the application and platform roles and the `vector` extension).
       test:
         - CMD-SHELL
         - >-
           psql -h 127.0.0.1 -U postgres -d dentasoft -tAc
           "SELECT (SELECT count(*) FROM pg_database WHERE datname IN ('dentasoft', 'keycloak')) = 2
           AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dentasoft_app')
+          AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'dentasoft_platform')
           AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
           | grep -qx t
       interval: 5s

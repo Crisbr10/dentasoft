@@ -15,6 +15,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -185,8 +186,16 @@ class RateLimitTests {
         return mvc.get().uri(PING).with(request::apply).exchange();
     }
 
+    /**
+     * Authenticated through Spring Security, as the application will be (M02): its chain runs before the rate limiter
+     * and is what the request's user principal comes from, so a principal set on the raw request is not seen.
+     */
     private MvcTestResult asUser(String user, String ip) {
-        return mvc.get().uri(PING).principal(() -> user).with(from(ip)::apply).exchange();
+        return mvc.get()
+                .uri(PING)
+                .with(SecurityMockMvcRequestPostProcessors.user(user))
+                .with(from(ip)::apply)
+                .exchange();
     }
 
     private static Processor from(String ip) {
