@@ -24,8 +24,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
- * V001: who migrates and who connects, the fail-closed {@code tenant_isolation} policy on {@code clinic} and the
- * privileges of the application role. Clinics A and B exist during each test.
+ * V001 and V003: who migrates and who connects, the fail-closed {@code tenant_isolation} policy on {@code clinic} and
+ * the privileges of the application role. Clinics A and B exist during each test.
+ *
+ * <p>The application cannot create clinics (V003), so the policy's {@code WITH CHECK} on {@code clinic} is checked as
+ * the owner, who is subject to Row Level Security too (FORCE).
  */
 @IntegrationTest
 class TenancyMigrationTests {
@@ -42,9 +45,10 @@ class TenancyMigrationTests {
     @Autowired
     private Flyway flyway;
 
+    /** As the owner: the application cannot create clinics. */
     @BeforeEach
     void createClinics() throws SQLException {
-        try (Connection connection = connectAsApplication()) {
+        try (Connection connection = connectAsOwner()) {
             setActiveClinic(connection, CLINIC_A.toString());
             insertClinic(connection, CLINIC_A, TestData.CLINIC_A.name());
             setActiveClinic(connection, CLINIC_B.toString());
@@ -158,23 +162,92 @@ class TenancyMigrationTests {
         try (Connection connection = connectAsApplication()) {
             setActiveClinic(connection, CLINIC_A.toString());
 
+            assertThat(updateName(connection, CLINIC_B)).isZero();
+        }
+        try (Connection connection = connectAsOwner()) {
+            setActiveClinic(connection, CLINIC_A.toString());
+
             assertThatExceptionOfType(SQLException.class)
                     .isThrownBy(() -> insertClinic(connection, UUID.randomUUID(), "Clínica Prueba Intrusa"))
                     .satisfies(error -> assertThat(error.getSQLState()).isEqualTo(INSUFFICIENT_PRIVILEGE));
             assertThatExceptionOfType(SQLException.class)
                     .isThrownBy(() -> moveClinic(connection, CLINIC_A, UUID.randomUUID()))
                     .satisfies(error -> assertThat(error.getSQLState()).isEqualTo(INSUFFICIENT_PRIVILEGE));
-            assertThat(updateName(connection, CLINIC_B)).isZero();
         }
     }
 
     @Test
     void withoutActiveClinicNothingCanBeWritten() throws SQLException {
         try (Connection connection = connectAsApplication()) {
+            assertThat(updateName(connection, CLINIC_A)).isZero();
+        }
+        try (Connection connection = connectAsOwner()) {
             assertThatExceptionOfType(SQLException.class)
                     .isThrownBy(() -> insertClinic(connection, UUID.randomUUID(), "Clínica Prueba Huérfana"))
                     .satisfies(error -> assertThat(error.getSQLState()).isEqualTo(INSUFFICIENT_PRIVILEGE));
-            assertThat(updateName(connection, CLINIC_A)).isZero();
+        }
+    }
+
+    /** Not even its own: creating clinics is the platform's (V002, V003). */
+    @Test
+    void applicationCannotCreateClinics() throws SQLException {
+        UUID newClinic = UUID.randomUUID();
+        try (Connection connection = connectAsApplication()) {
+            setActiveClinic(connection, newClinic.toString());
+
+            assertThatExceptionOfType(SQLException.class)
+                    .isThrownBy(() -> insertClinic(connection, newClinic, "Clínica Prueba Nueva"))
+                    .satisfies(error -> assertThat(error.getSQLState()).isEqualTo(INSUFFICIENT_PRIVILEGE));
+        }
+    }
+
+    /**
+     * The clinic only renames itself and changes its time zone (V003): it cannot reactivate itself, take another
+     * Keycloak organization, change its tax data or its id, nor rewrite its audit columns.
+     */
+    @Test
+    void applicationUpdatesOnlyTheColumnsTheClinicEdits() throws SQLException {
+        try (Connection owner = connectAsOwner()) {
+            assertThat(strings(
+                            owner,
+                            "SELECT attname FROM pg_attribute WHERE attrelid = 'clinic'::regclass AND attnum > 0"
+                                    + " AND NOT attisdropped AND has_column_privilege('" + APP_USER
+                                    + "', 'clinic', attname, 'UPDATE') ORDER BY attname"))
+                    .containsExactly("name", "timezone", "updated_at", "updated_by", "version");
+        }
+        try (Connection connection = connectAsApplication()) {
+            setActiveClinic(connection, CLINIC_A.toString());
+
+            for (String change : List.of(
+                    "status = 'ACTIVE'",
+                    "keycloak_org_id = 'org-prueba'",
+                    "legal_name = 'Otra Razón Social S.L.'",
+                    "tax_id = 'B99999999'",
+                    "locale = 'en-GB'",
+                    "id = id",
+                    "created_at = now()",
+                    "created_by = NULL")) {
+                assertInsufficientPrivilege(connection, "UPDATE clinic SET " + change);
+            }
+            assertThat(updateName(connection, CLINIC_A)).isOne();
+            assertThat(update(connection, "UPDATE clinic SET timezone = 'Atlantic/Canary' WHERE id = ?", CLINIC_A))
+                    .isOne();
+        }
+    }
+
+    /**
+     * Opening hours are replaced whole and are not clinical data, so their table is the only one where the
+     * application deletes (V003). Every other table, the test ones included, keeps clinical data's soft delete.
+     */
+    @Test
+    void applicationDeletesOnlyOpeningHours() throws SQLException {
+        try (Connection owner = connectAsOwner()) {
+            String tables = "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+                    + " WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')"
+                    + " AND has_table_privilege('" + APP_USER + "', c.oid, '%s') ORDER BY c.relname";
+
+            assertThat(strings(owner, tables.formatted("DELETE"))).containsExactly("clinic_hours_of_operation");
+            assertThat(strings(owner, tables.formatted("TRUNCATE"))).isEmpty();
         }
     }
 

@@ -1,6 +1,5 @@
 package es.crisbr.dentasoft.tenancy;
 
-import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsApplication;
 import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsOwner;
 
 import es.crisbr.dentasoft.TestData;
@@ -20,7 +19,7 @@ import java.util.regex.Pattern;
  * <p>These connections set {@code app.tenant_id} for their whole session, which the application never does. They are
  * opened for one call and closed, never taken from the application's pool.
  */
-final class TenancyTestDatabase {
+public final class TenancyTestDatabase {
 
     private static final List<UUID> CLINICS = List.of(TestData.CLINIC_A.id(), TestData.CLINIC_B.id());
     private static final Pattern TABLE_NAME = Pattern.compile("[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)?");
@@ -29,9 +28,9 @@ final class TenancyTestDatabase {
 
     record StoredRecord(UUID tenantId, String label) {}
 
-    /** Creates clinics A and B; there is no application service for it yet (M01-T05). */
-    static void insertClinics() throws SQLException {
-        try (Connection connection = connectAsApplication()) {
+    /** Creates clinics A and B as the owner: the application cannot create clinics (V003). */
+    public static void insertClinics() throws SQLException {
+        try (Connection connection = connectAsOwner()) {
             insertClinic(connection, TestData.CLINIC_A);
             insertClinic(connection, TestData.CLINIC_B);
         }
@@ -45,7 +44,7 @@ final class TenancyTestDatabase {
      * Deletes the rows of clinics A and B from {@code tables}, in that order, and then the clinics. The application
      * cannot delete; the owner can, one clinic at a time, as Row Level Security is forced.
      */
-    static void deleteClinicsAnd(List<String> tables) throws SQLException {
+    public static void deleteClinicsAnd(List<String> tables) throws SQLException {
         try (Connection connection = connectAsOwner()) {
             for (UUID clinic : CLINICS) {
                 setSessionClinic(connection, clinic);
@@ -61,7 +60,7 @@ final class TenancyTestDatabase {
      * Row {@code id} of {@code table} as the owner sees it with {@code clinic} active: every column, as JSON, so two
      * readings are equal only if nothing in the row changed.
      */
-    static Optional<String> storedRow(String table, UUID clinic, UUID id) throws SQLException {
+    public static Optional<String> storedRow(String table, UUID clinic, UUID id) throws SQLException {
         try (Connection connection = connectAsOwner()) {
             setSessionClinic(connection, clinic);
             try (PreparedStatement statement = connection.prepareStatement(
@@ -75,7 +74,7 @@ final class TenancyTestDatabase {
     }
 
     /** Number of rows of {@code table} the owner sees with {@code clinic} active. */
-    static int countRows(String table, UUID clinic) throws SQLException {
+    public static int countRows(String table, UUID clinic) throws SQLException {
         try (Connection connection = connectAsOwner()) {
             setSessionClinic(connection, clinic);
             try (PreparedStatement statement =

@@ -129,7 +129,10 @@ final class HibernateIsolationChecks<E extends BaseEntity> {
                 .isEqualTo(before);
     }
 
-    /** {@code dentasoft_app} has no DELETE grant at all: this proves the row survives, whichever layer stops it. */
+    /**
+     * {@code dentasoft_app} has DELETE only on {@code clinic_hours_of_operation} (V003): there Hibernate must stop it;
+     * elsewhere the missing grant does too. Either way, this proves the row survives, whichever layer stops it.
+     */
     void blocksDeletesOfTheOtherClinic() {
         String before = fixture.storedOtherRow();
         E detached = fixture.asClinic(
