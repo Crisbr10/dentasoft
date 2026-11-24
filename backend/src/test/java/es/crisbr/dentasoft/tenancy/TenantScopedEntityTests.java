@@ -267,23 +267,9 @@ class TenantScopedEntityTests {
         return transaction.execute(status -> work.get());
     }
 
-    /**
-     * A simulated Row Level Security failure, to test the second layer, Hibernate's clinic filter, on its own: makes
-     * PostgreSQL use {@code clinic} for the rest of the current transaction, whatever the active clinic is. Only
-     * {@code hibernateFiltersByTheActiveClinicOnItsOwn} and {@code withoutActiveClinicQueriesReturnNoRows} may call
-     * it: every other test must go through the real path.
-     */
+    /** Only {@code hibernateFiltersByTheActiveClinicOnItsOwn} and {@code withoutActiveClinicQueriesReturnNoRows}. */
     private void simulateRlsLetsClinicThrough(UUID clinic) {
-        jdbc.sql("SELECT set_config('app.tenant_id', ?, true)")
-                .param(clinic.toString())
-                .query(String.class)
-                .single();
-        // Native SQL is not filtered by Hibernate: the simulation works if it now sees the clinic's rows.
-        assertThat(jdbc.sql("SELECT count(*) FROM tenancy_test_record WHERE tenant_id = ?")
-                        .param(clinic)
-                        .query(Long.class)
-                        .single())
-                .isPositive();
+        HibernateIsolationChecks.simulateRlsLetsClinicThrough(jdbc, "tenancy_test_record", clinic);
     }
 
     private static Stream<Throwable> causes(Throwable thrown) {
