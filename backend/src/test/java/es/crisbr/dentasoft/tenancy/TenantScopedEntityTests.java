@@ -1,22 +1,19 @@
 package es.crisbr.dentasoft.tenancy;
 
-import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsApplication;
-import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsOwner;
+import static es.crisbr.dentasoft.tenancy.TenancyTestDatabase.countStored;
+import static es.crisbr.dentasoft.tenancy.TenancyTestDatabase.stored;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.TestData;
+import es.crisbr.dentasoft.tenancy.TenancyTestDatabase.StoredRecord;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -36,9 +33,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Clinic isolation in JPA through {@link TenantScopedEntity}, on the test-only table {@code tenancy_test_record}.
  *
- * <p>Until M01-T03 the application does not pass the active clinic to PostgreSQL, so Row Level Security would block
- * every row. These tests set {@code app.tenant_id} themselves, inside each transaction. Setting it to a clinic other
- * than the active one lets Row Level Security through and shows that Hibernate filters on its own.
+ * <p>Every test goes through the real path: the clinic is bound with {@link TenantContext} and the transaction passes
+ * it to PostgreSQL. Only the two tests of Hibernate's own filter override it, with
+ * {@link #simulateRlsLetsClinicThrough}.
  */
 @IntegrationTest
 class TenantScopedEntityTests {
@@ -60,22 +57,12 @@ class TenantScopedEntityTests {
 
     @BeforeEach
     void createClinics() throws SQLException {
-        try (Connection connection = connectAsApplication()) {
-            insertClinic(connection, CLINIC_A, TestData.CLINIC_A.name());
-            insertClinic(connection, CLINIC_B, TestData.CLINIC_B.name());
-        }
+        TenancyTestDatabase.insertClinics();
     }
 
-    /** The application cannot delete; the owner can, one clinic at a time, as Row Level Security is forced. */
     @AfterEach
     void deleteData() throws SQLException {
-        try (Connection connection = connectAsOwner()) {
-            for (UUID clinic : List.of(CLINIC_A, CLINIC_B)) {
-                setDatabaseClinic(connection, clinic);
-                execute(connection, "DELETE FROM tenancy_test_record WHERE tenant_id = ?", clinic);
-                execute(connection, "DELETE FROM clinic WHERE id = ?", clinic);
-            }
-        }
+        TenancyTestDatabase.deleteClinicsAndRecords();
     }
 
     @Test
@@ -114,8 +101,8 @@ class TenantScopedEntityTests {
 
     @Test
     void insertWithoutActiveClinicFails() throws SQLException {
-        Throwable thrown = catchThrowable(
-                () -> inTransaction(CLINIC_A, () -> records.saveAndFlush(new TenancyTestRecord("north"))));
+        Throwable thrown =
+                catchThrowable(() -> inTransaction(() -> records.saveAndFlush(new TenancyTestRecord("north"))));
 
         assertThat(causes(thrown)).anyMatch(NoActiveClinicException.class::isInstance);
         assertThat(countStored(CLINIC_A)).isZero();
@@ -157,36 +144,34 @@ class TenantScopedEntityTests {
         assertThat(asClinic(CLINIC_B, this::allLabels)).containsExactly("south");
     }
 
-    /** PostgreSQL lets clinic B's rows through, yet with clinic A active no JPA query or lookup returns them. */
+    /** Even if PostgreSQL let clinic B's rows through, with clinic A active no JPA query or lookup returns them. */
     @Test
     void hibernateFiltersByTheActiveClinicOnItsOwn() {
         UUID southId = seed().south();
 
-        TenantContext.runAs(
-                CLINIC_A,
-                () -> inTransaction(CLINIC_B, () -> {
-                    assertThat(records.findAll()).isEmpty();
-                    assertThat(records.findById(southId)).isEmpty();
-                    assertThat(entityManager.find(TenancyTestRecord.class, southId))
-                            .isNull();
-                    assertThat(records.findByLabel("south")).isEmpty();
-                    assertThat(records.findByLabelPrefix("so")).isEmpty();
-                    assertThat(records.count()).isZero();
-                    return null;
-                }));
-        assertThat(TenantContext.callAs(CLINIC_B, () -> inTransaction(CLINIC_B, this::allLabels)))
-                .containsExactly("south");
+        asClinic(CLINIC_A, () -> {
+            simulateRlsLetsClinicThrough(CLINIC_B);
+            assertThat(records.findAll()).isEmpty();
+            assertThat(records.findById(southId)).isEmpty();
+            assertThat(entityManager.find(TenancyTestRecord.class, southId)).isNull();
+            assertThat(records.findByLabel("south")).isEmpty();
+            assertThat(records.findByLabelPrefix("so")).isEmpty();
+            assertThat(records.count()).isZero();
+            return null;
+        });
+        assertThat(asClinic(CLINIC_B, this::allLabels)).containsExactly("south");
     }
 
     /**
-     * Without an active clinic, sessions use the {@code NO_CLINIC} marker: PostgreSQL lets clinic A's rows through, yet
-     * no query returns any row, and a bulk update changes none.
+     * Without an active clinic, sessions use the {@code NO_CLINIC} marker: even if PostgreSQL let clinic A's rows
+     * through, no query would return any row, and a bulk update would change none.
      */
     @Test
     void withoutActiveClinicQueriesReturnNoRows() throws SQLException {
         UUID northId = seed().north();
 
-        inTransaction(CLINIC_A, () -> {
+        inTransaction(() -> {
+            simulateRlsLetsClinicThrough(CLINIC_A);
             assertThat(records.findAll()).isEmpty();
             assertThat(records.findById(northId)).isEmpty();
             assertThat(entityManager.find(TenancyTestRecord.class, northId)).isNull();
@@ -206,9 +191,9 @@ class TenantScopedEntityTests {
         record.setLabel("north, renamed");
 
         // The filtered load finds nothing, so the detached entity looks deleted.
-        assertThat(catchThrowable(() -> inTransaction(CLINIC_A, () -> records.saveAndFlush(record))))
+        assertThat(catchThrowable(() -> inTransaction(() -> records.saveAndFlush(record))))
                 .isInstanceOf(ObjectOptimisticLockingFailureException.class);
-        inTransaction(CLINIC_A, () -> {
+        inTransaction(() -> {
             records.deleteById(record.getId());
             records.delete(record);
             return null;
@@ -253,7 +238,7 @@ class TenantScopedEntityTests {
     /** The session took its clinic when the transaction began: binding one afterwards would not reach it. */
     @Test
     void clinicCannotBeBoundInsideATransactionStartedWithoutOne() {
-        inTransaction(CLINIC_A, () -> {
+        inTransaction(() -> {
             assertThatIllegalStateException()
                     .isThrownBy(() -> TenantContext.runAs(CLINIC_A, () -> {}))
                     .withMessageContaining("before the transaction");
@@ -273,74 +258,32 @@ class TenantScopedEntityTests {
         return records.findAll().stream().map(TenancyTestRecord::getLabel).toList();
     }
 
-    /** {@code work} with {@code clinic} active, in a transaction where PostgreSQL also uses {@code clinic}. */
+    /** {@code work} with {@code clinic} active, in a transaction, which passes it to PostgreSQL. */
     private <T> T asClinic(UUID clinic, Supplier<T> work) {
-        return TenantContext.callAs(clinic, () -> inTransaction(clinic, work));
+        return TenantContext.callAs(clinic, () -> inTransaction(work));
     }
 
-    /** {@code work} in a transaction where PostgreSQL uses {@code databaseClinic}; the active clinic is not changed. */
-    private <T> T inTransaction(UUID databaseClinic, Supplier<T> work) {
-        return transaction.execute(status -> {
-            jdbc.sql("SELECT set_config('app.tenant_id', ?, true)")
-                    .param(databaseClinic.toString())
-                    .query(String.class)
-                    .single();
-            return work.get();
-        });
+    private <T> T inTransaction(Supplier<T> work) {
+        return transaction.execute(status -> work.get());
     }
 
-    /** The row as the owner sees it with {@code clinic} active. */
-    private static Optional<StoredRecord> stored(UUID clinic, UUID id) throws SQLException {
-        try (Connection connection = connectAsOwner()) {
-            setDatabaseClinic(connection, clinic);
-            try (PreparedStatement statement =
-                    connection.prepareStatement("SELECT tenant_id, label FROM tenancy_test_record WHERE id = ?")) {
-                statement.setObject(1, id);
-                try (ResultSet row = statement.executeQuery()) {
-                    return row.next()
-                            ? Optional.of(new StoredRecord(row.getObject(1, UUID.class), row.getString(2)))
-                            : Optional.empty();
-                }
-            }
-        }
-    }
-
-    private static int countStored(UUID clinic) throws SQLException {
-        try (Connection connection = connectAsOwner()) {
-            setDatabaseClinic(connection, clinic);
-            try (PreparedStatement statement = connection.prepareStatement("SELECT count(*) FROM tenancy_test_record");
-                    ResultSet row = statement.executeQuery()) {
-                row.next();
-                return row.getInt(1);
-            }
-        }
-    }
-
-    private static void insertClinic(Connection connection, UUID id, String name) throws SQLException {
-        setDatabaseClinic(connection, id);
-        try (PreparedStatement statement =
-                connection.prepareStatement("INSERT INTO clinic (id, name, legal_name, tax_id, created_at, updated_at)"
-                        + " VALUES (?, ?, ?, 'B00000000', now(), now())")) {
-            statement.setObject(1, id);
-            statement.setString(2, name);
-            statement.setString(3, name + " S.L.");
-            statement.executeUpdate();
-        }
-    }
-
-    private static void setDatabaseClinic(Connection connection, UUID clinic) throws SQLException {
-        try (PreparedStatement statement =
-                connection.prepareStatement("SELECT set_config('app.tenant_id', ?, false)")) {
-            statement.setString(1, clinic.toString());
-            statement.execute();
-        }
-    }
-
-    private static void execute(Connection connection, String sql, UUID parameter) throws SQLException {
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setObject(1, parameter);
-            statement.executeUpdate();
-        }
+    /**
+     * A simulated Row Level Security failure, to test the second layer, Hibernate's clinic filter, on its own: makes
+     * PostgreSQL use {@code clinic} for the rest of the current transaction, whatever the active clinic is. Only
+     * {@code hibernateFiltersByTheActiveClinicOnItsOwn} and {@code withoutActiveClinicQueriesReturnNoRows} may call
+     * it: every other test must go through the real path.
+     */
+    private void simulateRlsLetsClinicThrough(UUID clinic) {
+        jdbc.sql("SELECT set_config('app.tenant_id', ?, true)")
+                .param(clinic.toString())
+                .query(String.class)
+                .single();
+        // Native SQL is not filtered by Hibernate: the simulation works if it now sees the clinic's rows.
+        assertThat(jdbc.sql("SELECT count(*) FROM tenancy_test_record WHERE tenant_id = ?")
+                        .param(clinic)
+                        .query(Long.class)
+                        .single())
+                .isPositive();
     }
 
     private static Stream<Throwable> causes(Throwable thrown) {
@@ -348,6 +291,4 @@ class TenantScopedEntityTests {
     }
 
     private record Seeded(UUID north, UUID south) {}
-
-    private record StoredRecord(UUID tenantId, String label) {}
 }
