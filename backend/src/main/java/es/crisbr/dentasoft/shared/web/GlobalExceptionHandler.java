@@ -18,6 +18,8 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -32,8 +34,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  *
  * <p>Spring MVC exceptions are handled by {@link ResponseEntityExceptionHandler}. Anything else becomes a
  * generic problem whose texts come from {@code messages.properties}: exception messages and stack traces
- * never reach the client. Security exceptions (access denied, authentication) need their own handlers when
- * Spring Security is added, otherwise they would fall into the generic 500 handler.
+ * never reach the client. Security exceptions raised by method security ({@code @PreAuthorize}) have their own
+ * handlers, so they are not turned into the generic 500: 401 without an authenticated user, 403 with one.
  */
 @RestControllerAdvice
 class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
@@ -77,6 +79,18 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(ex, body, new HttpHeaders(), status, request);
     }
 
+    @ExceptionHandler(AuthenticationException.class)
+    @Nullable
+    ResponseEntity<Object> handleAuthentication(AuthenticationException ex, WebRequest request) {
+        return securityProblem(ex, HttpStatus.UNAUTHORIZED, "problemDetail.unauthenticated", request);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @Nullable
+    ResponseEntity<Object> handleAccessDenied(AccessDeniedException ex, WebRequest request) {
+        return securityProblem(ex, HttpStatus.FORBIDDEN, "problemDetail.access-denied", request);
+    }
+
     @ExceptionHandler(Exception.class)
     @Nullable
     ResponseEntity<Object> handleUnexpected(Exception ex, WebRequest request) {
@@ -94,6 +108,16 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             // A @ResponseStatus exception keeps its status, but its message is internal: only the title is sent.
             body = ProblemDetail.forStatus(status);
         }
+        return handleExceptionInternal(ex, body, new HttpHeaders(), status, request);
+    }
+
+    private @Nullable ResponseEntity<Object> securityProblem(
+            Exception ex, HttpStatus status, String messageCode, WebRequest request) {
+        ProblemDetail body = ErrorResponse.builder(ex, status, status.getReasonPhrase())
+                .titleMessageCode(messageCode + ".title")
+                .detailMessageCode(messageCode + ".detail")
+                .build()
+                .updateAndGetBody(getMessageSource(), LocaleContextHolder.getLocale());
         return handleExceptionInternal(ex, body, new HttpHeaders(), status, request);
     }
 

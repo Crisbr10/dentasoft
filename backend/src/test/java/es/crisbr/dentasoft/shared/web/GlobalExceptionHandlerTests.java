@@ -15,6 +15,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,8 +24,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-@WebMvcTest
-@Import(GlobalExceptionHandlerTests.FailingController.class)
+// Only this controller: the slice does not load the services other controllers need.
+@WebMvcTest(controllers = GlobalExceptionHandlerTests.FailingController.class)
+@Import({GlobalExceptionHandlerTests.FailingController.class, SecurityConfiguration.class})
 class GlobalExceptionHandlerTests {
 
     private static final String INTERNAL_MESSAGE = "internal detail that must not leak";
@@ -50,6 +53,36 @@ class GlobalExceptionHandlerTests {
                             .extractingPath("$.detail")
                             .isEqualTo("Se ha producido un error inesperado. Inténtalo de nuevo más tarde.");
                 });
+    }
+
+    /** What method security ({@code @PreAuthorize}) throws for an authenticated user it refuses. */
+    @Test
+    void accessDeniedReturnsForbiddenProblemDetailInsteadOfAnInternalError() {
+        assertThat(mvc.get().uri("/test/access-denied"))
+                .hasStatus(HttpStatus.FORBIDDEN)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .satisfies(result ->
+                        assertThat(result.getResponse().getContentAsString()).doesNotContain(INTERNAL_MESSAGE))
+                .bodyJson()
+                .satisfies(json -> {
+                    assertThat(json).extractingPath("$.title").isEqualTo("Acceso denegado");
+                    assertThat(json)
+                            .extractingPath("$.detail")
+                            .isEqualTo("No tienes permiso para realizar esta operación.");
+                });
+    }
+
+    /** What method security throws when nobody is authenticated. */
+    @Test
+    void missingAuthenticationReturnsUnauthorizedProblemDetail() {
+        assertThat(mvc.get().uri("/test/unauthenticated"))
+                .hasStatus(HttpStatus.UNAUTHORIZED)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .satisfies(result ->
+                        assertThat(result.getResponse().getContentAsString()).doesNotContain(INTERNAL_MESSAGE))
+                .bodyJson()
+                .extractingPath("$.title")
+                .isEqualTo("Autenticación necesaria");
     }
 
     @Test
@@ -162,6 +195,16 @@ class GlobalExceptionHandlerTests {
         String constraintViolations() {
             Set<ConstraintViolation<Person>> violations = validator.validate(new Person(new Contact(REJECTED_VALUE)));
             throw new ConstraintViolationException(violations);
+        }
+
+        @GetMapping("/test/access-denied")
+        String accessDenied() {
+            throw new AccessDeniedException(INTERNAL_MESSAGE);
+        }
+
+        @GetMapping("/test/unauthenticated")
+        String unauthenticated() {
+            throw new AuthenticationCredentialsNotFoundException(INTERNAL_MESSAGE);
         }
 
         @PostMapping("/test/echo")
