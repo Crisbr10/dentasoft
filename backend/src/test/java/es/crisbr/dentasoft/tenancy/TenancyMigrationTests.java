@@ -103,6 +103,32 @@ class TenancyMigrationTests {
         }
     }
 
+    /** The clinic is set per transaction (M01-T03): once it ends, the connection is back to no clinic. */
+    @Test
+    void transactionScopedClinicIsGoneAfterTheTransaction() throws SQLException {
+        try (Connection connection = connectAsApplication()) {
+            for (boolean commit : List.of(true, false)) {
+                connection.setAutoCommit(false);
+                try (PreparedStatement statement =
+                        connection.prepareStatement("SELECT set_config('app.tenant_id', ?, true)")) {
+                    statement.setString(1, CLINIC_A.toString());
+                    statement.execute();
+                }
+                assertThat(visibleClinics(connection)).containsExactly(CLINIC_A.toString());
+                if (commit) {
+                    connection.commit();
+                } else {
+                    connection.rollback();
+                }
+                connection.setAutoCommit(true);
+
+                assertThat(visibleClinics(connection))
+                        .as("after %s", commit ? "commit" : "rollback")
+                        .isEmpty();
+            }
+        }
+    }
+
     @Test
     void activeClinicSeesOnlyItself() throws SQLException {
         try (Connection connection = connectAsApplication()) {

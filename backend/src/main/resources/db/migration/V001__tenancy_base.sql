@@ -27,7 +27,8 @@ ALTER DEFAULT PRIVILEGES FOR ROLE dentasoft_owner
 REVOKE ALL ON TABLE ${flyway:defaultSchema}.${flyway:table} FROM PUBLIC, dentasoft_app;
 
 -- Turns on and forces Row Level Security on a table and creates its `tenant_isolation` policy, which only
--- lets through rows whose p_column equals the active clinic (app.tenant_id, set per connection).
+-- lets through rows whose p_column equals the active clinic (app.tenant_id, set per transaction:
+-- set_config(…, true) / SET LOCAL).
 -- Fails closed: without an active clinic the setting is NULL (missing) or '' (reset), NULLIF turns both into
 -- NULL, the comparison is never true and no row is visible or writable, without raising an error.
 -- Only migrations call it: EXECUTE is revoked from PUBLIC and from the application.
