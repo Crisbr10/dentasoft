@@ -5,15 +5,18 @@ import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 /**
  * The properties of {@link WithTestEnvironment} without its Redis container, for tests that bring their own Redis
- * (or none). Uses the reserved {@code .test} domain so no real host ends up in the tests.
+ * (or none). Uses the reserved {@code .test} domain so no real host ends up in the tests. Includes the PostgreSQL of
+ * {@link TestPostgresConfiguration}: the application does not start without its database.
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
+@Import(TestPostgresConfiguration.class)
 @TestPropertySource(
         properties = {
             "dentasoft.urls.app=" + WithTestEnvironment.APP,

@@ -13,6 +13,19 @@ spring:
     fallback-to-system-locale: false
   web:
     locale: es
+  # Two database roles (ADR 0002, infra/postgres/init/01-init.sh). The application connects as dentasoft_app
+  # (NOBYPASSRLS, owns nothing): SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD.
+  # Flyway migrates as dentasoft_owner with its own credentials: SPRING_FLYWAY_USER, SPRING_FLYWAY_PASSWORD.
+  # Without them Flyway would use dentasoft_app, which cannot create tables, so startup fails instead of
+  # running with the wrong role.
+  flyway:
+    # Never let `flyway clean` (drop every object) run against a real database.
+    clean-disabled: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The schema belongs to Flyway; Hibernate never changes it.
+      ddl-auto: none
   data:
     redis:
       # Short timeouts: if Redis stalls, rate limiting falls back to the per-instance limit quickly

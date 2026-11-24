@@ -9,6 +9,14 @@ dentasoft:
     key: ${DENTASOFT_RATE_LIMIT_KEY:local-development-only-not-a-secret}
 
 spring:
+  # The PostgreSQL of infra/ (compose.yml), with the same password variables as infra/.env.
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/dentasoft}
+    username: ${SPRING_DATASOURCE_USERNAME:dentasoft_app}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DENTASOFT_DB_APP_PASSWORD:}}
+  flyway:
+    user: ${SPRING_FLYWAY_USER:dentasoft_owner}
+    password: ${SPRING_FLYWAY_PASSWORD:${DENTASOFT_DB_OWNER_PASSWORD:}}
   data:
     redis:
       # Same variable as infra/.env, so `mvnw spring-boot:run` reaches the local Redis.
