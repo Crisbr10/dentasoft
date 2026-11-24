@@ -1,6 +1,7 @@
 package es.crisbr.dentasoft.platform.web;
 
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.NewClinic;
+import es.crisbr.dentasoft.shared.KnownTimeZone;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
