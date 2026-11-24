@@ -201,13 +201,13 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T03 · Row Level Security en la conexión
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T02
 - **Descripción**: fijar `app.tenant_id` por transacción, no por conexión: al empezar cada transacción, `set_config('app.tenant_id', …, true)` (equivale a `SET LOCAL`). PostgreSQL lo descarta al confirmar o deshacer, así que la conexión vuelve al pool sin clínica aunque falle la petición. Todo acceso a datos de una clínica va dentro de una transacción; fuera de ella no se ve ninguna fila (falla cerrado).
 - **Criterios de aceptación**:
-  - [ ] Una consulta nativa sin filtro solo devuelve filas de la clínica activa
-  - [ ] Sin clínica activa, las tablas con RLS devuelven cero filas
-  - [ ] Ninguna conexión vuelve al pool con una clínica fijada: tras cada transacción, también si falla, `app.tenant_id` queda vacío (test con concurrencia)
+  - [x] Una consulta nativa sin filtro solo devuelve filas de la clínica activa
+  - [x] Sin clínica activa, las tablas con RLS devuelven cero filas
+  - [x] Ninguna conexión vuelve al pool con una clínica fijada: tras cada transacción, también si falla, `app.tenant_id` queda vacío (test con concurrencia)
 
 ### M01-T04 · Test de aislamiento reutilizable
 
