@@ -1,6 +1,6 @@
 # Backend image: Maven build, then a JRE 25 runtime with the Spring Boot layers.
 #   docker build -t dentasoft-backend:local backend
-# Base images are pinned by tag and digest. Dependabot updates the digests from M00-T07 on:
+# Base images are pinned by tag and digest. Dependabot updates the digests:
 # never replace them by hand with a floating tag such as `latest`.
 
 FROM eclipse-temurin:25-jdk-noble@sha256:4ddc1a8bdaf283421df5487411aff10b797ccf1e06a339041005114c8f489b5c AS build
