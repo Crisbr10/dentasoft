@@ -2,9 +2,12 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 class GlobalExceptionHandlerTests {
 
     private static final String INTERNAL_MESSAGE = "internal detail that must not leak";
+
+    private static final String REJECTED_VALUE = "rejected-value-that-must-not-leak";
 
     @Autowired
     private MockMvcTester mvc;
@@ -88,6 +93,24 @@ class GlobalExceptionHandlerTests {
     }
 
     @Test
+    void realConstraintViolationsNameTheLeafFieldAndNeverTheRejectedValue() {
+        assertThat(mvc.get().uri("/test/constraint-violations"))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .satisfies(result ->
+                        assertThat(result.getResponse().getContentAsString()).doesNotContain(REJECTED_VALUE))
+                .bodyJson()
+                .satisfies(json -> {
+                    assertThat(json).extractingPath("$.errors.length()").isEqualTo(1);
+                    assertThat(json).extractingPath("$.errors[0].field").isEqualTo("phone");
+                    assertThat(json)
+                            .extractingPath("$.errors[0].message")
+                            .asString()
+                            .isNotBlank();
+                });
+    }
+
+    @Test
     void unknownPathReturnsNotFoundProblemDetail() {
         assertThat(mvc.get().uri("/test/does-not-exist"))
                 .hasStatus(HttpStatus.NOT_FOUND)
@@ -99,6 +122,10 @@ class GlobalExceptionHandlerTests {
 
     record EchoRequest(@NotBlank String name) {}
 
+    record Contact(@Size(max = 9) String phone) {}
+
+    record Person(@Valid Contact contact) {}
+
     @ResponseStatus(HttpStatus.CONFLICT)
     static class ConflictException extends RuntimeException {
         ConflictException(String message) {
@@ -108,6 +135,12 @@ class GlobalExceptionHandlerTests {
 
     @RestController
     static class FailingController {
+
+        private final Validator validator;
+
+        FailingController(Validator validator) {
+            this.validator = validator;
+        }
 
         @GetMapping("/test/unexpected")
         String unexpected() {
@@ -122,6 +155,13 @@ class GlobalExceptionHandlerTests {
         @GetMapping("/test/constraint")
         String constraint() {
             throw new ConstraintViolationException(INTERNAL_MESSAGE, Set.of());
+        }
+
+        /** Path {@code contact.phone}: the response must keep only {@code phone}. */
+        @GetMapping("/test/constraint-violations")
+        String constraintViolations() {
+            Set<ConstraintViolation<Person>> violations = validator.validate(new Person(new Contact(REJECTED_VALUE)));
+            throw new ConstraintViolationException(violations);
         }
 
         @PostMapping("/test/echo")

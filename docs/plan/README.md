@@ -31,7 +31,7 @@ flowchart LR
 
 | Módulo | Nombre | Depende de | Estado |
 | --- | --- | --- | --- |
-| [M00](M00-fundamentos.md) | Fundamentos técnicos | — | En curso |
+| [M00](M00-fundamentos.md) | Fundamentos técnicos | — | Hecho |
 | [M01](M01-clinicas-multitenant.md) | Clínicas y multi-tenant | M00 | Pendiente |
 | [M02](M02-identidad-roles.md) | Identidad, usuarios y roles | M01 | Pendiente |
 | [M03](M03-entorno-pruebas.md) | Entorno de pruebas y despliegue continuo | M02 | Pendiente |
