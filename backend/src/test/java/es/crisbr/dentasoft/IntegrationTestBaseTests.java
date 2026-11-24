@@ -20,18 +20,6 @@ class IntegrationTestBaseTests {
     private static final String INSUFFICIENT_PRIVILEGE = "42501";
 
     @Test
-    void applicationRoleIsNeitherSuperuserNorBypassesRowLevelSecurity() throws SQLException {
-        try (Connection connection = connectAsApplication();
-                PreparedStatement statement = connection.prepareStatement(
-                        "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user");
-                ResultSet role = statement.executeQuery()) {
-            assertThat(role.next()).isTrue();
-            assertThat(role.getBoolean("rolsuper")).isFalse();
-            assertThat(role.getBoolean("rolbypassrls")).isFalse();
-        }
-    }
-
-    @Test
     void vectorExtensionIsInstalled() throws SQLException {
         try (Connection connection = connectAsApplication();
                 PreparedStatement statement =

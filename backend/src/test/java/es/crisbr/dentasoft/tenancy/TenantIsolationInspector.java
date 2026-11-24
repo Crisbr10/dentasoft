@@ -104,7 +104,10 @@ final class TenantIsolationInspector {
             statement.setString(1, schema);
             statement.setString(2, table);
             try (ResultSet result = statement.executeQuery()) {
-                result.next();
+                if (!result.next()) {
+                    problems.add(table + ": not found in the catalog");
+                    return;
+                }
                 if (!result.getBoolean("relrowsecurity")) {
                     problems.add(table + ": Row Level Security is not enabled");
                 }
@@ -189,8 +192,7 @@ final class TenantIsolationInspector {
             statement.setString(2, table);
             statement.setString(3, column);
             try (ResultSet result = statement.executeQuery()) {
-                result.next();
-                if (result.getLong(1) == 0) {
+                if (!result.next() || result.getLong(1) == 0) {
                     problems.add(table + ": no index whose first column is " + column);
                 }
             }

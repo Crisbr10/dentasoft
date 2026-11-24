@@ -33,6 +33,9 @@ class TenancyMigrationTests {
     /** PostgreSQL error code {@code insufficient_privilege}, also raised when a row breaks a policy. */
     private static final String INSUFFICIENT_PRIVILEGE = "42501";
 
+    /** PostgreSQL error code {@code invalid_text_representation}, raised when a value cannot be cast. */
+    private static final String INVALID_TEXT_REPRESENTATION = "22P02";
+
     private static final UUID CLINIC_A = TestData.CLINIC_A.id();
     private static final UUID CLINIC_B = TestData.CLINIC_B.id();
 
@@ -126,6 +129,18 @@ class TenancyMigrationTests {
                         .as("after %s", commit ? "commit" : "rollback")
                         .isEmpty();
             }
+        }
+    }
+
+    /** Fails closed, but loudly: a malformed clinic never matches and every query on the table errors. */
+    @Test
+    void clinicThatIsNotAUuidRaisesAnError() throws SQLException {
+        try (Connection connection = connectAsApplication()) {
+            setActiveClinic(connection, "not-a-uuid");
+
+            assertThatExceptionOfType(SQLException.class)
+                    .isThrownBy(() -> visibleClinics(connection))
+                    .satisfies(error -> assertThat(error.getSQLState()).isEqualTo(INVALID_TEXT_REPRESENTATION));
         }
     }
 

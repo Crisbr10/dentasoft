@@ -30,7 +30,9 @@ REVOKE ALL ON TABLE ${flyway:defaultSchema}.${flyway:table} FROM PUBLIC, dentaso
 -- lets through rows whose p_column equals the active clinic (app.tenant_id, set per transaction:
 -- set_config(…, true) / SET LOCAL).
 -- Fails closed: without an active clinic the setting is NULL (missing) or '' (reset), NULLIF turns both into
--- NULL, the comparison is never true and no row is visible or writable, without raising an error.
+-- NULL and the comparison is never true. Reads, UPDATE and DELETE then see no row, silently; an INSERT (or an
+-- UPDATE that moves a row to another clinic) breaks WITH CHECK and raises 42501. A value that is not a UUID
+-- raises 22P02 on every query: still closed, but loud.
 -- Only migrations call it: EXECUTE is revoked from PUBLIC and from the application.
 CREATE FUNCTION enable_tenant_isolation(p_table text, p_column text DEFAULT 'tenant_id')
     RETURNS void

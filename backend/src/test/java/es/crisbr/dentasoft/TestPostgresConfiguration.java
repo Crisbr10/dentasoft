@@ -22,7 +22,7 @@ import org.testcontainers.utility.MountableFile;
  * container's superuser, which bypasses Row Level Security and would hide any isolation bug.
  *
  * <p>One container is shared by every Spring context of the test run (contexts differ in properties, not in the
- * database) and Testcontainers removes it when the JVM exits. Flyway migrates it once; later contexts find it up to
+ * database) and it is stopped when the JVM exits. Flyway migrates it once; later contexts find it up to
  * date.
  */
 @TestConfiguration(proxyBeanMethods = false)
@@ -88,6 +88,8 @@ public class TestPostgresConfiguration {
                     .withCopyFileToContainer(
                             MountableFile.forHostPath(initScript(), 0755), "/docker-entrypoint-initdb.d/01-init.sh");
             postgres.start();
+            // Stops it at JVM exit even where the Testcontainers reaper (Ryuk) is disabled.
+            Runtime.getRuntime().addShutdownHook(new Thread(postgres::stop, "postgres-test-container-stop"));
             container = postgres;
         }
         return container;
