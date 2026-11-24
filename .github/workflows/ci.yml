@@ -171,15 +171,30 @@ jobs:
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --tag "${image}" backend
       # Same policy as backend/README.md: critical vulnerabilities stop the release; high ones
-      # are listed for review.
+      # are listed for review. Temporary exceptions go in backend/.trivyignore.
       - name: Scan the image with Trivy
         run: |
           trivy() {
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-              -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" "$@"
+              -v trivy-cache:/root/.cache/trivy \
+              -v "$GITHUB_WORKSPACE/backend/.trivyignore:/.trivyignore:ro" \
+              "$TRIVY_IMAGE" "$@"
           }
-          trivy image --scanners vuln --severity HIGH,CRITICAL --no-progress "$IMAGE"
-          trivy image --scanners vuln --severity CRITICAL --exit-code 1 --quiet "$IMAGE"
+          # The databases are downloaded once, retrying a transient registry failure, and
+          # both scans reuse them.
+          for attempt in 1 2 3; do
+            if trivy image --download-db-only --no-progress \
+              && trivy image --download-java-db-only --no-progress; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 20))
+          done
+          scan=(image --skip-db-update --skip-java-db-update --ignorefile /.trivyignore --scanners vuln)
+          trivy "${scan[@]}" --severity HIGH,CRITICAL --no-progress "$IMAGE"
+          trivy "${scan[@]}" --severity CRITICAL --exit-code 1 --quiet "$IMAGE"
       - name: Push to GHCR
         if: github.event_name == 'push'
         env:

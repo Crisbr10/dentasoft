@@ -25,6 +25,8 @@ Al fusionar en `main` un cambio del backend, se publica `ghcr.io/<propietario>/d
 
 Trivy sigue la misma política que en local ([backend/README.md](../../backend/README.md#escaneo-de-vulnerabilidades)): las vulnerabilidades críticas impiden publicar la imagen y las altas se listan en el log para revisarlas.
 
+El escaneo también corre en los PR que tocan el backend, así que una vulnerabilidad crítica nueva en la imagen base o en una dependencia bloquea esos PR aunque no tengan relación con ella. Lo normal es actualizar la imagen o la dependencia. Si no hay versión corregida, se hace una excepción temporal en [`backend/.trivyignore`](../../backend/.trivyignore): un CVE por línea, precedido de un comentario con el issue que la justifica y la fecha de revisión. Las bases de datos de Trivy se descargan una vez por ejecución, con 3 reintentos ante un fallo transitorio del registro.
+
 ## Protección de `main`
 
 El ruleset está en [`.github/rulesets/main.json`](../../.github/rulesets/main.json) y se aplica con:
