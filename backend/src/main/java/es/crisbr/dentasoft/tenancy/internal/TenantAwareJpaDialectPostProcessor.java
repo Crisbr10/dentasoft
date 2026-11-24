@@ -4,10 +4,12 @@ import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.orm.jpa.AbstractEntityManagerFactoryBean;
 import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
 
 /**
- * Installs {@link TenantAwareJpaDialect} on the entity manager factory, and refuses to start the application with a
- * {@link JpaTransactionManager} that uses any other dialect.
+ * Installs {@link TenantAwareJpaDialect} on the entity manager factory, and refuses to start the application with any
+ * transaction manager that would not pass the clinic to PostgreSQL: one that is not a {@link JpaTransactionManager}
+ * (a JDBC or JTA one, for example), or one that uses another dialect.
  *
  * <p>The dialect has to be set on the factory: the transaction manager copies the factory's dialect when it is
  * initialized, so a dialect set on the transaction manager alone would be replaced. The factory only takes the
@@ -26,14 +28,21 @@ final class TenantAwareJpaDialectPostProcessor implements BeanPostProcessor {
         return bean;
     }
 
+    /** Every transaction manager must be a {@link JpaTransactionManager} with {@link TenantAwareJpaDialect}. */
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
-        if (bean instanceof JpaTransactionManager transactionManager
-                && !(transactionManager.getJpaDialect() instanceof TenantAwareJpaDialect)) {
-            throw new BeanInitializationException("Transaction manager '" + beanName
-                    + "' does not pass the active clinic to PostgreSQL: its JPA dialect is "
-                    + transactionManager.getJpaDialect().getClass().getName());
+        if (bean instanceof PlatformTransactionManager transactionManager && !passesTheClinic(transactionManager)) {
+            String uses = transactionManager instanceof JpaTransactionManager jpa
+                    ? "its JPA dialect is " + jpa.getJpaDialect().getClass().getName()
+                    : "it is a " + transactionManager.getClass().getName();
+            throw new BeanInitializationException(
+                    "Transaction manager '" + beanName + "' does not pass the active clinic to PostgreSQL: " + uses);
         }
         return bean;
+    }
+
+    private static boolean passesTheClinic(PlatformTransactionManager transactionManager) {
+        return transactionManager instanceof JpaTransactionManager jpa
+                && jpa.getJpaDialect() instanceof TenantAwareJpaDialect;
     }
 }

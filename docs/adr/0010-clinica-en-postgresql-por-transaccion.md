@@ -16,7 +16,7 @@ Hibernate ya conoce la clínica de cada sesión (ADR 0009), y Spring expone la c
   - Ni `connectionInitSql` en Hikari ni `SET` de sesión.
 - **El valor es la clínica de la sesión de Hibernate**, que tiene que coincidir con la de `TenantContext`. Si no coincide, la transacción no empieza. Sin clínica (`NO_CLINIC`) no se fija nada.
 - **Leer o escribir datos de una clínica exige una transacción de Spring** (`@Transactional` o `TransactionTemplate`). Fuera de ella, las tablas con RLS no devuelven filas, aunque haya una clínica activa.
-- **El dialecto se instala en el `EntityManagerFactory`** con un `BeanPostProcessor` (`TenantAwareJpaDialectPostProcessor`). El transaction manager copia el dialecto de la factoría al inicializarse, así que ponerlo solo en él no sirve. El mismo post-processor hace fallar el arranque si un `JpaTransactionManager` usa otro dialecto.
+- **El dialecto se instala en el `EntityManagerFactory`** con un `BeanPostProcessor` (`TenantAwareJpaDialectPostProcessor`). El transaction manager copia el dialecto de la factoría al inicializarse, así que ponerlo solo en él no sirve. El mismo post-processor hace fallar el arranque con cualquier `PlatformTransactionManager` que no sea un `JpaTransactionManager` con este dialecto, por ejemplo uno de JDBC o uno de JTA.
 
 ## Consecuencias
 

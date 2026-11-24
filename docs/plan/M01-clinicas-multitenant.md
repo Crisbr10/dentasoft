@@ -157,7 +157,8 @@ Al empezar cada transacción de Spring, `TenantAwareJpaDialect` ejecuta `SELECT 
 - `JdbcClient` dentro de la transacción usa la misma conexión y la misma clínica.
 - `REQUIRES_NEW` abre otra conexión, que recibe la misma clínica. Las transacciones de solo lectura también la reciben.
 - Si la sesión se abrió para otra clínica que la activa, la transacción no empieza (`IllegalStateException`).
-- Si `TenantAwareJpaDialect` deja de instalarse, la aplicación no arranca (`TenantAwareJpaDialectPostProcessor`).
+- `REQUIRES_NEW` es la forma de abrir una transacción aparte. `NESTED` no está disponible con JPA: `JpaTransactionManager` la rechaza con `NestedTransactionNotSupportedException`.
+- **La aplicación no arranca con un transaction manager que no pase la clínica**: `TenantAwareJpaDialectPostProcessor` rechaza todo `PlatformTransactionManager` que no sea un `JpaTransactionManager` con `TenantAwareJpaDialect`, por ejemplo uno de JDBC. Si el propio post-processor deja de registrarse, la aplicación arranca pero no ve ni escribe datos de clínicas, y lo detectan los tests (`TenantAwareJpaDialectPostProcessorTests`, `ConnectionRowLevelSecurityTests`).
 
 ### Hilos y procesos asíncronos
 

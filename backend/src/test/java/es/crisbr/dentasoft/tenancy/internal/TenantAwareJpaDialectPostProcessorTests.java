@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.BeanInitializationException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.orm.jpa.EntityManagerFactoryInfo;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
@@ -43,6 +45,25 @@ class TenantAwareJpaDialectPostProcessorTests {
                 .withMessageContaining("does not pass the active clinic to PostgreSQL");
     }
 
+    /** A JDBC transaction manager would start transactions without the clinic: startup fails. */
+    @Test
+    void rejectsATransactionManagerThatIsNotJpa() {
+        var transactionManager = new DataSourceTransactionManager();
+
+        assertThatExceptionOfType(BeanInitializationException.class)
+                .isThrownBy(() ->
+                        postProcessor.postProcessAfterInitialization(transactionManager, "jdbcTransactionManager"))
+                .withMessageContaining("does not pass the active clinic to PostgreSQL")
+                .withMessageContaining(DataSourceTransactionManager.class.getName());
+    }
+
+    @Test
+    void ignoresBeansThatAreNotTransactionManagers() {
+        Object bean = new Object();
+
+        assertThat(postProcessor.postProcessAfterInitialization(bean, "other")).isSameAs(bean);
+    }
+
     @Test
     void acceptsATransactionManagerWithTheDialect() {
         var transactionManager = new JpaTransactionManager();
@@ -63,6 +84,16 @@ class TenantAwareJpaDialectPostProcessorTests {
             assertThat(((JpaTransactionManager) transactionManager).getJpaDialect())
                     .isInstanceOf(TenantAwareJpaDialect.class);
             assertThat(((EntityManagerFactoryInfo) factory).getJpaDialect()).isInstanceOf(TenantAwareJpaDialect.class);
+        }
+
+        @Test
+        void everyTransactionManagerPassesTheClinic(@Autowired ApplicationContext context) {
+            assertThat(context.getBeansOfType(PlatformTransactionManager.class).values())
+                    .isNotEmpty()
+                    .allSatisfy(transactionManager -> assertThat(transactionManager)
+                            .isInstanceOfSatisfying(
+                                    JpaTransactionManager.class,
+                                    jpa -> assertThat(jpa.getJpaDialect()).isInstanceOf(TenantAwareJpaDialect.class)));
         }
     }
 }

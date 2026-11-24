@@ -9,7 +9,9 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -73,6 +75,7 @@ class PooledConnectionClinicLeakTests {
         assertThat(dataSource.unwrap(HikariDataSource.class).getMaximumPoolSize())
                 .isEqualTo(2);
         Queue<String> wrongViews = new ConcurrentLinkedQueue<>();
+        Set<Integer> usedConnections = ConcurrentHashMap.newKeySet();
         AtomicInteger failed = new AtomicInteger();
         CountDownLatch start = new CountDownLatch(1);
 
@@ -83,7 +86,7 @@ class PooledConnectionClinicLeakTests {
                 running.add(threads.submit(() -> {
                     start.await();
                     try {
-                        runTransaction(n, wrongViews);
+                        runTransaction(n, wrongViews, usedConnections);
                     } catch (SimulatedFailure e) {
                         failed.incrementAndGet();
                     }
@@ -98,7 +101,12 @@ class PooledConnectionClinicLeakTests {
 
         assertThat(wrongViews).isEmpty();
         assertThat(failed).hasValue(TRANSACTIONS / FAILING_EVERY);
-        assertThat(PooledConnections.inspectAll(dataSource)).hasSize(2).allSatisfy(connection -> {
+        List<PooledConnections.IdleConnection> idle = PooledConnections.inspectAll(dataSource);
+        // The inspected connections are the ones the transactions used, so the checks below are not vacuous.
+        assertThat(idle)
+                .extracting(PooledConnections.IdleConnection::backendPid)
+                .isSubsetOf(usedConnections);
+        assertThat(idle).hasSize(2).allSatisfy(connection -> {
             assertThat(connection.hasNoClinic()).as("clinic of %s", connection).isTrue();
             assertThat(connection.visibleRows())
                     .as("rows seen by %s", connection)
@@ -109,12 +117,15 @@ class PooledConnectionClinicLeakTests {
     }
 
     /** Transaction {@code n}: clinics alternate, and every {@value #FAILING_EVERY}th one fails. */
-    private void runTransaction(int n, Queue<String> wrongViews) {
+    private void runTransaction(int n, Queue<String> wrongViews, Set<Integer> usedConnections) {
         UUID clinic = n % 2 == 0 ? CLINIC_A : CLINIC_B;
         String expected = clinic.equals(CLINIC_A) ? "north" : "south";
         TenantContext.runAs(
                 clinic,
                 () -> transaction.executeWithoutResult(status -> {
+                    usedConnections.add(jdbc.sql("SELECT pg_backend_pid()")
+                            .query(Integer.class)
+                            .single());
                     String databaseClinic = jdbc.sql("SELECT current_setting('app.tenant_id', true)")
                             .query(String.class)
                             .single();
