@@ -36,7 +36,7 @@ Regla: los mensajes llevan los datos justos (fecha y hora de la cita, nombre de 
 - **Criterios de aceptación**:
   - [ ] En local, los correos aparecen en Mailpit y nunca salen fuera
   - [ ] En pruebas llegan con SPF, DKIM y DMARC correctos
-  - [ ] Validar el email con un formato estricto (con dominio de nivel superior) antes de usarlo como remitente
+  - [ ] Validar el email con un formato estricto (con dominio de nivel superior) antes de usarlo como `Reply-To`
 
 ### M07-T03 · Canal de WhatsApp
 
