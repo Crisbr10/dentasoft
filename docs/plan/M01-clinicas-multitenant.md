@@ -91,6 +91,60 @@ $$;
 - El `NO FORCE` de `clinic` solo vale para el dueño y dentro de la transacción de la migración: si algo falla, Flyway la deshace entera.
 - Comprueba el resultado en la propia migración (por ejemplo, con un `RAISE EXCEPTION` si quedan filas sin migrar) en vez de confiar en que el `UPDATE` haya encontrado filas.
 
+## Clínica activa en la aplicación
+
+### `TenantContext`
+
+La clínica activa vive en un `ScopedValue`. Solo existe dentro del bloque y desaparece al salir de él, aunque falle. No hay `set()`, así que no puede quedarse en el hilo ni pasar a otra petición.
+
+```java
+TenantContext.runAs(clinicId, () -> appointments.confirm(appointmentId));
+Quote quote = TenantContext.callAs(clinicId, () -> quotes.find(quoteId));
+UUID clinicId = TenantContext.current(); // NoActiveClinicException si no hay clínica activa
+```
+
+Hibernate fija la clínica de la sesión al abrirla, al empezar el `@Transactional` exterior. Por eso hay dos reglas, y las dos lanzan `IllegalStateException` si se incumplen:
+
+- **No se cambia de clínica dentro de otra.** Anidar la misma clínica está permitido.
+- **No se fija la clínica dentro de una transacción ya empezada.** Primero `runAs` y después la transacción, nunca al revés. Un job recorre las clínicas sin una transacción que envuelva el bucle: cada vuelta, `runAs` y dentro un servicio `@Transactional`.
+
+Hasta que exista la validación de la membresía (M02), la clínica no se lee de ninguna cabecera, ruta ni cuerpo de la petición.
+
+### Sin clínica activa: el centinela `NO_CLINIC`
+
+`ActiveClinicResolver` da a la sesión el UUID nulo `00000000-0000-0000-0000-000000000000` cuando no hay clínica activa. Ese valor nunca es una clínica: los id de clínica son UUID v7 y `runAs` lo rechaza. Con él:
+
+- **Las lecturas no devuelven nada.** Toda consulta JPQL o de Spring Data, `find()` y `UPDATE`/`DELETE` en JPQL sobre una `TenantScopedEntity` filtran por `tenant_id = 00000000-…`: devuelven vacío y no cambian ninguna fila. No dan error: un `runAs` olvidado parece «no hay datos».
+- **Las escrituras fallan.** Todo `INSERT`, `UPDATE` o `DELETE` de una `TenantScopedEntity` lanza `NoActiveClinicException` (`TenantWriteGuard`). También falla si la sesión se abrió para otra clínica.
+- **Lo que no es de una clínica sigue accesible**: la tabla `clinic`, la administración de plataforma y, si se añade, el registro de eventos de Spring Modulith.
+
+Ninguna clínica es «root» (`isRoot` siempre devuelve `false`), porque Hibernate quitaría el filtro. Por qué un centinela y no un resolver que lance excepción: lo explica el [comentario de la decisión en el issue #10](https://github.com/Crisbr10/dentasoft/issues/10#issuecomment-7125108865). En resumen, la excepción rompía el arranque de Spring Data, la plataforma (M01-T05), los jobs y el registro de eventos.
+
+### Entidades
+
+- **`BaseEntity`** (`shared`):
+  - id UUID v7 (`@UuidGenerator(style = VERSION_7)`);
+  - `@Version Long version`: un objeto, no un `long`, para que Spring Data distinga las entidades nuevas;
+  - `created_at`, `created_by`, `updated_at` y `updated_by`, con `Instant` y `UUID`. `created_by` y `updated_by` quedan vacíos hasta M02, que los rellenará con el `sub` de Keycloak (`AuditingConfiguration`).
+- **`TenantScopedEntity`** (`tenancy`): extiende `BaseEntity` y añade `tenant_id` con `@TenantId`. Hibernate lo rellena con la clínica activa al insertar y añade `tenant_id = <clínica activa>` a cada consulta JPA, `find()`, `UPDATE` y `DELETE`. No hay filtro que escribir a mano.
+- **`tenant_id` no se puede cambiar**: no tiene setter y la columna no es actualizable. Si aun así se cambia el valor en memoria, Hibernate lo ignora al guardar y no da error. Al insertar, un valor distinto de la clínica activa falla (`PropertyValueException`).
+
+### Lo que `@TenantId` no protege
+
+Las consultas nativas, `JdbcClient` y el SQL propio (`@SQLDelete`, `@SQLUpdate`, `@Formula`) no pasan por el filtro de Hibernate. Ahí solo protege el Row Level Security, que la aplicación activa en M01-T03.
+
+### Hilos y procesos asíncronos
+
+La clínica no se hereda en ningún caso: ni en las tareas enviadas a un executor, ni en hilos nuevos, ni en métodos `@Async`, ni en listeners `@ApplicationModuleListener`. `@EnableAsync` (`SharedConfiguration`) hace que los dos últimos se ejecuten en su propio hilo virtual; sin él se ejecutarían en el hilo de quien los llama y con su clínica.
+
+- **Un `@Async`** empieza sin transacción: fija su clínica con `runAs` y dentro llama al servicio `@Transactional`.
+- **Un `@ApplicationModuleListener`** abre su transacción (`REQUIRES_NEW`) antes de ejecutar el método, así que dentro ya no se puede fijar la clínica: `runAs` lo rechaza. Para tocar datos de una clínica, el listener toma el id de la clínica del evento y llama, dentro de `runAs`, a un servicio que abre su propia transacción. M01-T08 dará una utilidad para esto.
+
+### Tests
+
+- **Tablas solo de test**: en `src/test/resources/db/testmigration`, numeradas desde `V900` para que se apliquen después de las reales, y con RLS como cualquier otra (el test guardián también las revisa). Ejemplo: `V900__tenancy_test_record.sql`.
+- **Hasta M01-T03**, la aplicación no pasa la clínica activa a PostgreSQL. Los tests fijan `app.tenant_id` ellos mismos en cada transacción (ver `TenantScopedEntityTests`).
+
 ## Tareas
 
 ### M01-T01 · Migración base y roles de base de datos
