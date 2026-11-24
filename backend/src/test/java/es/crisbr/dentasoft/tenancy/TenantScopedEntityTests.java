@@ -9,6 +9,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.TestData;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -24,9 +25,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.data.jpa.repository.support.JpaEntityInformationSupport;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.orm.jpa.support.OpenEntityManagerInViewInterceptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -212,6 +215,39 @@ class TenantScopedEntityTests {
         });
 
         assertThat(stored(CLINIC_A, record.getId())).hasValue(new StoredRecord(CLINIC_A, "north"));
+    }
+
+    /** An EntityManager keeps the clinic it was opened with: writing through it with another clinic active fails. */
+    @Test
+    void writingThroughASessionOpenedForAnotherClinicFails(@Autowired EntityManagerFactory factory)
+            throws SQLException {
+        try (EntityManager openedForA = TenantContext.callAs(CLINIC_A, factory::createEntityManager)) {
+            Throwable thrown = catchThrowable(() -> TenantContext.runAs(CLINIC_B, () -> {
+                openedForA.getTransaction().begin();
+                try {
+                    openedForA.persist(new TenancyTestRecord("south"));
+                    openedForA.flush();
+                } finally {
+                    openedForA.getTransaction().rollback();
+                }
+            }));
+
+            assertThat(causes(thrown))
+                    .anyMatch(cause -> cause instanceof IllegalStateException
+                            && String.valueOf(cause.getMessage()).contains("opened for another clinic"));
+        }
+        assertThat(countStored(CLINIC_A)).isZero();
+        assertThat(countStored(CLINIC_B)).isZero();
+    }
+
+    /**
+     * With open-in-view, the session would open when the request starts, before any {@code runAs}, and keep
+     * {@code NO_CLINIC} for the whole request. {@code runAs} cannot see it: it only knows about transactions.
+     */
+    @Test
+    void sessionsAreNotOpenedForTheWholeRequest(@Autowired ApplicationContext context) {
+        assertThat(context.getBeansOfType(OpenEntityManagerInViewInterceptor.class))
+                .isEmpty();
     }
 
     /** The session took its clinic when the transaction began: binding one afterwards would not reach it. */

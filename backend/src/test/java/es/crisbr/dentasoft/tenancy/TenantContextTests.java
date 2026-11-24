@@ -96,12 +96,12 @@ class TenantContextTests {
     void clinicDoesNotLeakToTheNextTaskOfTheSameExecutor() throws Exception {
         try (ExecutorService executor =
                 Executors.newSingleThreadExecutor(Thread.ofVirtual().factory())) {
-            Future<Thread> first = executor.submit(() -> TenantContext.callAs(CLINIC_A, Thread::currentThread));
-            Future<Thread> second = executor.submit(Thread::currentThread);
-            Future<Boolean> secondSeesClinic = executor.submit(TenantContext::isBound);
+            Future<Thread> withClinic = executor.submit(() -> TenantContext.callAs(CLINIC_A, Thread::currentThread));
+            Future<Observation> next =
+                    executor.submit(() -> new Observation(Thread.currentThread(), TenantContext.isBound()));
 
-            assertThat(second.get()).isSameAs(first.get());
-            assertThat(secondSeesClinic.get()).isFalse();
+            assertThat(next.get().thread()).isSameAs(withClinic.get());
+            assertThat(next.get().clinicActive()).isFalse();
         }
     }
 
@@ -150,7 +150,7 @@ class TenantContextTests {
                 results.add(CompletableFuture.supplyAsync(
                         () -> TenantContext.callAs(clinic, () -> {
                             allBound.countDown();
-                            awaitQuietly(allBound);
+                            awaitAll(allBound);
                             return clinic.equals(TenantContext.current());
                         }),
                         executor));
@@ -161,7 +161,10 @@ class TenantContextTests {
         }
     }
 
-    private static void awaitQuietly(CountDownLatch latch) {
+    private record Observation(Thread thread, boolean clinicActive) {}
+
+    /** Waits until every task has bound its clinic; fails the task if that takes too long. */
+    private static void awaitAll(CountDownLatch latch) {
         try {
             assertThat(latch.await(Duration.ofSeconds(30).toMillis(), TimeUnit.MILLISECONDS))
                     .as("all tasks bound their clinic")
