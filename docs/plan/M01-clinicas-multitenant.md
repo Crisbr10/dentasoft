@@ -25,7 +25,7 @@
 - **`dentasoft_owner`** es dueño del esquema y ejecuta las migraciones (`SPRING_FLYWAY_USER`, `SPRING_FLYWAY_PASSWORD`).
 - **`dentasoft_app`** es el rol con el que se conecta la aplicación (`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`). Es `NOBYPASSRLS`, no es dueño de nada y no puede crear objetos.
 - **Permisos por defecto** (`V001`): toda tabla nueva de `dentasoft_owner` en `public` da a `dentasoft_app` `SELECT`, `INSERT` y `UPDATE`. Nunca `DELETE` ni `TRUNCATE`, porque lo clínico se borra de forma lógica. `dentasoft_app` no tiene acceso a `flyway_schema_history`.
-- **Política `tenant_isolation`**: compara la columna de clínica con `NULLIF(current_setting('app.tenant_id', true), '')::uuid`, en `USING` y en `WITH CHECK`. Falla cerrado: sin clínica activa, o con el valor vacío tras limpiarlo, no se ve ni se escribe ninguna fila, y no se produce ningún error.
+- **Política `tenant_isolation`**: compara la columna de clínica con `NULLIF(current_setting('app.tenant_id', true), '')::uuid`, en `USING` y en `WITH CHECK`. Falla cerrado: sin clínica activa, o con el valor vacío tras limpiarlo, las lecturas, los `UPDATE` y los `DELETE` no ven ninguna fila, sin error; un `INSERT` (o un `UPDATE` que mueva una fila a otra clínica) incumple el `WITH CHECK` y falla con `42501`. Un valor que no es UUID da error `22P02` en cualquier consulta.
 - **`clinic`** es la excepción: su política compara `id`, no `tenant_id`, porque la fila es la clínica misma.
 - **`RowLevelSecurityGuardTests`** recorre todas las tablas del esquema y falla si alguna no cumple. Las excepciones a la columna `tenant_id` se declaran en ese test, cada una con su motivo.
 
@@ -95,13 +95,13 @@ $$;
 
 ### M01-T01 · Migración base y roles de base de datos
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T03
 - **Descripción**: migración `V001` con la extensión `vector`, tabla `clinic`, permisos por defecto para `dentasoft_app` y función SQL de ayuda para crear la política `tenant_isolation` en tablas nuevas. Sin `pgcrypto`: `gen_random_uuid()` es nativa desde PostgreSQL 13 y los UUID v7 los genera la aplicación.
 - **Criterios de aceptación**:
-  - [ ] Flyway migra con `dentasoft_owner` y la app conecta con `dentasoft_app`
-  - [ ] `dentasoft_app` tiene `NOBYPASSRLS` y no es propietario de ninguna tabla
-  - [ ] Documentado en el módulo cómo añadir una tabla con RLS
+  - [x] Flyway migra con `dentasoft_owner` y la app conecta con `dentasoft_app`
+  - [x] `dentasoft_app` tiene `NOBYPASSRLS` y no es propietario de ninguna tabla
+  - [x] Documentado en el módulo cómo añadir una tabla con RLS
 
 ### M01-T02 · TenantContext y entidad base
 
