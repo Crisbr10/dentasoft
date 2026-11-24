@@ -1,4 +1,6 @@
-# Production. Kept explicit so that no other profile can re-enable these by accident.
+# Production. These already default to off in application.yml; they are repeated here so the production
+# values are visible in one place. A profile activated after prod, or an environment variable, can still
+# override them: do not activate other profiles together with prod.
 management:
   endpoint:
     health:

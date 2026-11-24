@@ -3,7 +3,9 @@ package es.crisbr.dentasoft.shared;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.validation.FieldError;
 
 class DentasoftUrlsTests {
 
@@ -59,7 +61,18 @@ class DentasoftUrlsTests {
                         "dentasoft.urls.auth=https://auth.dentasoft.test")
                 .run(context -> {
                     assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure()).rootCause().hasMessageContaining("dentasoft.urls");
+                    assertThat(context.getStartupFailure())
+                            .rootCause()
+                            .isInstanceOfSatisfying(
+                                    BindValidationException.class,
+                                    ex -> assertThat(ex.getValidationErrors().getAllErrors())
+                                            .singleElement()
+                                            .isInstanceOfSatisfying(FieldError.class, error -> {
+                                                assertThat(error.getObjectName())
+                                                        .isEqualTo("dentasoft.urls");
+                                                assertThat(error.getField()).isEqualTo("app");
+                                                assertThat(error.getCode()).isEqualTo("URL");
+                                            }));
                 });
     }
 }
