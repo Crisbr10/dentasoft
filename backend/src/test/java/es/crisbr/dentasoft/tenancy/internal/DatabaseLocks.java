@@ -29,14 +29,17 @@ final class DatabaseLocks {
                 .intValue();
     }
 
-    /** Whether the backend {@code pid} is waiting for a lock; {@code false} while {@code pid} is not known (0). */
+    /**
+     * Whether the backend {@code pid} is waiting for a row another transaction holds (a transaction or tuple lock, not
+     * a short internal one such as extending a table); {@code false} while {@code pid} is not known (0).
+     */
     static boolean isWaitingForALock(int pid) {
         if (pid == 0) {
             return false;
         }
         try (Connection connection = connectAsOwner();
-                PreparedStatement statement =
-                        connection.prepareStatement("SELECT count(*) FROM pg_locks WHERE pid = ? AND NOT granted")) {
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT count(*) FROM pg_locks WHERE pid = ? AND NOT granted AND locktype IN ('transactionid', 'tuple')")) {
             statement.setInt(1, pid);
             try (ResultSet waiting = statement.executeQuery()) {
                 waiting.next();

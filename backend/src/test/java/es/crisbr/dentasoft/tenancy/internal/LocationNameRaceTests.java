@@ -72,6 +72,8 @@ class LocationNameRaceTests extends ClinicConfigurationTestBase {
                     .isInstanceOf(LocationNameTakenException.class);
         } finally {
             threads.shutdownNow();
+            // A worker still inside its transaction would hold locks the cleanup after the test needs.
+            threads.awaitTermination(DatabaseLocks.TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         }
 
         assertThat(asClinicA(() -> locations.list(LocationStatus.ACTIVE, PageRequest.of(0, 20, Sort.by("name"))))

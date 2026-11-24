@@ -69,6 +69,8 @@ class ClinicOpeningHoursConcurrencyTests extends ClinicConfigurationTestBase {
                     .isEqualTo(SECOND_WEEK);
         } finally {
             threads.shutdownNow();
+            // A worker still inside its transaction would hold locks the cleanup after the test needs.
+            threads.awaitTermination(DatabaseLocks.TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         }
 
         List<Slot> week = asClinicA(openingHours::week);

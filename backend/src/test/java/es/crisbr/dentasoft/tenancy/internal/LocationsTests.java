@@ -159,25 +159,33 @@ class LocationsTests extends ClinicConfigurationTestBase {
                 .containsExactly(inactive);
     }
 
-    /** Inactive rooms may share a name: the id breaks the tie, so pages neither repeat nor skip a room. */
+    /**
+     * Rooms that tie on the sort (all inactive) come in id order, so pages neither repeat nor skip a room. Without the
+     * tie-break their order would be whatever PostgreSQL finds first, which a test cannot force: so the order asked for
+     * is checked too.
+     */
     @Test
-    void pagesThroughRoomsWithTheSameNameWithoutRepeatingAny() {
-        List<UUID> ids = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
-            LocationDetails room = create("Gabinete 1", null);
+    void pagesThroughRoomsThatTieWithoutRepeatingAny() {
+        List<LocationDetails> rooms =
+                List.of(create("Gabinete 1", null), create("Gabinete 2", null), create("Gabinete 3", null));
+        for (LocationDetails room : rooms.reversed()) {
             asClinicA(() -> locations.deactivate(room.id(), room.version()));
-            ids.add(room.id());
         }
+        List<UUID> ids = rooms.stream().map(LocationDetails::id).toList();
 
         List<UUID> paged = new ArrayList<>();
         for (int page = 0; page < ids.size(); page++) {
-            PageRequest onePerPage = PageRequest.of(page, 1, Sort.by("name"));
+            PageRequest onePerPage = PageRequest.of(page, 1, Sort.by("status"));
             paged.addAll(asClinicA(() -> locations.list(null, onePerPage))
                     .map(LocationDetails::id)
                     .getContent());
         }
 
         assertThat(paged).containsExactlyElementsOf(ids.stream().sorted().toList());
+        assertThat(asClinicA(() -> locations.list(null, PageRequest.of(0, 1, Sort.by("status"))))
+                        .getPageable()
+                        .getSort())
+                .isEqualTo(Sort.by("status").and(Sort.by("id")));
     }
 
     @Test
