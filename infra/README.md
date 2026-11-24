@@ -48,7 +48,7 @@ curl http://localhost:8080/actuator/health/readiness   # {"status":"UP"}
 - El contenedor corre con el UID 10001, el sistema de ficheros en solo lectura (solo `/tmp` es escribible), sin *capabilities* y con `no-new-privileges`.
 - `stop_grace_period` (40 s) es mayor que el apagado ordenado del backend (`SHUTDOWN_TIMEOUT`, 30 s).
 
-Fuera de local no se construye la imagen: se usa la publicada en GHCR (M00-T07). La imagen se describe en [backend/README.md](../backend/README.md#imagen-docker).
+Fuera de local no se construye la imagen: se usa la que publica la CI en GHCR (ver [integración continua](../docs/operaciones/integracion-continua.md#imagen-del-backend)). La imagen se describe en [backend/README.md](../backend/README.md#imagen-docker).
 
 ## URLs locales
 

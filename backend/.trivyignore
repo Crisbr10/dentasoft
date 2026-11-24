@@ -1,0 +1,2 @@
+# Temporary Trivy exceptions: one CVE per line, preceded by a comment with the issue that
+# justifies it and the date it must be reviewed again. Keep this file empty when possible.

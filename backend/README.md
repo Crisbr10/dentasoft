@@ -34,7 +34,7 @@ Para arrancarla junto a la infraestructura local, usa el perfil `app` de Compose
 - **Proceso principal**: `ENTRYPOINT` en forma exec, así que Java es el PID 1 y recibe el `SIGTERM` del apagado ordenado.
 - **Opciones de la JVM**: `-XX:MaxRAMPercentage=75` (heap según el límite de memoria del contenedor), `-XX:+ExitOnOutOfMemoryError` (el contenedor se reinicia en lugar de quedarse medio vivo) y `-Djava.io.tmpdir=/tmp -Duser.home=/tmp` (nada escribe fuera de `/tmp`). Otras opciones se pasan con `JAVA_TOOL_OPTIONS`.
 - **Health check**: consulta `/actuator/health/readiness` con `/dev/tcp` de bash, porque la imagen no trae `curl` ni `wget`.
-- **Imágenes base fijadas por etiqueta y digest**. Los digests los actualizará Dependabot cuando llegue M00-T07: no los cambies a mano por una etiqueta flotante como `latest`.
+- **Imágenes base fijadas por etiqueta y digest**. Los digests los actualiza Dependabot: no los cambies a mano por una etiqueta flotante como `latest`.
 
 ### Escaneo de vulnerabilidades
 
@@ -45,6 +45,8 @@ $trivy = "run", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v",
 docker @trivy image --scanners vuln --severity CRITICAL --exit-code 1 dentasoft-backend:local
 docker @trivy image --scanners vuln --severity HIGH,CRITICAL dentasoft-backend:local
 ```
+
+La CI aplica la misma política antes de publicar la imagen en GHCR (ver [integración continua](../docs/operaciones/integracion-continua.md#imagen-del-backend)).
 
 ## Perfiles
 

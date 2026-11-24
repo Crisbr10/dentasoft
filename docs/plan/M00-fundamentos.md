@@ -114,14 +114,14 @@
 
 ### M00-T07 · Integración continua
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T04, M00-T05
 - **Descripción**: workflow `ci.yml` con filtro por rutas (backend, frontend), build de imagen en `main`, escaneo de secretos (gitleaks), CodeQL, Dependabot y Trivy; protección de la rama `main`.
 - **Criterios de aceptación**:
-  - [ ] Un PR que solo toca el frontend no compila el backend, y no queda bloqueado por checks obligatorios
-  - [ ] La imagen se publica en GHCR con la etiqueta del commit al fusionar en `main`
-  - [ ] `main` exige PR y CI en verde
-  - [ ] *Actions* fijadas por hash
+  - [x] Un PR que solo toca el frontend no compila el backend, y no queda bloqueado por checks obligatorios
+  - [ ] La imagen se publica en GHCR con la etiqueta del commit al fusionar en `main` (solo se puede comprobar al fusionar este PR; en los PR, el job `image` ya construye y escanea la imagen)
+  - [x] `main` exige PR y CI en verde
+  - [x] *Actions* fijadas por hash
 
 ### M00-T08 · Base de seguridad transversal
 
