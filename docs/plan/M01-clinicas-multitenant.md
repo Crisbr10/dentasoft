@@ -57,7 +57,7 @@ SELECT enable_tenant_isolation('patient');
 ```
 
 - Identificadores `uuid` generados en la aplicación (o columnas `identity`), nunca `serial`: los permisos por defecto no incluyen secuencias.
-- `DELETE` solo en tablas no clínicas que necesiten borrado físico, y tabla a tabla: `GRANT DELETE ON treatment_room TO dentasoft_app;`.
+- `DELETE` solo en tablas no clínicas que necesiten borrado físico, tabla a tabla y con un comentario que lo justifique, como `GRANT DELETE ON clinic_hours_of_operation TO dentasoft_app;` (V003). `TenancyMigrationTests` comprueba qué tablas lo tienen: la tabla nueva se añade a ese test en el mismo pull request.
 - Las funciones nuevas no las puede ejecutar nadie salvo su dueño; concede `EXECUTE` a `dentasoft_app` una a una si hace falta.
 - Ni vistas materializadas ni tablas foráneas en `public`: RLS no se aplica a ellas y el test guardián las rechaza.
 
