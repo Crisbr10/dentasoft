@@ -22,6 +22,9 @@ import org.springframework.security.web.SecurityFilterChain;
  *       Paths that must stay closed get a chain of their own, ordered before this one (the platform API).
  *   <li>Stateless, without CSRF, login form, HTTP Basic or a request cache. Security headers and CORS stay in {@link
  *       SecurityHeadersFilter} and {@link WebConfiguration}, so Spring Security does not write them a second time.
+ *   <li>CSRF is off because the API is stateless: no session and no cookie authentication. M02 authenticates with a
+ *       Bearer token in the {@code Authorization} header, which a CSRF attack cannot send. If authentication ever uses
+ *       cookies, CSRF protection must be turned on.
  * </ul>
  */
 @Configuration(proxyBeanMethods = false)
