@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -93,7 +94,12 @@ public class ClinicAdministration {
             throw new ClinicStatusConflictException(to);
         }
         clinic.setStatus(to);
-        clinics.flush();
+        try {
+            clinics.flush();
+        } catch (OptimisticLockingFailureException concurrentChange) {
+            // Another request changed the clinic between the read and this write: it already has another status.
+            throw new ClinicStatusConflictException(to);
+        }
         return ClinicDetails.of(clinic);
     }
 

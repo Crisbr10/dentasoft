@@ -87,6 +87,16 @@ class ClinicAdministrationControllerTests {
     }
 
     @Test
+    void rejectsAPageNumberBeyondTheMaximum() {
+        assertThat(mvc.get().uri(CLINICS + "?page=100001"))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .bodyJson()
+                .extractingPath("$.title")
+                .isEqualTo("Página fuera de rango");
+    }
+
+    @Test
     void rejectsSortingByAnUnknownProperty() {
         assertThat(mvc.get().uri(CLINICS + "?sort=keycloakOrgId"))
                 .hasStatus(HttpStatus.BAD_REQUEST)

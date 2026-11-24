@@ -9,6 +9,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.time.ZoneId;
+import java.util.Set;
 
 /** A region time zone ID Java knows, such as {@code Europe/Madrid}. {@code null} is valid. */
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})
@@ -24,9 +25,12 @@ public @interface KnownTimeZone {
 
     class Validator implements ConstraintValidator<KnownTimeZone, String> {
 
+        /** {@link ZoneId#getAvailableZoneIds()} builds a new set on every call. */
+        private static final Set<String> ZONES = Set.copyOf(ZoneId.getAvailableZoneIds());
+
         @Override
         public boolean isValid(String value, ConstraintValidatorContext context) {
-            return value == null || ZoneId.getAvailableZoneIds().contains(value);
+            return value == null || ZONES.contains(value);
         }
     }
 }

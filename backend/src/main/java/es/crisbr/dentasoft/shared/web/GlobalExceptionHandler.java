@@ -35,7 +35,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * <p>Spring MVC exceptions are handled by {@link ResponseEntityExceptionHandler}. Anything else becomes a
  * generic problem whose texts come from {@code messages.properties}: exception messages and stack traces
  * never reach the client. Security exceptions raised by method security ({@code @PreAuthorize}) have their own
- * handlers, so they are not turned into the generic 500: 401 without an authenticated user, 403 with one.
+ * handlers, so they are not turned into the generic 500: 403 for a refused caller, and 401 only when there is no
+ * authentication at all. Over HTTP, Spring Security gives an unauthenticated request an anonymous authentication,
+ * so it is refused with 403 too; M02-T02 decides how anonymous calls get their 401.
  */
 @RestControllerAdvice
 class GlobalExceptionHandler extends ResponseEntityExceptionHandler {

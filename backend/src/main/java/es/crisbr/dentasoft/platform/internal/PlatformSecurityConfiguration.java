@@ -1,5 +1,8 @@
 package es.crisbr.dentasoft.platform.internal;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -36,14 +39,13 @@ class PlatformSecurityConfiguration {
         return http.securityMatcher(PATHS)
                 .authorizeHttpRequests(requests -> requests.anyRequest().denyAll())
                 .exceptionHandling(exceptions -> exceptions
-                        .accessDeniedHandler((request, response, denied) ->
-                                exceptionResolver.resolveException(request, response, null, denied))
-                        .authenticationEntryPoint(
-                                (request, response, unauthenticated) -> exceptionResolver.resolveException(
-                                        request,
-                                        response,
-                                        null,
-                                        new AccessDeniedException("Platform API closed", unauthenticated))))
+                        .accessDeniedHandler(
+                                (request, response, denied) -> deny(exceptionResolver, request, response, denied))
+                        .authenticationEntryPoint((request, response, unauthenticated) -> deny(
+                                exceptionResolver,
+                                request,
+                                response,
+                                new AccessDeniedException("Platform API closed", unauthenticated))))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -53,5 +55,17 @@ class PlatformSecurityConfiguration {
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .build();
+    }
+
+    /** A 403 ProblemDetail from the MVC resolvers; a bare 403 if none of them handles it, never an empty 200. */
+    static void deny(
+            HandlerExceptionResolver exceptionResolver,
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AccessDeniedException denied)
+            throws IOException {
+        if (exceptionResolver.resolveException(request, response, null, denied) == null) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+        }
     }
 }

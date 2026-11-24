@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.platform.web;
 
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.ClinicDetails;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.UUID;
@@ -34,10 +35,11 @@ class ClinicAdministrationController {
     }
 
     @PostMapping
-    ResponseEntity<ClinicDetails> create(@Valid @RequestBody CreateClinicRequest request) {
-        ClinicDetails clinic = administration.create(request.toNewClinic());
-        // Relative: never built from the request's Host header.
-        return ResponseEntity.created(URI.create(PATH + "/" + clinic.id())).body(clinic);
+    ResponseEntity<ClinicDetails> create(@Valid @RequestBody CreateClinicRequest body, HttpServletRequest request) {
+        ClinicDetails clinic = administration.create(body.toNewClinic());
+        // Relative, with the context path: never built from the request's Host header.
+        URI location = URI.create(request.getContextPath() + PATH + "/" + clinic.id());
+        return ResponseEntity.created(location).body(clinic);
     }
 
     @GetMapping
