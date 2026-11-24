@@ -79,7 +79,12 @@ Invoke-Write "Alertas de Dependabot" @("api", "-X", "PUT", "repos/$repo/vulnerab
 Invoke-Write "Actualizaciones de seguridad de Dependabot" @(
   "api", "-X", "PUT", "repos/$repo/automated-security-fixes")
 
-$existing = Invoke-Gh api "repos/$repo/rulesets" --jq '.[] | select(.name == "main") | .id'
+# Filtrado en PowerShell y no con --jq: Windows PowerShell 5.1 no escapa las comillas dobles
+# de un argumento al llamar a un programa externo, y el filtro llegaria roto a gh.
+# ForEach-Object desenrolla el array: en 5.1, ConvertFrom-Json lo emite como un solo objeto.
+$existing = (Invoke-Gh api "repos/$repo/rulesets") -join "`n" | ConvertFrom-Json |
+  ForEach-Object { $_ } | Where-Object { $_.name -eq "main" } |
+  Select-Object -ExpandProperty id -First 1
 if ($existing) {
   Invoke-Write "Ruleset main actualizado (id $existing)" @(
     "api", "-X", "PUT", "repos/$repo/rulesets/$existing", "--input", $ruleset)

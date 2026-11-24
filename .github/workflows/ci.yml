@@ -131,7 +131,7 @@ jobs:
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, secrets, backend, frontend]
+    needs: [changes, secrets, backend, frontend, image]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -142,12 +142,17 @@ jobs:
           exit 1
       - run: echo "All required jobs passed or were skipped by the path filter."
 
-  # Only after a merge into main, and only when the backend changed. Tagged with the commit
-  # hash: tags are never reused, so a deployment always knows which code it runs.
+  # Runs when the backend changed. Pull requests build and scan the image, so a broken base
+  # image (for example a Dependabot digest update) fails before the merge. Only a push to main
+  # publishes it, tagged with the commit hash: tags are never reused, so a deployment always
+  # knows which code it runs.
+  # `packages: write` also applies on pull requests: GitHub makes the token read-only for
+  # pull requests from forks and Dependabot, and same-repository branches come from people
+  # who can already push.
   image:
     name: image
     needs: [changes, backend]
-    if: github.event_name == 'push' && needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -176,6 +181,7 @@ jobs:
           trivy image --scanners vuln --severity HIGH,CRITICAL --no-progress "$IMAGE"
           trivy image --scanners vuln --severity CRITICAL --exit-code 1 --quiet "$IMAGE"
       - name: Push to GHCR
+        if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

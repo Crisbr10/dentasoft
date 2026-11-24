@@ -16,8 +16,8 @@ La CI corre en GitHub Actions. Este documento explica qué comprueba, qué bloqu
 - **`secrets`**: gitleaks sobre **todo** el historial, en cada ejecución. Tarda segundos y también detecta un secreto que se añadió y se quitó dentro del mismo PR.
 - **`backend`**: `mvnw verify` (compilación, tests unitarios y de integración con Testcontainers, y formato).
 - **`frontend`**: `pnpm install --frozen-lockfile`, `pnpm audit --audit-level high`, `format:check`, `lint`, `test` y `build`. El build usa dominios reservados `.test` (ADR 0006).
+- **`image`**: si cambió el backend, construye la imagen y la escanea con Trivy. En un PR no publica nada: así un PR que rompe la imagen (por ejemplo, una actualización de Dependabot de la imagen base) falla antes de fusionarse. En push a `main`, además, la publica en GHCR.
 - **`ci-ok`**: el **único check obligatorio**. Corre siempre y falla si algún job del que depende ha fallado o se ha cancelado. Los jobs saltados por el filtro no lo bloquean, así que un PR que solo toca el frontend no espera al backend.
-- **`image`**: solo en push a `main` y si cambió el backend. Construye la imagen, la escanea con Trivy y la publica en GHCR.
 
 ## Imagen del backend
 
@@ -51,4 +51,5 @@ Todo esto necesita que el repositorio sea **público**: en el plan gratuito, Git
 - **Imágenes de herramientas** (gitleaks y Trivy): fijadas por etiqueta y digest en las variables `GITLEAKS_IMAGE` y `TRIVY_IMAGE` de `ci.yml`. Dependabot no las ve; se actualizan a mano, igual que la versión de Trivy de `backend/README.md`.
 - **Imágenes de `infra/`**: salen de variables de `infra/.env.example`, así que también se actualizan a mano.
 - **Espera de una semana** (`cooldown`): Dependabot no propone una versión hasta 7 días después de publicarse, para dar tiempo a detectar y retirar una versión comprometida. Las actualizaciones de seguridad no esperan.
+- **`pnpm audit` bloquea a propósito**: depende de la base de avisos del registro, así que un aviso alto nuevo sobre una dependencia que ya teníamos hace fallar cualquier PR que toque el frontend, aunque no tenga relación. Lo normal es actualizar la dependencia (Dependabot suele abrir ya el PR de seguridad). Si no hay versión corregida, se hace una excepción temporal añadiendo `--ignore GHSA-xxxx-xxxx-xxxx` al paso *Audit dependencies* de `ci.yml`, con un comentario que enlace el issue que la justifica y la fecha de revisión.
 - **Añadir un job obligatorio**: añádelo a `needs` de `ci-ok`. No lo añadas al ruleset: el ruleset solo exige `ci-ok`.
