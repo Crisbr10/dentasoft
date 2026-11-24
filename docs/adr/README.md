@@ -13,6 +13,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0007](0007-s3-local-seaweedfs.md) | Almacenamiento S3 local con SeaweedFS en lugar de MinIO | Aceptada |
 | [0008](0008-frontend-angular-material.md) | Frontend con Angular Material en lugar de PrimeNG (se mantiene Transloco) | Aceptada |
 | [0009](0009-clinica-activa-scopedvalue-centinela.md) | Clínica activa en un `ScopedValue` y centinela `NO_CLINIC` en Hibernate | Aceptada |
+| [0010](0010-clinica-en-postgresql-por-transaccion.md) | La clínica llega a PostgreSQL al empezar cada transacción | Aceptada |
 
 ## Plantilla
 

@@ -140,7 +140,7 @@ Ninguna clínica es «root» (`isRoot` siempre devuelve `false`), porque Hiberna
 
 ### Lo que `@TenantId` no protege
 
-Ahí solo protege el Row Level Security, que la aplicación activa en M01-T03:
+Ahí solo protege el Row Level Security (ver «La clínica en PostgreSQL»):
 
 - las consultas nativas y `JdbcClient`;
 - el SQL propio (`@SQLDelete`, `@SQLUpdate`, `@Formula`);
@@ -148,6 +148,16 @@ Ahí solo protege el Row Level Security, que la aplicación activa en M01-T03:
 - un `UPDATE` en JPQL que asigna `tenantId`. Hibernate filtra la fila por la clínica activa, pero sí envía el cambio de `tenant_id` y no dispara `TenantWriteGuard`. Hoy lo para el `WITH CHECK` de la política `tenant_isolation`.
 
 No escribas sentencias JPQL que asignen `tenantId`.
+
+### La clínica en PostgreSQL
+
+Al empezar cada transacción de Spring, `TenantAwareJpaDialect` ejecuta `SELECT set_config('app.tenant_id', ?, true)` con la clínica de la sesión de Hibernate (ADR 0010). PostgreSQL lo descarta al confirmar o deshacer, así que ninguna conexión vuelve al pool con una clínica.
+
+- **Leer o escribir datos de una clínica exige una transacción**: `@Transactional` en el servicio o `TransactionTemplate`. Fuera de ella, las consultas nativas y `JdbcClient` no ven ninguna fila, aunque haya una clínica activa. Los métodos de los repositorios de Spring Data abren su propia transacción.
+- `JdbcClient` dentro de la transacción usa la misma conexión y la misma clínica.
+- `REQUIRES_NEW` abre otra conexión, que recibe la misma clínica. Las transacciones de solo lectura también la reciben.
+- Si la sesión se abrió para otra clínica que la activa, la transacción no empieza (`IllegalStateException`).
+- Si `TenantAwareJpaDialect` deja de instalarse, la aplicación no arranca (`TenantAwareJpaDialectPostProcessor`).
 
 ### Hilos y procesos asíncronos
 
@@ -164,7 +174,7 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 ### Tests
 
 - **Tablas solo de test**: en `src/test/resources/db/testmigration`, numeradas desde `V900` para que se apliquen después de las reales, y con RLS como cualquier otra (el test guardián también las revisa). Ejemplo: `V900__tenancy_test_record.sql`.
-- **Hasta M01-T03**, la aplicación no pasa la clínica activa a PostgreSQL. Los tests fijan `app.tenant_id` ellos mismos en cada transacción (ver `TenantScopedEntityTests`).
+- **Los tests pasan por el camino real**: `TenantContext.runAs` y una transacción. No fijan `app.tenant_id` a mano. La única excepción son los dos tests del filtro de Hibernate de `TenantScopedEntityTests`, que simulan un fallo del RLS con `simulateRlsLetsClinicThrough`. Preparar y limpiar datos con conexiones directas fuera de la aplicación (`TenancyTestDatabase`) sí puede fijarlo.
 
 ## Tareas
 
