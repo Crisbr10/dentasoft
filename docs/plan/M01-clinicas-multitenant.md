@@ -222,13 +222,13 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T05 · Alta y gestión de clínicas (administración de plataforma)
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T02
 - **Descripción**: API para el rol `PLATFORM_ADMIN`: crear, listar, suspender y reactivar clínicas, con su `clinic_settings` inicial.
 - **Criterios de aceptación**:
-  - [ ] Solo `PLATFORM_ADMIN` puede usar estos endpoints
-  - [ ] Una clínica suspendida no permite iniciar sesión en ella (comprobado en M02)
-  - [ ] Evento `ClinicaCreada` publicado para que otros módulos creen sus datos iniciales
+  - [x] Solo `PLATFORM_ADMIN` puede usar estos endpoints. El servicio exige el rol con `@PreAuthorize`, y `/api/v1/platform/**` deniega todas las peticiones hasta M02-T02 (ADR 0011).
+  - [x] Una clínica suspendida no permite iniciar sesión en ella (comprobado en M02). Esta tarea guarda el estado `SUSPENDED`; el rechazo del acceso es de M02-T04.
+  - [x] Evento `ClinicCreated` (antes «`ClinicaCreada`», en inglés como el resto del código) publicado para que otros módulos creen sus datos iniciales
 
 ### M01-T06 · Configuración de la clínica y gabinetes
 
