@@ -61,7 +61,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 
 ### Multi-clínica y acceso a datos
 
-- **Obligatorio**: toda tabla de negocio tiene `tenant_id uuid NOT NULL`, índice que empieza por `tenant_id`, `ENABLE` + `FORCE ROW LEVEL SECURITY` y la política `tenant_isolation`. Las entidades extienden `TenantScopedEntity`.
+- **Obligatorio**: toda tabla de negocio tiene `tenant_id uuid NOT NULL`, índice que empieza por `tenant_id`, `ENABLE` + `FORCE ROW LEVEL SECURITY` y la política `tenant_isolation`. Las entidades extienden `TenantScopedEntity`. La única excepción es el módulo `platform`: la administración de clínicas de `PLATFORM_ADMIN` usa su propio rol de base de datos y su propia unidad de persistencia, sin datos clínicos (ADR 0011). Ningún otro módulo los usa.
 - **Obligatorio**: la clínica activa sale del `TenantContext`, nunca de un parámetro, cuerpo de petición o ruta sin validar contra la membresía del usuario.
 - **Obligatorio**: cada módulo con datos tiene un test de aislamiento (la clínica A no lee ni modifica datos de la clínica B) con Testcontainers: una subclase de `TenantIsolationTest<Entidad>` por cada entidad que extiende `TenantScopedEntity` (ver su Javadoc y el ejemplo `TenancyTestRecordIsolationTests`). `TenantIsolationCoverageTests` falla si alguna no la tiene.
 - Los procesos sin usuario (jobs, webhooks) fijan la clínica explícitamente antes de tocar datos.
@@ -93,7 +93,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 
 ### Backend
 
-- Un paquete por módulo bajo `es.crisbr.dentasoft` (`tenancy`, `identity`, `patients`, `documents`, `scheduling`, `notifications`, `treatments`, `clinical`, `quotes`, `signatures`, `shared`). Solo es público lo que está en la raíz del paquete; lo demás va en subpaquetes `internal`, `web`, `persistence`.
+- Un paquete por módulo bajo `es.crisbr.dentasoft` (`tenancy`, `platform`, `identity`, `patients`, `documents`, `scheduling`, `notifications`, `treatments`, `clinical`, `quotes`, `signatures`, `shared`). Solo es público lo que está en la raíz del paquete; lo demás va en subpaquetes `internal`, `web`, `persistence`.
 - Los módulos se comunican por **eventos** (`ApplicationEventPublisher` + `@ApplicationModuleListener`) o por la API pública del otro módulo, nunca por sus clases internas. `ModularityTests` lo verifica.
 - DTO como `record`; conversión con MapStruct; controladores finos, lógica en servicios.
 - API REST bajo `/api/v1/...`, documentada con springdoc (OpenAPI). Paginación con `page`, `size`, `sort`.

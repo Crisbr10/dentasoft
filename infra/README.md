@@ -8,6 +8,7 @@ Servicios de apoyo de Dentasoft para desarrollo, con Docker Compose.
 | `compose.local.yml` | Desarrollo local: puertos en `127.0.0.1`, Keycloak en `start-dev` y Mailpit. |
 | `.env.example` | Versiones fijadas de las imágenes y contraseñas de ejemplo (falsas). |
 | `postgres/init/01-init.sh` | Crea bases, roles y la extensión `vector` (solo en el primer arranque). |
+| `postgres/init/02-platform-role.sh` | Crea el rol de plataforma `dentasoft_platform` (primer arranque; se puede repetir a mano). |
 
 ## Arrancar
 
@@ -71,6 +72,8 @@ El script `postgres/init/01-init.sh` crea:
 - Los roles `dentasoft_owner` (dueño de la base `dentasoft` y del esquema `public`) y `dentasoft_app` (solo `CONNECT` y `USAGE` en `public`, `NOBYPASSRLS`, no puede crear tablas).
 - La base `keycloak` con su propio rol `keycloak`.
 - La extensión `vector` en `dentasoft`.
+
+El script `postgres/init/02-platform-role.sh` crea el rol `dentasoft_platform`, con el que la administración de la plataforma ve todas las clínicas (ADR 0011). Necesita `DENTASOFT_DB_PLATFORM_PASSWORD` en `.env`. A diferencia de `01-init.sh`, se puede ejecutar sobre una base que ya existe, sin borrar el volumen: ver [`docs/operaciones/rol-de-plataforma.md`](../docs/operaciones/rol-de-plataforma.md).
 
 Las tablas y sus permisos son cosa de las migraciones de Flyway (M01-T01), y el realm de Keycloak de M02-T01.
 

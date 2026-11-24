@@ -7,6 +7,11 @@ dentasoft:
   rate-limit:
     # Not a secret: it only hashes the IPs of the local Redis. Real environments must set their own.
     key: ${DENTASOFT_RATE_LIMIT_KEY:local-development-only-not-a-secret}
+  # The platform role of infra/ (postgres/init/02-platform-role.sh), with the password variable of infra/.env.
+  platform:
+    datasource:
+      username: ${DENTASOFT_PLATFORM_DATASOURCE_USERNAME:dentasoft_platform}
+      password: ${DENTASOFT_PLATFORM_DATASOURCE_PASSWORD:${DENTASOFT_DB_PLATFORM_PASSWORD:}}
 
 spring:
   # The PostgreSQL of infra/ (compose.yml), with the same password variables as infra/.env.

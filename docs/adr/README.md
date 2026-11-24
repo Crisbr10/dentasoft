@@ -14,6 +14,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0008](0008-frontend-angular-material.md) | Frontend con Angular Material en lugar de PrimeNG (se mantiene Transloco) | Aceptada |
 | [0009](0009-clinica-activa-scopedvalue-centinela.md) | Clínica activa en un `ScopedValue` y centinela `NO_CLINIC` en Hibernate | Aceptada |
 | [0010](0010-clinica-en-postgresql-por-transaccion.md) | La clínica llega a PostgreSQL al empezar cada transacción | Aceptada |
+| [0011](0011-rol-de-plataforma-en-base-de-datos.md) | El administrador de la plataforma usa su propio rol de base de datos | Aceptada |
 
 ## Plantilla
 

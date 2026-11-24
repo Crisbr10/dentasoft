@@ -1,10 +1,12 @@
 package es.crisbr.dentasoft.tenancy;
 
 import static es.crisbr.dentasoft.TestPostgresConfiguration.APP_USER;
+import static es.crisbr.dentasoft.TestPostgresConfiguration.PLATFORM_USER;
 import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsApplication;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.AllowedPolicy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -33,6 +35,17 @@ class RowLevelSecurityGuardTests {
      */
     private static final Map<String, String> TENANT_COLUMN_EXCEPTIONS = Map.of("clinic", "id");
 
+    /**
+     * Policies allowed next to {@code tenant_isolation}. Every entry needs a reason: the platform administration
+     * (ADR 0011, V002) lists, creates and changes the status of every clinic, and creates their initial settings, as
+     * {@code dentasoft_platform} only. No DELETE policy, and none on any other table.
+     */
+    private static final Set<AllowedPolicy> ALLOWED_POLICIES = Set.of(
+            new AllowedPolicy("clinic", "platform_select", PLATFORM_USER, "SELECT", "true", null),
+            new AllowedPolicy("clinic", "platform_insert", PLATFORM_USER, "INSERT", null, "true"),
+            new AllowedPolicy("clinic", "platform_update", PLATFORM_USER, "UPDATE", "true", "true"),
+            new AllowedPolicy("clinic_settings", "platform_insert", PLATFORM_USER, "INSERT", null, "true"));
+
     @Autowired
     private Flyway flyway;
 
@@ -54,7 +67,8 @@ class RowLevelSecurityGuardTests {
                 connection,
                 SCHEMA,
                 TENANT_COLUMN_EXCEPTIONS,
-                Set.of(flyway.getConfiguration().getTable()));
+                Set.of(flyway.getConfiguration().getTable()),
+                ALLOWED_POLICIES);
 
         assertThat(inspector.tables()).as("tables of schema %s", SCHEMA).contains("clinic");
         assertThat(inspector.problems())
