@@ -108,6 +108,11 @@ Hibernate fija la clínica de la sesión al abrirla, al empezar el `@Transaction
 - **No se cambia de clínica dentro de otra.** Anidar la misma clínica está permitido.
 - **No se fija la clínica dentro de una transacción ya empezada.** Primero `runAs` y después la transacción, nunca al revés. Un job recorre las clínicas sin una transacción que envuelva el bucle: cada vuelta, `runAs` y dentro un servicio `@Transactional`.
 
+`runAs` solo detecta las transacciones de Spring. Por eso:
+
+- **`spring.jpa.open-in-view` sigue en `false`.** Con él, la sesión se abriría al empezar la petición, antes de `runAs`, y se quedaría con `NO_CLINIC` toda la petición.
+- **Un `EntityManager` abierto a mano conserva la clínica con la que se abrió.** Si se escribe con él con otra clínica activa, `TenantWriteGuard` lo rechaza.
+
 Hasta que exista la validación de la membresía (M02), la clínica no se lee de ninguna cabecera, ruta ni cuerpo de la petición.
 
 ### Sin clínica activa: el centinela `NO_CLINIC`
@@ -175,13 +180,13 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T02 · TenantContext y entidad base
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T01
 - **Descripción**: `TenantContext` (limpiado siempre en `finally`), `TenantScopedEntity` con `@TenantId`, `CurrentTenantIdentifierResolver`, entidad base con UUID v7, auditoría (`created_at/by`, `updated_at/by`) y `@Version`.
 - **Criterios de aceptación**:
-  - [ ] Insertar sin clínica activa falla
-  - [ ] Las consultas JPA filtran por la clínica activa sin escribir el filtro a mano
-  - [ ] Tests unitarios del contexto en hilos virtuales
+  - [x] Insertar sin clínica activa falla
+  - [x] Las consultas JPA filtran por la clínica activa sin escribir el filtro a mano
+  - [x] Tests unitarios del contexto en hilos virtuales
 
 ### M01-T03 · Row Level Security en la conexión
 
