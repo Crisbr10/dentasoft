@@ -16,8 +16,9 @@
 | Tabla | Campos principales |
 | --- | --- |
 | `clinic` | `id`, `name`, `legal_name`, `tax_id`, `timezone`, `locale`, `status` (activa, suspendida), `keycloak_org_id` |
-| `clinic_settings` | `id`, `tenant_id` (único: una fila por clínica), `default_appointment_minutes`, `contact_email`, `contact_phone` (M01-T05); horario de apertura y logo (M01-T06). Nunca secretos: las credenciales de los canales van cifradas en su propia tabla (M07-T07) |
-| `treatment_room` | `tenant_id`, `name`, `color`, `active` (gabinete) |
+| `clinic_settings` | `id`, `tenant_id` (único: una fila por clínica), `default_appointment_minutes`, `contact_email`, `contact_phone` (M01-T05); logo (pendiente de decidir su tarea). Nunca secretos: las credenciales de los canales van cifradas en su propia tabla (M07-T07) |
+| `clinic_hours_of_operation` | `tenant_id`, `day_of_week` (1 = lunes … 7 = domingo, ISO 8601), `opening_time`, `closing_time` (tipo `time`, hora de reloj de la clínica en su zona horaria). Varios tramos por día, sin solaparse (M01-T06) |
+| `location` | `tenant_id`, `name`, `color`, `status` (activo, inactivo). Gabinete, alineado con el recurso FHIR `Location`; el nombre es único entre los activos de la clínica (M01-T06) |
 | `audit_log` | `tenant_id`, `occurred_at`, `actor_id`, `action`, `entity`, `entity_id`, `ip`, `details` (sin datos clínicos) |
 
 ## Roles de base de datos y Row Level Security
@@ -25,7 +26,8 @@
 - **`dentasoft_owner`** es dueño del esquema y ejecuta las migraciones (`SPRING_FLYWAY_USER`, `SPRING_FLYWAY_PASSWORD`).
 - **`dentasoft_app`** es el rol con el que se conecta la aplicación (`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`). Es `NOBYPASSRLS`, no es dueño de nada y no puede crear objetos.
 - **`dentasoft_platform`** es el rol del módulo `platform`, la administración de clínicas de `PLATFORM_ADMIN` (`DENTASOFT_PLATFORM_DATASOURCE_USERNAME`, `DENTASOFT_PLATFORM_DATASOURCE_PASSWORD`; ADR 0011). Es `NOBYPASSRLS`, ningún rol es miembro suyo y solo tiene, en `V002`, `SELECT`, el alta y el cambio de estado en `clinic` y el alta de `clinic_settings`, con políticas `TO dentasoft_platform`. Lo crea el superusuario fuera de Flyway ([`docs/operaciones/rol-de-plataforma.md`](../operaciones/rol-de-plataforma.md)). Ninguna tabla nueva le da permisos: si un módulo los necesita, se conceden en su migración y se añaden a `PlatformRoleTests`.
-- **Permisos por defecto** (`V001`): toda tabla nueva de `dentasoft_owner` en `public` da a `dentasoft_app` `SELECT`, `INSERT` y `UPDATE`. Nunca `DELETE` ni `TRUNCATE`, porque lo clínico se borra de forma lógica. `dentasoft_app` no tiene acceso a `flyway_schema_history`.
+- **Permisos por defecto** (`V001`): toda tabla nueva de `dentasoft_owner` en `public` da a `dentasoft_app` `SELECT`, `INSERT` y `UPDATE`. Nunca `DELETE` ni `TRUNCATE`, porque lo clínico se borra de forma lógica. La única tabla con `DELETE` es `clinic_hours_of_operation` (`V003`): el horario se sustituye entero y no es un dato clínico.
+- **`clinic` para la aplicación** (`V003`): solo `SELECT` y `UPDATE` de `name`, `timezone`, `updated_at`, `updated_by` y `version`. Ni `INSERT` ni el resto de columnas: la clínica no puede reactivarse, cambiar su `keycloak_org_id` ni sus datos fiscales, ni crear clínicas. `dentasoft_app` no tiene acceso a `flyway_schema_history`.
 - **Política `tenant_isolation`**: compara la columna de clínica con `NULLIF(current_setting('app.tenant_id', true), '')::uuid`, en `USING` y en `WITH CHECK`. Falla cerrado: sin clínica activa, o con el valor vacío tras limpiarlo, las lecturas, los `UPDATE` y los `DELETE` no ven ninguna fila, sin error; un `INSERT` (o un `UPDATE` que mueva una fila a otra clínica) incumple el `WITH CHECK` y falla con `42501`. Un valor que no es UUID da error `22P02` en cualquier consulta.
 - **`clinic`** es la excepción: su política compara `id`, no `tenant_id`, porque la fila es la clínica misma. Una clínica nunca puede tener el UUID nulo (`clinic_id_not_nil`, V002), que es el centinela «sin clínica».
 - **`RowLevelSecurityGuardTests`** recorre todas las tablas del esquema y falla si alguna no cumple. Las excepciones a la columna `tenant_id` y las políticas permitidas además de `tenant_isolation` (solo las de `dentasoft_platform`) se declaran en ese test, cada una con su motivo.
@@ -234,7 +236,7 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 - **Estado**: pendiente
 - **Depende de**: M01-T05
-- **Descripción**: API y pantallas para que `ADMIN_CLINICA` edite datos, horario y zona horaria de la clínica, y gestione gabinetes.
+- **Descripción**: API para que `ADMIN_CLINICA` edite datos, horario y zona horaria de la clínica, y gestione gabinetes. Las pantallas son M01-T10, porque sin inicio de sesión (M02-T02) no pueden llamar a la API.
 - **Criterios de aceptación**:
   - [ ] CRUD de gabinetes con validación y test de aislamiento
   - [ ] Zona horaria por defecto `Europe/Madrid`
@@ -265,3 +267,21 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 - **Criterios de aceptación**:
   - [ ] Solo `ADMIN_CLINICA` y solo los registros de su clínica
   - [ ] Consultar el registro también queda registrado
+
+### M01-T10 · Pantallas de configuración de la clínica y gabinetes
+
+- **Estado**: pendiente
+- **Depende de**: M01-T06, M02-T02
+- **Descripción**: pantallas de la sección «Clínica» del apartado de Configuración (ver `configuracion.md`) sobre la API de M01-T06, con el cliente generado (`pnpm api:gen`): datos y zona horaria, ajustes, horario semanal con varios tramos por día y gestión de gabinetes (alta, edición, desactivación y reactivación).
+- **Criterios de aceptación**:
+  - [ ] Textos con Transloco y formularios validados; los errores del servidor (validación, nombre de gabinete repetido, conflicto de versión) se muestran en el formulario
+  - [ ] El nombre y los datos fiscales se ven; solo el nombre se edita (los fiscales los cambia la plataforma, M01-T11)
+
+### M01-T11 · Corrección de los datos fiscales por la plataforma
+
+- **Estado**: pendiente
+- **Depende de**: M01-T05
+- **Descripción**: la clínica no puede cambiar su `legal_name` ni su `tax_id` (M01-T06). Si hay que corregirlos, lo hace `PLATFORM_ADMIN` desde la administración de clínicas, con su propio permiso por columna para `dentasoft_platform` en una migración nueva.
+- **Criterios de aceptación**:
+  - [ ] Solo `PLATFORM_ADMIN` puede cambiar `legal_name` y `tax_id`, y `PlatformRoleTests` comprueba el nuevo permiso
+  - [ ] `dentasoft_app` sigue sin poder cambiarlos (test de permisos)
