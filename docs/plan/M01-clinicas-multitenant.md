@@ -234,12 +234,12 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T06 · Configuración de la clínica y gabinetes
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T05
 - **Descripción**: API para que `ADMIN_CLINICA` edite datos, horario y zona horaria de la clínica, y gestione gabinetes. Las pantallas son M01-T10, porque sin inicio de sesión (M02-T02) no pueden llamar a la API.
 - **Criterios de aceptación**:
-  - [ ] CRUD de gabinetes con validación y test de aislamiento
-  - [ ] Zona horaria por defecto `Europe/Madrid`
+  - [x] CRUD de gabinetes con validación y test de aislamiento
+  - [x] Zona horaria por defecto `Europe/Madrid`
 
 ### M01-T07 · Auditoría transversal
 
