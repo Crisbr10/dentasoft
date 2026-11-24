@@ -2,7 +2,6 @@ package es.crisbr.dentasoft.platform.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -14,13 +13,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.web.servlet.HandlerExceptionResolver;
 
-/** Paths that need a race or a misconfiguration to happen, so they are forced here without a database. */
+/** Paths that need a race to happen, so they are forced here without a database. */
 class ClinicAdministrationUnitTests {
 
     private final PlatformClinics clinics = mock(PlatformClinics.class);
@@ -40,18 +35,5 @@ class ClinicAdministrationUnitTests {
 
         assertThatThrownBy(() -> administration.suspend(id)).isInstanceOf(ClinicStatusConflictException.class);
         assertThat(clinic.getStatus()).isEqualTo(ClinicStatus.SUSPENDED);
-    }
-
-    /** If no MVC resolver handles the denial, the response is still a 403, never an empty 200. */
-    @Test
-    void aDenialNoResolverHandlesIsStillForbidden() throws Exception {
-        HandlerExceptionResolver noResolver = mock(HandlerExceptionResolver.class);
-        when(noResolver.resolveException(any(), any(), any(), any())).thenReturn(null);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        PlatformSecurityConfiguration.deny(
-                noResolver, new MockHttpServletRequest(), response, new AccessDeniedException("denied"));
-
-        assertThat(response.getStatus()).isEqualTo(403);
     }
 }

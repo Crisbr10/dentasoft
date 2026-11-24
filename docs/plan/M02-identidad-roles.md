@@ -52,6 +52,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Criterios de aceptación**:
   - [ ] Token de otra audiencia o caducado → 401
   - [ ] Tests con tokens generados en el test, sin Keycloak real
+  - [ ] Una clínica suspendida no puede ser la clínica activa (403 con ProblemDetail) y hay un test que lo comprueba
 
 ### M02-T03 · Usuarios y membresías
 

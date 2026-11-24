@@ -1,4 +1,4 @@
-package es.crisbr.dentasoft.platform.web;
+package es.crisbr.dentasoft.shared;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
@@ -17,7 +17,7 @@ import java.util.Set;
 @Constraint(validatedBy = KnownTimeZone.Validator.class)
 public @interface KnownTimeZone {
 
-    String message() default "{es.crisbr.dentasoft.platform.web.KnownTimeZone.message}";
+    String message() default "{es.crisbr.dentasoft.shared.KnownTimeZone.message}";
 
     Class<?>[] groups() default {};
 

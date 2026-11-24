@@ -71,6 +71,21 @@ class ClinicAdministrationControllerTests {
                 .containsExactlyInAnyOrder("name", "legalName", "taxId", "timezone", "locale");
     }
 
+    /** U+0000 in a name, which PostgreSQL refuses in text, is a 400, not a 500; so is a line break. */
+    @Test
+    void rejectsControlCharactersInTheNames() {
+        MvcTestResult result =
+                // JSON escapes: the request carries the characters themselves once parsed.
+                create("{\"name\":\"Clínica\\u0000\",\"legalName\":\"Clínica\\nS.L.\",\"taxId\":\"B1\"}");
+
+        assertThat(result)
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactlyInAnyOrder("name", "legalName");
+    }
+
     @Test
     void listsClinicsAsAPage() throws Exception {
         created.add(idOf(create("{\"name\":\"Clínica Lista\",\"legalName\":\"Lista S.L.\",\"taxId\":\"B1\"}")));

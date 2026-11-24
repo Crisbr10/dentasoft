@@ -58,7 +58,10 @@ final class RowLevelSecurityIsolationChecks {
                 .isEqualTo(before);
     }
 
-    /** {@code dentasoft_app} has no DELETE grant at all, so the statement fails: the row must still be there. */
+    /**
+     * {@code dentasoft_app} has DELETE only on {@code clinic_hours_of_operation} (V003): there the policy hides clinic
+     * B's row from the statement; elsewhere the statement fails for lack of the grant. The row must still be there.
+     */
     void blocksDeletesOfTheOtherClinic() {
         String before = fixture.storedOtherRow();
 

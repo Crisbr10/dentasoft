@@ -1,12 +1,12 @@
-package es.crisbr.dentasoft.platform.internal;
+package es.crisbr.dentasoft.shared;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.ErrorResponseException;
 
-/** The list was asked for a page number beyond {@link ClinicAdministration#MAX_PAGE_NUMBER}: 400. */
-class PageOutOfRangeException extends ErrorResponseException {
+/** The list was asked for a page number beyond {@link PageLimits#MAX_PAGE_NUMBER}: 400. */
+public class PageOutOfRangeException extends ErrorResponseException {
 
-    PageOutOfRangeException() {
+    public PageOutOfRangeException() {
         super(HttpStatus.BAD_REQUEST, null);
     }
 

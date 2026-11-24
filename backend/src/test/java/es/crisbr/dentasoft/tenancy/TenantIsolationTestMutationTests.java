@@ -147,7 +147,7 @@ class TenantIsolationTestMutationTests {
 
     /**
      * Without {@code @TenantId}, Hibernate reads and changes clinic B's row once Row Level Security lets it through.
-     * The delete check still passes: {@code dentasoft_app} has no DELETE grant at all.
+     * The delete check still passes: {@code dentasoft_app} has no DELETE grant on this test table.
      */
     @Test
     void withoutTenantIdTheHibernateChecksFail() {

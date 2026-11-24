@@ -5,6 +5,7 @@ import es.crisbr.dentasoft.platform.persistence.ClinicStatus;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinic;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinicSettings;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinics;
+import es.crisbr.dentasoft.shared.PageLimits;
 import es.crisbr.dentasoft.tenancy.TenantContext;
 import java.time.Instant;
 import java.util.UUID;
@@ -12,9 +13,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,12 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @PreAuthorize("hasRole('PLATFORM_ADMIN')")
 public class ClinicAdministration {
-
-    /** Larger pages are cut to this size. */
-    public static final int MAX_PAGE_SIZE = 100;
-
-    /** Far beyond any real number of clinics, and low enough that the offset always fits in an int. */
-    public static final int MAX_PAGE_NUMBER = 100_000;
 
     private final PlatformClinics clinics;
     private final ApplicationEventPublisher events;
@@ -63,17 +56,7 @@ public class ClinicAdministration {
     @Transactional(value = PlatformPersistenceConfiguration.TRANSACTION_MANAGER, readOnly = true)
     public Page<ClinicDetails> list(Pageable pageable) {
         requireNoActiveClinic();
-        for (Sort.Order order : pageable.getSort()) {
-            if (!PlatformClinics.SORTABLE.containsKey(order.getProperty())) {
-                throw new UnsupportedSortException();
-            }
-        }
-        if (pageable.getPageNumber() > MAX_PAGE_NUMBER) {
-            throw new PageOutOfRangeException();
-        }
-        Pageable bounded = pageable.getPageSize() > MAX_PAGE_SIZE
-                ? PageRequest.of(pageable.getPageNumber(), MAX_PAGE_SIZE, pageable.getSort())
-                : pageable;
+        Pageable bounded = PageLimits.bounded(pageable, PlatformClinics.SORTABLE.keySet());
         return clinics.page(bounded).map(ClinicDetails::of);
     }
 
