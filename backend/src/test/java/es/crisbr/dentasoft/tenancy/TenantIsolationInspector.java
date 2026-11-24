@@ -66,7 +66,7 @@ final class TenantIsolationInspector {
 
     /** One line per problem, prefixed by the table name. Empty when every table is isolated. */
     List<String> problems() throws SQLException {
-        List<String> problems = new ArrayList<>();
+        List<String> problems = new ArrayList<>(unprotectedRelations());
         for (String table : tables()) {
             String column = tenantColumnExceptions.getOrDefault(table, TENANT_COLUMN);
             checkRowLevelSecurity(table, problems);
@@ -75,6 +75,26 @@ final class TenantIsolationInspector {
             checkLeadingIndex(table, column, problems);
         }
         return problems;
+    }
+
+    /**
+     * Materialized views and foreign tables: Row Level Security does not apply to them, and the default privileges
+     * of V001 still let the application read them, so any of them would show every clinic's rows.
+     */
+    private List<String> unprotectedRelations() throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT c.relname, c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace"
+                        + " WHERE n.nspname = ? AND c.relkind IN ('m', 'f') ORDER BY c.relname")) {
+            statement.setString(1, schema);
+            try (ResultSet result = statement.executeQuery()) {
+                List<String> problems = new ArrayList<>();
+                while (result.next()) {
+                    String kind = "m".equals(result.getString("relkind")) ? "materialized view" : "foreign table";
+                    problems.add(result.getString("relname") + ": a " + kind + " has no Row Level Security");
+                }
+                return problems;
+            }
+        }
     }
 
     private void checkRowLevelSecurity(String table, List<String> problems) throws SQLException {

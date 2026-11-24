@@ -51,10 +51,12 @@ CREATE INDEX patient_tenant_id_idx ON patient (tenant_id);
 
 -- ENABLE + FORCE ROW LEVEL SECURITY y la política tenant_isolation (USING y WITH CHECK).
 SELECT enable_tenant_isolation('patient');
-
--- Solo si la tabla necesita borrado físico (nunca en datos clínicos):
--- GRANT DELETE ON patient TO dentasoft_app;
 ```
+
+- Identificadores `uuid` generados en la aplicación (o columnas `identity`), nunca `serial`: los permisos por defecto no incluyen secuencias.
+- `DELETE` solo en tablas no clínicas que necesiten borrado físico, y tabla a tabla: `GRANT DELETE ON treatment_room TO dentasoft_app;`.
+- Las funciones nuevas no las puede ejecutar nadie salvo su dueño; concede `EXECUTE` a `dentasoft_app` una a una si hace falta.
+- Ni vistas materializadas ni tablas foráneas en `public`: RLS no se aplica a ellas y el test guardián las rechaza.
 
 - No escribas la política a mano: el test guardián compara la expresión exacta y rechaza cualquier otra, además de cualquier segunda política.
 - La entidad JPA extiende `TenantScopedEntity` (M01-T02).
@@ -85,6 +87,7 @@ $$
 $$;
 ```
 
+- `ALTER TABLE clinic` bloquea la tabla (`ACCESS EXCLUSIVE`) hasta que termina la migración, y con ella las lecturas de clínicas y las claves foráneas hacia `clinic`. Mantén estas migraciones cortas o ejecútalas con la aplicación parada.
 - El `NO FORCE` de `clinic` solo vale para el dueño y dentro de la transacción de la migración: si algo falla, Flyway la deshace entera.
 - Comprueba el resultado en la propia migración (por ejemplo, con un `RAISE EXCEPTION` si quedan filas sin migrar) en vez de confiar en que el `UPDATE` haya encontrado filas.
 

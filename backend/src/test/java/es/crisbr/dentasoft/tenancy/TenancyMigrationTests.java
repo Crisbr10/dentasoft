@@ -231,6 +231,18 @@ class TenancyMigrationTests {
         }
     }
 
+    @Test
+    void newFunctionsAreNotExecutableByTheApplication() throws SQLException {
+        try (Connection owner = connectAsOwner()) {
+            execute(owner, "CREATE FUNCTION probe_function() RETURNS int LANGUAGE sql AS 'SELECT 1'");
+            try (Connection connection = connectAsApplication()) {
+                assertInsufficientPrivilege(connection, "SELECT probe_function()");
+            } finally {
+                execute(owner, "DROP FUNCTION probe_function()");
+            }
+        }
+    }
+
     private static void setActiveClinic(Connection connection, String clinic) throws SQLException {
         try (PreparedStatement statement =
                 connection.prepareStatement("SELECT set_config('app.tenant_id', ?, false)")) {

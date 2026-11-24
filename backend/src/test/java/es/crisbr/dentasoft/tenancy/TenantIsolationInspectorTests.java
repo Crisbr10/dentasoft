@@ -146,6 +146,15 @@ class TenantIsolationInspectorTests {
                         "index_second: no index whose first column is tenant_id");
     }
 
+    @Test
+    void rejectsMaterializedViews() throws SQLException {
+        isolatedTable("isolated");
+        execute("CREATE MATERIALIZED VIEW guard_probe.isolated_summary AS SELECT tenant_id FROM guard_probe.isolated");
+
+        assertThat(inspector().problems())
+                .containsExactly("isolated_summary: a materialized view has no Row Level Security");
+    }
+
     private TenantIsolationInspector inspector() {
         return new TenantIsolationInspector(connection, SCHEMA, Map.of(), Set.of());
     }

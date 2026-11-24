@@ -16,9 +16,15 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ALTER DEFAULT PRIVILEGES FOR ROLE dentasoft_owner IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE ON TABLES TO dentasoft_app;
 
+-- PostgreSQL lets PUBLIC execute every new function. Functions are granted one by one instead, so a future
+-- SECURITY DEFINER function is never callable by the application by accident. Triggers do not need it.
+-- Without IN SCHEMA on purpose: per-schema default privileges can only add to the global ones, not revoke them.
+ALTER DEFAULT PRIVILEGES FOR ROLE dentasoft_owner
+    REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
 -- Flyway creates its history table before running this migration, so the default privileges above do not
 -- reach it; revoking makes the intent explicit. The application never reads or writes the migration history.
-REVOKE ALL ON TABLE ${flyway:table} FROM PUBLIC, dentasoft_app;
+REVOKE ALL ON TABLE ${flyway:defaultSchema}.${flyway:table} FROM PUBLIC, dentasoft_app;
 
 -- Turns on and forces Row Level Security on a table and creates its `tenant_isolation` policy, which only
 -- lets through rows whose p_column equals the active clinic (app.tenant_id, set per connection).
