@@ -20,17 +20,88 @@
 | `treatment_room` | `tenant_id`, `name`, `color`, `active` (gabinete) |
 | `audit_log` | `tenant_id`, `occurred_at`, `actor_id`, `action`, `entity`, `entity_id`, `ip`, `details` (sin datos clínicos) |
 
+## Roles de base de datos y Row Level Security
+
+- **`dentasoft_owner`** es dueño del esquema y ejecuta las migraciones (`SPRING_FLYWAY_USER`, `SPRING_FLYWAY_PASSWORD`).
+- **`dentasoft_app`** es el rol con el que se conecta la aplicación (`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`). Es `NOBYPASSRLS`, no es dueño de nada y no puede crear objetos.
+- **Permisos por defecto** (`V001`): toda tabla nueva de `dentasoft_owner` en `public` da a `dentasoft_app` `SELECT`, `INSERT` y `UPDATE`. Nunca `DELETE` ni `TRUNCATE`, porque lo clínico se borra de forma lógica. `dentasoft_app` no tiene acceso a `flyway_schema_history`.
+- **Política `tenant_isolation`**: compara la columna de clínica con `NULLIF(current_setting('app.tenant_id', true), '')::uuid`, en `USING` y en `WITH CHECK`. Falla cerrado: sin clínica activa, o con el valor vacío tras limpiarlo, las lecturas, los `UPDATE` y los `DELETE` no ven ninguna fila, sin error; un `INSERT` (o un `UPDATE` que mueva una fila a otra clínica) incumple el `WITH CHECK` y falla con `42501`. Un valor que no es UUID da error `22P02` en cualquier consulta.
+- **`clinic`** es la excepción: su política compara `id`, no `tenant_id`, porque la fila es la clínica misma.
+- **`RowLevelSecurityGuardTests`** recorre todas las tablas del esquema y falla si alguna no cumple. Las excepciones a la columna `tenant_id` se declaran en ese test, cada una con su motivo.
+
+### Cómo añadir una tabla con RLS
+
+Dentro de una migración nueva (`V{NNN}__descripcion.sql`):
+
+```sql
+CREATE TABLE patient
+(
+    id         uuid PRIMARY KEY,
+    tenant_id  uuid        NOT NULL REFERENCES clinic (id),
+    -- campos de negocio…
+    created_at timestamptz NOT NULL,
+    created_by uuid,
+    updated_at timestamptz NOT NULL,
+    updated_by uuid,
+    version    bigint      NOT NULL DEFAULT 0
+);
+
+-- El índice empieza por tenant_id: todas las consultas filtran por clínica.
+CREATE INDEX patient_tenant_id_idx ON patient (tenant_id);
+
+-- ENABLE + FORCE ROW LEVEL SECURITY y la política tenant_isolation (USING y WITH CHECK).
+SELECT enable_tenant_isolation('patient');
+```
+
+- Identificadores `uuid` generados en la aplicación (o columnas `identity`), nunca `serial`: los permisos por defecto no incluyen secuencias.
+- `DELETE` solo en tablas no clínicas que necesiten borrado físico, y tabla a tabla: `GRANT DELETE ON treatment_room TO dentasoft_app;`.
+- Las funciones nuevas no las puede ejecutar nadie salvo su dueño; concede `EXECUTE` a `dentasoft_app` una a una si hace falta.
+- Ni vistas materializadas ni tablas foráneas en `public`: RLS no se aplica a ellas y el test guardián las rechaza.
+
+- No escribas la política a mano: el test guardián compara la expresión exacta y rechaza cualquier otra, además de cualquier segunda política.
+- La entidad JPA extiende `TenantScopedEntity` (M01-T02).
+- Cada módulo con datos añade su test de aislamiento (M01-T04).
+
+### Migraciones que tocan datos
+
+`FORCE ROW LEVEL SECURITY` también sujeta a RLS a `dentasoft_owner`, el dueño de las tablas. Una migración que haga `UPDATE`, `DELETE` o `INSERT ... SELECT` sin clínica activa **ve 0 filas y no hace nada, sin avisar**. Para cambiar datos de todas las clínicas, recórrelas fijando la clínica en cada vuelta:
+
+```sql
+DO
+$$
+    DECLARE
+        clinic_id uuid;
+    BEGIN
+        -- clinic también tiene RLS: para listar todas las clínicas hay que quitarlo un momento.
+        -- ALTER TABLE solo lo puede ejecutar el dueño, y forma parte de la transacción de la migración.
+        ALTER TABLE clinic NO FORCE ROW LEVEL SECURITY;
+        FOR clinic_id IN SELECT id FROM clinic
+            LOOP
+                -- true = solo para esta transacción
+                PERFORM set_config('app.tenant_id', clinic_id::text, true);
+                UPDATE treatment_room SET color = '#1E88E5' WHERE color IS NULL;
+            END LOOP;
+        ALTER TABLE clinic FORCE ROW LEVEL SECURITY;
+        PERFORM set_config('app.tenant_id', '', true);
+    END
+$$;
+```
+
+- `ALTER TABLE clinic` bloquea la tabla (`ACCESS EXCLUSIVE`) hasta que termina la migración, y con ella las lecturas de clínicas y las claves foráneas hacia `clinic`. Mantén estas migraciones cortas o ejecútalas con la aplicación parada.
+- El `NO FORCE` de `clinic` solo vale para el dueño y dentro de la transacción de la migración: si algo falla, Flyway la deshace entera.
+- Comprueba el resultado en la propia migración (por ejemplo, con un `RAISE EXCEPTION` si quedan filas sin migrar) en vez de confiar en que el `UPDATE` haya encontrado filas.
+
 ## Tareas
 
 ### M01-T01 · Migración base y roles de base de datos
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T03
-- **Descripción**: migración `V001` con extensiones (`pgcrypto`, `vector`), tabla `clinic`, permisos por defecto para `dentasoft_app` y función SQL de ayuda para crear la política `tenant_isolation` en tablas nuevas.
+- **Descripción**: migración `V001` con la extensión `vector`, tabla `clinic`, permisos por defecto para `dentasoft_app` y función SQL de ayuda para crear la política `tenant_isolation` en tablas nuevas. Sin `pgcrypto`: `gen_random_uuid()` es nativa desde PostgreSQL 13 y los UUID v7 los genera la aplicación.
 - **Criterios de aceptación**:
-  - [ ] Flyway migra con `dentasoft_owner` y la app conecta con `dentasoft_app`
-  - [ ] `dentasoft_app` tiene `NOBYPASSRLS` y no es propietario de ninguna tabla
-  - [ ] Documentado en el módulo cómo añadir una tabla con RLS
+  - [x] Flyway migra con `dentasoft_owner` y la app conecta con `dentasoft_app`
+  - [x] `dentasoft_app` tiene `NOBYPASSRLS` y no es propietario de ninguna tabla
+  - [x] Documentado en el módulo cómo añadir una tabla con RLS
 
 ### M01-T02 · TenantContext y entidad base
 
@@ -46,11 +117,11 @@
 
 - **Estado**: pendiente
 - **Depende de**: M01-T02
-- **Descripción**: envolver el `DataSource` para fijar `app.tenant_id` con `set_config` al obtener la conexión y limpiarlo al devolverla al pool.
+- **Descripción**: fijar `app.tenant_id` por transacción, no por conexión: al empezar cada transacción, `set_config('app.tenant_id', …, true)` (equivale a `SET LOCAL`). PostgreSQL lo descarta al confirmar o deshacer, así que la conexión vuelve al pool sin clínica aunque falle la petición. Todo acceso a datos de una clínica va dentro de una transacción; fuera de ella no se ve ninguna fila (falla cerrado).
 - **Criterios de aceptación**:
   - [ ] Una consulta nativa sin filtro solo devuelve filas de la clínica activa
   - [ ] Sin clínica activa, las tablas con RLS devuelven cero filas
-  - [ ] Ninguna conexión vuelve al pool con la clínica de otra petición (test con concurrencia)
+  - [ ] Ninguna conexión vuelve al pool con una clínica fijada: tras cada transacción, también si falla, `app.tenant_id` queda vacío (test con concurrencia)
 
 ### M01-T04 · Test de aislamiento reutilizable
 

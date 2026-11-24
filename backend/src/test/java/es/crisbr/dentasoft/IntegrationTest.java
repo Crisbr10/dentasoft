@@ -6,7 +6,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 
 /**
  * Base for integration tests: the whole application with PostgreSQL and Redis in Testcontainers and the properties of
@@ -19,5 +18,4 @@ import org.springframework.context.annotation.Import;
 @Inherited
 @SpringBootTest
 @WithTestEnvironment
-@Import(TestPostgresConfiguration.class)
 public @interface IntegrationTest {}

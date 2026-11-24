@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
-@Import(TestRedisConfiguration.class)
+@Import({TestRedisConfiguration.class, TestPostgresConfiguration.class})
 class ApiDocsLocalProfileTests {
 
     @Autowired
