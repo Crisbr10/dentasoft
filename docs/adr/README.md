@@ -12,6 +12,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0006](0006-dominio-intercambiable.md) | Dominio intercambiable: ninguna URL pública en el código | Aceptada |
 | [0007](0007-s3-local-seaweedfs.md) | Almacenamiento S3 local con SeaweedFS en lugar de MinIO | Aceptada |
 | [0008](0008-frontend-angular-material.md) | Frontend con Angular Material en lugar de PrimeNG (se mantiene Transloco) | Aceptada |
+| [0009](0009-clinica-activa-scopedvalue-centinela.md) | Clínica activa en un `ScopedValue` y centinela `NO_CLINIC` en Hibernate | Aceptada |
 
 ## Plantilla
 

@@ -22,6 +22,8 @@ import org.springframework.test.context.TestPropertySource;
             "dentasoft.urls.app=" + WithTestEnvironment.APP,
             "dentasoft.urls.api=" + WithTestEnvironment.API,
             "dentasoft.urls.auth=" + WithTestEnvironment.AUTH,
-            "dentasoft.rate-limit.key=" + WithTestEnvironment.RATE_LIMIT_KEY
+            "dentasoft.rate-limit.key=" + WithTestEnvironment.RATE_LIMIT_KEY,
+            // Test-only tables (db/testmigration), numbered from V900 so they always run after the real ones.
+            "spring.flyway.locations=classpath:db/migration,classpath:db/testmigration"
         })
 public @interface WithTestProperties {}
