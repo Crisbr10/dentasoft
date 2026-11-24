@@ -20,13 +20,81 @@
 | `treatment_room` | `tenant_id`, `name`, `color`, `active` (gabinete) |
 | `audit_log` | `tenant_id`, `occurred_at`, `actor_id`, `action`, `entity`, `entity_id`, `ip`, `details` (sin datos clínicos) |
 
+## Roles de base de datos y Row Level Security
+
+- **`dentasoft_owner`** es dueño del esquema y ejecuta las migraciones (`SPRING_FLYWAY_USER`, `SPRING_FLYWAY_PASSWORD`).
+- **`dentasoft_app`** es el rol con el que se conecta la aplicación (`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`). Es `NOBYPASSRLS`, no es dueño de nada y no puede crear objetos.
+- **Permisos por defecto** (`V001`): toda tabla nueva de `dentasoft_owner` en `public` da a `dentasoft_app` `SELECT`, `INSERT` y `UPDATE`. Nunca `DELETE` ni `TRUNCATE`, porque lo clínico se borra de forma lógica. `dentasoft_app` no tiene acceso a `flyway_schema_history`.
+- **Política `tenant_isolation`**: compara la columna de clínica con `NULLIF(current_setting('app.tenant_id', true), '')::uuid`, en `USING` y en `WITH CHECK`. Falla cerrado: sin clínica activa, o con el valor vacío tras limpiarlo, no se ve ni se escribe ninguna fila, y no se produce ningún error.
+- **`clinic`** es la excepción: su política compara `id`, no `tenant_id`, porque la fila es la clínica misma.
+- **`RowLevelSecurityGuardTests`** recorre todas las tablas del esquema y falla si alguna no cumple. Las excepciones a la columna `tenant_id` se declaran en ese test, cada una con su motivo.
+
+### Cómo añadir una tabla con RLS
+
+Dentro de una migración nueva (`V{NNN}__descripcion.sql`):
+
+```sql
+CREATE TABLE patient
+(
+    id         uuid PRIMARY KEY,
+    tenant_id  uuid        NOT NULL REFERENCES clinic (id),
+    -- campos de negocio…
+    created_at timestamptz NOT NULL,
+    created_by uuid,
+    updated_at timestamptz NOT NULL,
+    updated_by uuid,
+    version    bigint      NOT NULL DEFAULT 0
+);
+
+-- El índice empieza por tenant_id: todas las consultas filtran por clínica.
+CREATE INDEX patient_tenant_id_idx ON patient (tenant_id);
+
+-- ENABLE + FORCE ROW LEVEL SECURITY y la política tenant_isolation (USING y WITH CHECK).
+SELECT enable_tenant_isolation('patient');
+
+-- Solo si la tabla necesita borrado físico (nunca en datos clínicos):
+-- GRANT DELETE ON patient TO dentasoft_app;
+```
+
+- No escribas la política a mano: el test guardián compara la expresión exacta y rechaza cualquier otra, además de cualquier segunda política.
+- La entidad JPA extiende `TenantScopedEntity` (M01-T02).
+- Cada módulo con datos añade su test de aislamiento (M01-T04).
+
+### Migraciones que tocan datos
+
+`FORCE ROW LEVEL SECURITY` también sujeta a RLS a `dentasoft_owner`, el dueño de las tablas. Una migración que haga `UPDATE`, `DELETE` o `INSERT ... SELECT` sin clínica activa **ve 0 filas y no hace nada, sin avisar**. Para cambiar datos de todas las clínicas, recórrelas fijando la clínica en cada vuelta:
+
+```sql
+DO
+$$
+    DECLARE
+        clinic_id uuid;
+    BEGIN
+        -- clinic también tiene RLS: para listar todas las clínicas hay que quitarlo un momento.
+        -- ALTER TABLE solo lo puede ejecutar el dueño, y forma parte de la transacción de la migración.
+        ALTER TABLE clinic NO FORCE ROW LEVEL SECURITY;
+        FOR clinic_id IN SELECT id FROM clinic
+            LOOP
+                -- true = solo para esta transacción
+                PERFORM set_config('app.tenant_id', clinic_id::text, true);
+                UPDATE treatment_room SET color = '#1E88E5' WHERE color IS NULL;
+            END LOOP;
+        ALTER TABLE clinic FORCE ROW LEVEL SECURITY;
+        PERFORM set_config('app.tenant_id', '', true);
+    END
+$$;
+```
+
+- El `NO FORCE` de `clinic` solo vale para el dueño y dentro de la transacción de la migración: si algo falla, Flyway la deshace entera.
+- Comprueba el resultado en la propia migración (por ejemplo, con un `RAISE EXCEPTION` si quedan filas sin migrar) en vez de confiar en que el `UPDATE` haya encontrado filas.
+
 ## Tareas
 
 ### M01-T01 · Migración base y roles de base de datos
 
 - **Estado**: pendiente
 - **Depende de**: M00-T03
-- **Descripción**: migración `V001` con extensiones (`pgcrypto`, `vector`), tabla `clinic`, permisos por defecto para `dentasoft_app` y función SQL de ayuda para crear la política `tenant_isolation` en tablas nuevas.
+- **Descripción**: migración `V001` con la extensión `vector`, tabla `clinic`, permisos por defecto para `dentasoft_app` y función SQL de ayuda para crear la política `tenant_isolation` en tablas nuevas. Sin `pgcrypto`: `gen_random_uuid()` es nativa desde PostgreSQL 13 y los UUID v7 los genera la aplicación.
 - **Criterios de aceptación**:
   - [ ] Flyway migra con `dentasoft_owner` y la app conecta con `dentasoft_app`
   - [ ] `dentasoft_app` tiene `NOBYPASSRLS` y no es propietario de ninguna tabla
