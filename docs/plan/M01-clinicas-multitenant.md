@@ -211,12 +211,12 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T04 · Test de aislamiento reutilizable
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T03
 - **Descripción**: clase base de test con Testcontainers que crea dos clínicas y comprueba lectura, modificación y borrado cruzados, para reutilizarla en cada módulo.
 - **Criterios de aceptación**:
-  - [ ] Plantilla documentada y usada con una tabla de ejemplo
-  - [ ] Falla si se quita la política RLS o el `@TenantId`
+  - [x] Plantilla documentada y usada con una tabla de ejemplo
+  - [x] Falla si se quita la política RLS o el `@TenantId`
 
 ### M01-T05 · Alta y gestión de clínicas (administración de plataforma)
 
