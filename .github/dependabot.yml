@@ -1,0 +1,66 @@
+# Weekly dependency updates. See docs/operaciones/integracion-continua.md.
+#
+# `cooldown` waits a week after a release before proposing it, so a compromised or broken
+# version has time to be detected and withdrawn. Security updates are not delayed.
+# Minor and patch updates are grouped into one pull request per ecosystem; major updates
+# come one by one because they usually need code changes.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci
+      include: scope
+
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      maven-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build
+      include: scope
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build
+      include: scope
+
+  # Base image digests of backend/Dockerfile (pinned by tag and digest, never `latest`).
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: build
+      include: scope
+
+# Not covered: the service images of infra/ come from variables in infra/.env.example, and the
+# tool images of the workflows are referenced with `docker run`. Both are updated by hand.

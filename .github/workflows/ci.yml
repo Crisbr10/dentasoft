@@ -1,0 +1,184 @@
+# Continuous integration. See docs/operaciones/integracion-continua.md.
+#
+# `ci-ok` is the only required check on `main`: it always runs and fails when any job it
+# depends on failed or was cancelled. Jobs skipped by the path filter do not block it, so a
+# pull request that only touches the frontend does not wait for the backend.
+#
+# Every action is pinned by commit hash, with its version in a comment. Dependabot updates
+# both. Tool images run with `docker run` are pinned by tag and digest; Dependabot does not
+# see them, so they are updated by hand (see the document above).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+
+jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: filter
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # The whole history is scanned on every run: it takes seconds and also catches a secret
+      # added and removed again inside the same pull request.
+      - name: Scan the history with gitleaks
+        run: docker run --rm -v "$GITHUB_WORKSPACE:/repo" "$GITLEAKS_IMAGE" git /repo --redact --no-banner --exit-code 1
+
+  backend:
+    name: backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      # Compiles, runs unit and Testcontainers integration tests, and checks the format.
+      - name: Verify
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+
+  frontend:
+    name: frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          package_json_file: frontend/package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+      - name: Check format
+        run: pnpm format:check
+      - name: Lint
+        run: pnpm lint
+      - name: Test
+        run: pnpm test --watch=false
+      # Production build. The URLs are reserved `.test` domains: the build only needs valid
+      # https values, and no real domain is written in the repository (ADR 0006).
+      - name: Build
+        run: pnpm build
+        env:
+          DENTASOFT_URLS_API: https://api.dentasoft.test
+          DENTASOFT_URLS_AUTH: https://auth.dentasoft.test
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [changes, secrets, backend, frontend]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fail when a required job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: |
+          echo "At least one job failed or was cancelled."
+          exit 1
+      - run: echo "All required jobs passed or were skipped by the path filter."
+
+  # Only after a merge into main, and only when the backend changed. Tagged with the commit
+  # hash: tags are never reused, so a deployment always knows which code it runs.
+  image:
+    name: image
+    needs: [changes, backend]
+    if: github.event_name == 'push' && needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dentasoft-backend:${GITHUB_SHA}"
+          echo "IMAGE=${image}" >> "$GITHUB_ENV"
+          docker build \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "${image}" backend
+      # Same policy as backend/README.md: critical vulnerabilities stop the release; high ones
+      # are listed for review.
+      - name: Scan the image with Trivy
+        run: |
+          trivy() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v trivy-cache:/root/.cache/trivy "$TRIVY_IMAGE" "$@"
+          }
+          trivy image --scanners vuln --severity HIGH,CRITICAL --no-progress "$IMAGE"
+          trivy image --scanners vuln --severity CRITICAL --exit-code 1 --quiet "$IMAGE"
+      - name: Push to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE"
+          docker logout ghcr.io
