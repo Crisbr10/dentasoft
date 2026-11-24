@@ -8,8 +8,8 @@
 -- changing their status is the platform's (V002). legal_name and tax_id are not the clinic's to change either: if
 -- they need correcting, the platform does it (M01-T11).
 -- Revoking at table level removes the table-wide privilege; the column grant then adds back only what is needed.
--- SELECT ... FOR UPDATE, with which the application serializes changes to a clinic's hours, needs UPDATE on at least
--- one column, which it keeps.
+-- SELECT ... FOR NO KEY UPDATE (what Hibernate issues for a pessimistic write lock on PostgreSQL), with which the
+-- application serializes changes to a clinic's hours, needs UPDATE on at least one column, which it keeps.
 REVOKE INSERT, UPDATE ON clinic FROM dentasoft_app;
 GRANT UPDATE (name, timezone, updated_at, updated_by, version) ON clinic TO dentasoft_app;
 
