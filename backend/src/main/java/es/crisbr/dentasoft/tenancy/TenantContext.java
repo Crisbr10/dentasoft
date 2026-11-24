@@ -23,6 +23,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *       transaction.
  * </ul>
  *
+ * <p>Reading or writing a clinic's data requires a Spring transaction ({@code @Transactional} or
+ * {@code TransactionTemplate}) inside the block: the clinic reaches PostgreSQL when the transaction begins (ADR 0010).
+ * Without one, native SQL and {@code JdbcClient} see no rows of tables with Row Level Security, even with a clinic
+ * active.
+ *
  * <p>Only Spring transactions are detected. A session opened in another way keeps its clinic: that is why
  * {@code spring.jpa.open-in-view} stays {@code false}, and why the write guard checks the session's clinic.
  *
