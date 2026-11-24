@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.tenancy.web;
 
+import es.crisbr.dentasoft.shared.NoControlCharacters;
 import es.crisbr.dentasoft.tenancy.internal.Locations.LocationData;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -16,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * @param version the version of the room the client read; the change is refused with 409 if it is no longer current
  */
 public record UpdateLocationRequest(
-        @NotBlank @Size(max = 100) String name,
+        @NotBlank @NoControlCharacters @Size(max = 100) String name,
         @Nullable @Pattern(regexp = "#[0-9A-F]{6}") String color,
         @NotNull @PositiveOrZero Long version) {
 

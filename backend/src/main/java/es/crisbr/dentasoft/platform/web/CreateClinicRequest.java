@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.platform.web;
 
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.NewClinic;
 import es.crisbr.dentasoft.shared.KnownTimeZone;
+import es.crisbr.dentasoft.shared.NoControlCharacters;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,8 +14,8 @@ import org.jspecify.annotations.Nullable;
  * @param taxId the clinic's tax identifier (CIF/NIF), in upper case without spaces or dashes
  */
 public record CreateClinicRequest(
-        @NotBlank @Size(max = 200) String name,
-        @NotBlank @Size(max = 200) String legalName,
+        @NotBlank @NoControlCharacters @Size(max = 200) String name,
+        @NotBlank @NoControlCharacters @Size(max = 200) String legalName,
         @NotBlank @Pattern(regexp = "[A-Z0-9]{1,20}") String taxId,
         @Nullable @KnownTimeZone String timezone,
         @Nullable @Pattern(regexp = "[a-z]{2}-[A-Z]{2}") String locale) {

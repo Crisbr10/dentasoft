@@ -10,6 +10,8 @@ import es.crisbr.dentasoft.tenancy.internal.Locations.LocationData;
 import es.crisbr.dentasoft.tenancy.internal.Locations.LocationDetails;
 import es.crisbr.dentasoft.tenancy.persistence.LocationStatus;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -155,6 +157,27 @@ class LocationsTests extends ClinicConfigurationTestBase {
         assertThat(asClinicA(() -> locations.list(LocationStatus.INACTIVE, BY_NAME))
                         .getContent())
                 .containsExactly(inactive);
+    }
+
+    /** Inactive rooms may share a name: the id breaks the tie, so pages neither repeat nor skip a room. */
+    @Test
+    void pagesThroughRoomsWithTheSameNameWithoutRepeatingAny() {
+        List<UUID> ids = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            LocationDetails room = create("Gabinete 1", null);
+            asClinicA(() -> locations.deactivate(room.id(), room.version()));
+            ids.add(room.id());
+        }
+
+        List<UUID> paged = new ArrayList<>();
+        for (int page = 0; page < ids.size(); page++) {
+            PageRequest onePerPage = PageRequest.of(page, 1, Sort.by("name"));
+            paged.addAll(asClinicA(() -> locations.list(null, onePerPage))
+                    .map(LocationDetails::id)
+                    .getContent());
+        }
+
+        assertThat(paged).containsExactlyElementsOf(ids.stream().sorted().toList());
     }
 
     @Test

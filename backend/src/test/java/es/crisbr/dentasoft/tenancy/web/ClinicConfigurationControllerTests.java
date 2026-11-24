@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.jayway.jsonpath.JsonPath;
 import es.crisbr.dentasoft.TestData;
 import es.crisbr.dentasoft.tenancy.internal.ClinicConfigurationTestBase;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -132,6 +133,35 @@ class ClinicConfigurationControllerTests extends ClinicConfigurationTestBase {
                 .isEqualTo(2);
     }
 
+    /**
+     * Times count in whole minutes: seconds and fractions are dropped before the check, so a slot shorter than a minute
+     * is refused with 400, never stored rounded by PostgreSQL to an empty slot (a 500).
+     */
+    @Test
+    void dropsSecondsFromTheTimes() {
+        assertThat(asClinicA(() -> send(
+                        mvc.put().uri(HOURS),
+                        "{\"slots\":[{\"dayOfWeek\":\"MONDAY\",\"openingTime\":\"09:00:30\","
+                                + "\"closingTime\":\"14:00:59.9999999\"}]}")))
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$[0]")
+                .isEqualTo(Map.of("dayOfWeek", "MONDAY", "openingTime", "09:00:00", "closingTime", "14:00:00"));
+        assertThat(asClinicA(() -> send(
+                        mvc.put().uri(HOURS),
+                        "{\"slots\":[{\"dayOfWeek\":\"MONDAY\",\"openingTime\":\"09:00:00.0000001\","
+                                + "\"closingTime\":\"09:00:00.0000004\"}]}")))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.title")
+                .isEqualTo("Horario no válido");
+        assertThat(asClinicA(() -> mvc.get().uri(HOURS).exchange()))
+                .bodyJson()
+                .extractingPath("$[*].closingTime")
+                .asArray()
+                .containsExactly("14:00:00");
+    }
+
     @Test
     void rejectsAnIncompleteSlotAndAnUnknownDay() {
         assertThat(asClinicA(() -> send(
@@ -190,6 +220,34 @@ class ClinicConfigurationControllerTests extends ClinicConfigurationTestBase {
                 .extractingPath("$.errors[*].field")
                 .asArray()
                 .containsExactlyInAnyOrder("name", "color");
+    }
+
+    /**
+     * A name of Unicode spaces, which {@code strip()} would leave empty, is blank for {@code @NotBlank} too (Hibernate
+     * Validator uses {@code String.isBlank()}). U+0000, which PostgreSQL refuses in text, would otherwise be a 500.
+     */
+    @Test
+    void rejectsNamesOfUnicodeSpacesOrWithControlCharacters() {
+        // JSON escapes: the request carries the characters themselves once parsed.
+        for (String name : new String[] {"\\u2003\\u3000", "Gabinete\\u0000"}) {
+            assertThat(asClinicA(() -> send(mvc.post().uri(LOCATIONS), "{\"name\":\"" + name + "\"}")))
+                    .hasStatus(HttpStatus.BAD_REQUEST)
+                    .bodyJson()
+                    .extractingPath("$.errors[*].field")
+                    .asArray()
+                    .containsExactly("name");
+        }
+        assertThat(asClinicA(() -> send(
+                        mvc.put().uri(CLINIC), "{\"name\":\"\\u3000\",\"timezone\":\"Europe/Madrid\",\"version\":0}")))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactly("name");
+        assertThat(asClinicA(() -> mvc.get().uri(LOCATIONS).exchange()))
+                .bodyJson()
+                .extractingPath("$.page.totalElements")
+                .isEqualTo(0);
     }
 
     @Test

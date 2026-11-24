@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
@@ -24,7 +25,8 @@ public record ReplaceOpeningHoursRequest(
     }
 
     /**
-     * One opening slot, as wall-clock times in the clinic's time zone.
+     * One opening slot, as wall-clock times in the clinic's time zone. Times count in whole minutes: seconds and
+     * fractions are dropped before anything is checked, so what is stored, and returned, is what was validated.
      *
      * @param dayOfWeek {@code MONDAY} to {@code SUNDAY}
      * @param openingTime as {@code HH:mm}, before {@code closingTime}
@@ -35,7 +37,10 @@ public record ReplaceOpeningHoursRequest(
             @NotNull LocalTime closingTime) {
 
         Slot toSlot() {
-            return new Slot(dayOfWeek, openingTime, closingTime);
+            return new Slot(
+                    dayOfWeek,
+                    openingTime.truncatedTo(ChronoUnit.MINUTES),
+                    closingTime.truncatedTo(ChronoUnit.MINUTES));
         }
     }
 }
