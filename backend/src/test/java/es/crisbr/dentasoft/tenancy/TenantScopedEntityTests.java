@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.repository.support.JpaEntityInformationSupport;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -201,8 +202,9 @@ class TenantScopedEntityTests {
         TenancyTestRecord record = asClinic(CLINIC_A, () -> records.save(new TenancyTestRecord("north")));
         record.setLabel("north, renamed");
 
+        // The filtered load finds nothing, so the detached entity looks deleted.
         assertThat(catchThrowable(() -> inTransaction(CLINIC_A, () -> records.saveAndFlush(record))))
-                .isNotNull();
+                .isInstanceOf(ObjectOptimisticLockingFailureException.class);
         inTransaction(CLINIC_A, () -> {
             records.deleteById(record.getId());
             records.delete(record);

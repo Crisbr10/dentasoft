@@ -5,6 +5,7 @@ import java.util.concurrent.CompletableFuture;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Test-only: reports, from {@code @Async} methods and module listeners, whether a clinic is active, on which thread
@@ -39,6 +40,16 @@ class ClinicProbe {
 
     @ApplicationModuleListener
     void on(ProbeEvent event) {
+        event.observed().complete(Observation.now());
+    }
+
+    /** Published by the tests; the listener without a transaction completes {@code observed}. */
+    record NonTransactionalProbeEvent(CompletableFuture<Observation> observed) {}
+
+    /** The documented way, until M01-T08, for a listener that works with a clinic's data. */
+    @Async
+    @TransactionalEventListener
+    void on(NonTransactionalProbeEvent event) {
         event.observed().complete(Observation.now());
     }
 }

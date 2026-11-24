@@ -12,6 +12,9 @@ import org.springframework.context.annotation.Configuration;
  * Clinic isolation in Hibernate: the active clinic for every session ({@link ActiveClinicResolver}) and the write
  * guard ({@link TenantWriteGuard}). Both are set explicitly instead of relying on Hibernate finding a resolver bean
  * on its own, which it silently skips when there is none or more than one.
+ *
+ * <p>{@code hibernate.integrator_provider} holds a single provider: any other integrator the application needs goes
+ * in this list, never in a second customizer, which would silently replace the guard.
  */
 @Configuration(proxyBeanMethods = false)
 class TenancyJpaConfiguration {

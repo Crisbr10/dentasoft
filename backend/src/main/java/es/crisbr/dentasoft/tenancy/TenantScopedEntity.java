@@ -7,15 +7,15 @@ import java.util.UUID;
 import org.hibernate.annotations.TenantId;
 
 /**
- * Base of every entity that belongs to a clinic. Hibernate fills {@code tenant_id} with the active clinic of
- * {@link TenantContext} on insert and adds {@code tenant_id = <active clinic>} to every JPA query, {@code find()},
- * update and delete, so no repository writes that filter by hand.
+ * Base of every entity that belongs to a clinic. When an entity is saved, Hibernate fills {@code tenant_id} with the
+ * active clinic of {@link TenantContext}, and it adds {@code tenant_id = <active clinic>} to every JPQL query,
+ * {@code find()}, entity update and delete and JPQL update and delete, so no repository writes that filter by hand.
  *
- * <p>The clinic cannot be changed: there is no setter and the column is not updatable. A different value set by
- * other means is ignored on update and rejected on insert.
+ * <p>An entity cannot change its clinic: there is no setter and the column is not updatable. A different value set
+ * by other means is ignored on update and rejected when a new entity is saved.
  *
- * <p>Native queries, {@code JdbcClient} and custom SQL such as {@code @SQLDelete} are not filtered by Hibernate:
- * there, only Row Level Security protects the data.
+ * <p>Only Row Level Security protects what Hibernate does not filter: native queries, {@code JdbcClient}, custom SQL
+ * such as {@code @SQLDelete}, JPQL inserts and JPQL updates that assign {@code tenantId}.
  */
 @MappedSuperclass
 public abstract class TenantScopedEntity extends BaseEntity {

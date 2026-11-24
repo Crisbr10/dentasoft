@@ -13,7 +13,8 @@ import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
  *
  * <ul>
  *   <li>every query on a {@code TenantScopedEntity} filters by {@code tenant_id = NO_CLINIC} and finds nothing;
- *   <li>every insert, update or delete of one fails with {@code NoActiveClinicException} ({@link TenantWriteGuard}).
+ *   <li>saving a new one fails with {@code NoActiveClinicException} ({@link TenantWriteGuard}); existing ones cannot
+ *       be loaded, so they cannot be updated or deleted either.
  * </ul>
  *
  * <p>No clinic is ever "root": Hibernate would drop the clinic filter for it.

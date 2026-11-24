@@ -11,7 +11,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * never stay on a thread and reach another request or task.
  *
  * <p>The clinic is not inherited: tasks sent to an executor, new threads, {@code @Async} methods and
- * {@code @ApplicationModuleListener} listeners start without one and must bind their own.
+ * {@code @ApplicationModuleListener} listeners start without one. A module listener cannot bind one either, since its
+ * transaction is already open: see {@code docs/plan/M01-clinicas-multitenant.md}.
  *
  * <p>Two rules keep the clinic of the Hibernate session equal to the active one, since the session takes the clinic
  * when it opens, at the start of the outermost transaction:
