@@ -60,3 +60,12 @@ Clave de almacenamiento: `{tenant_id}/patients/{patient_id}/{document_id}`. El b
 - **Criterios de aceptación**:
   - [ ] Progreso de subida y estado del análisis visibles
   - [ ] El visor no descarga el fichero completo de golpe si es grande
+
+### M05-T06 · Logo de la clínica
+
+- **Estado**: pendiente
+- **Depende de**: M05-T02, M05-T03, M01-T06
+- **Descripción**: `ADMIN_CLINICA` sube, sustituye y quita el logo de su clínica. Es un fichero subido como cualquier otro y pasa por los mismos controles que los documentos: límite de tamaño, tipo real con Apache Tika (solo imágenes), huella SHA-256 y análisis con ClamAV, y descarga solo con URL firmada. No es un documento del paciente: su clave de almacenamiento no lleva paciente. La pantalla de la clínica (M01-T10) lo muestra cuando exista.
+- **Criterios de aceptación**:
+  - [ ] Un fichero que no es una imagen, aunque lo parezca por la extensión, se rechaza, y uno infectado no se sirve
+  - [ ] Test de aislamiento: una clínica no ve, sustituye ni quita el logo de otra

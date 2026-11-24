@@ -17,7 +17,7 @@ Leyenda: **E** = ve y edita · **V** = solo ve · — = no ve la sección.
 
 | Sección | Contenido | PLATFORM_ADMIN | ADMIN_CLINICA | ODONTOLOGO | HIGIENISTA | RECEPCION | FACTURACION | Tarea |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Clínica | Datos generales y fiscales (los fiscales, solo lectura: los corrige la plataforma, M01-T11), logo, horario, zona horaria, idioma, gabinetes | — | E | V | V | V | V | M01-T06, M01-T10 |
+| Clínica | Datos generales y fiscales (los fiscales, solo lectura: los corrige la plataforma, M01-T11), logo, horario, zona horaria, idioma, gabinetes | — | E | V | V | V | V | M01-T06, M01-T10, M05-T06 |
 | Usuarios y roles | Invitar, cambiar rol, desactivar | — | E | — | — | — | — | M02-T05, M02-T08 |
 | Profesionales | Colegiado, especialidad, color en agenda | — | E | V (el suyo: E color) | V | V | — | M02-T06 |
 | Agenda | Duración de cita por defecto, horarios de profesionales, festivos y cierres | — | E | V | V | E (festivos y bloqueos) | — | M06-T03 |

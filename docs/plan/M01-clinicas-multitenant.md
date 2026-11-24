@@ -16,7 +16,7 @@
 | Tabla | Campos principales |
 | --- | --- |
 | `clinic` | `id`, `name`, `legal_name`, `tax_id`, `timezone`, `locale`, `status` (activa, suspendida), `keycloak_org_id` |
-| `clinic_settings` | `id`, `tenant_id` (único: una fila por clínica), `default_appointment_minutes`, `contact_email`, `contact_phone` (M01-T05); logo (pendiente de decidir su tarea). Nunca secretos: las credenciales de los canales van cifradas en su propia tabla (M07-T07) |
+| `clinic_settings` | `id`, `tenant_id` (único: una fila por clínica), `default_appointment_minutes`, `contact_email`, `contact_phone` (M01-T05); el logo llega con la subida segura de ficheros (M05-T06). Nunca secretos: las credenciales de los canales van cifradas en su propia tabla (M07-T07) |
 | `clinic_hours_of_operation` | `tenant_id`, `day_of_week` (1 = lunes … 7 = domingo, ISO 8601), `opening_time`, `closing_time` (tipo `time`, hora de reloj de la clínica en su zona horaria). Varios tramos por día, sin solaparse (M01-T06) |
 | `location` | `tenant_id`, `name`, `color`, `status` (activo, inactivo). Gabinete, alineado con el recurso FHIR `Location`; el nombre es único entre los activos de la clínica (M01-T06) |
 | `audit_log` | `tenant_id`, `occurred_at`, `actor_id`, `action`, `entity`, `entity_id`, `ip`, `details` (sin datos clínicos) |
@@ -271,8 +271,8 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 ### M01-T10 · Pantallas de configuración de la clínica y gabinetes
 
 - **Estado**: pendiente
-- **Depende de**: M01-T06, M02-T02
-- **Descripción**: pantallas de la sección «Clínica» del apartado de Configuración (ver `configuracion.md`) sobre la API de M01-T06, con el cliente generado (`pnpm api:gen`): datos y zona horaria, ajustes, horario semanal con varios tramos por día y gestión de gabinetes (alta, edición, desactivación y reactivación).
+- **Depende de**: M01-T06, M02-T02, M02-T09
+- **Descripción**: pantallas de la sección «Clínica» del apartado de Configuración (ver `configuracion.md`, marco de M02-T09) sobre la API de M01-T06, con el cliente generado (`pnpm api:gen`): datos y zona horaria, ajustes, horario semanal con varios tramos por día y gestión de gabinetes (alta, edición, desactivación y reactivación). El logo no entra: lo añade M05-T06.
 - **Criterios de aceptación**:
   - [ ] Textos con Transloco y formularios validados; los errores del servidor (validación, nombre de gabinete repetido, conflicto de versión) se muestran en el formulario
   - [ ] El nombre y los datos fiscales se ven; solo el nombre se edita (los fiscales los cambia la plataforma, M01-T11)
