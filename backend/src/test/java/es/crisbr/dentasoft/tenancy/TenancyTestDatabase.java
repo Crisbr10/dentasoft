@@ -11,10 +11,11 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
- * Test data for {@code tenancy_test_record}, prepared, checked and removed with direct connections that do not go
- * through the application: clinics A and B, and what each one has stored.
+ * Test data for {@code tenancy_test_record} and the tables of {@link TenantIsolationTest}, prepared, checked and removed
+ * with direct connections that do not go through the application: clinics A and B, and what each one has stored.
  *
  * <p>These connections set {@code app.tenant_id} for their whole session, which the application never does. They are
  * opened for one call and closed, never taken from the application's pool.
@@ -22,6 +23,7 @@ import java.util.UUID;
 final class TenancyTestDatabase {
 
     private static final List<UUID> CLINICS = List.of(TestData.CLINIC_A.id(), TestData.CLINIC_B.id());
+    private static final Pattern TABLE_NAME = Pattern.compile("[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)?");
 
     private TenancyTestDatabase() {}
 
@@ -35,15 +37,65 @@ final class TenancyTestDatabase {
         }
     }
 
-    /** The application cannot delete; the owner can, one clinic at a time, as Row Level Security is forced. */
     static void deleteClinicsAndRecords() throws SQLException {
+        deleteClinicsAnd(List.of("tenancy_test_record"));
+    }
+
+    /**
+     * Deletes the rows of clinics A and B from {@code tables}, in that order, and then the clinics. The application
+     * cannot delete; the owner can, one clinic at a time, as Row Level Security is forced.
+     */
+    static void deleteClinicsAnd(List<String> tables) throws SQLException {
         try (Connection connection = connectAsOwner()) {
             for (UUID clinic : CLINICS) {
                 setSessionClinic(connection, clinic);
-                execute(connection, "DELETE FROM tenancy_test_record WHERE tenant_id = ?", clinic);
+                for (String table : tables) {
+                    execute(connection, "DELETE FROM %s WHERE tenant_id = ?".formatted(checkedTable(table)), clinic);
+                }
                 execute(connection, "DELETE FROM clinic WHERE id = ?", clinic);
             }
         }
+    }
+
+    /**
+     * Row {@code id} of {@code table} as the owner sees it with {@code clinic} active: every column, as JSON, so two
+     * readings are equal only if nothing in the row changed.
+     */
+    static Optional<String> storedRow(String table, UUID clinic, UUID id) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSessionClinic(connection, clinic);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT to_jsonb(r)::text FROM %s r WHERE id = ?".formatted(checkedTable(table)))) {
+                statement.setObject(1, id);
+                try (ResultSet row = statement.executeQuery()) {
+                    return row.next() ? Optional.of(row.getString(1)) : Optional.empty();
+                }
+            }
+        }
+    }
+
+    /** Number of rows of {@code table} the owner sees with {@code clinic} active. */
+    static int countRows(String table, UUID clinic) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSessionClinic(connection, clinic);
+            try (PreparedStatement statement =
+                            connection.prepareStatement("SELECT count(*) FROM %s".formatted(checkedTable(table)));
+                    ResultSet row = statement.executeQuery()) {
+                row.next();
+                return row.getInt(1);
+            }
+        }
+    }
+
+    /**
+     * {@code table}, a table name, optionally with its schema, in lower case: the only shape test code may put into
+     * SQL, where a name cannot be a bind parameter.
+     */
+    static String checkedTable(String table) {
+        if (table == null || !TABLE_NAME.matcher(table).matches()) {
+            throw new IllegalArgumentException("not a table name: " + table);
+        }
+        return table;
     }
 
     /** The row as the owner sees it with {@code clinic} active. */

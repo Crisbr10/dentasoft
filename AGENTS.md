@@ -63,7 +63,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 
 - **Obligatorio**: toda tabla de negocio tiene `tenant_id uuid NOT NULL`, índice que empieza por `tenant_id`, `ENABLE` + `FORCE ROW LEVEL SECURITY` y la política `tenant_isolation`. Las entidades extienden `TenantScopedEntity`.
 - **Obligatorio**: la clínica activa sale del `TenantContext`, nunca de un parámetro, cuerpo de petición o ruta sin validar contra la membresía del usuario.
-- **Obligatorio**: cada módulo con datos tiene un test de aislamiento (la clínica A no lee ni modifica datos de la clínica B) con Testcontainers.
+- **Obligatorio**: cada módulo con datos tiene un test de aislamiento (la clínica A no lee ni modifica datos de la clínica B) con Testcontainers: una subclase de `TenantIsolationTest<Entidad>` por cada entidad que extiende `TenantScopedEntity` (ver su Javadoc y el ejemplo `TenancyTestRecordIsolationTests`). `TenantIsolationCoverageTests` falla si alguna no la tiene.
 - Los procesos sin usuario (jobs, webhooks) fijan la clínica explícitamente antes de tocar datos.
 
 ### Seguridad
