@@ -4,12 +4,17 @@ import es.crisbr.dentasoft.shared.PageLimits;
 import es.crisbr.dentasoft.tenancy.persistence.Location;
 import es.crisbr.dentasoft.tenancy.persistence.LocationRepository;
 import es.crisbr.dentasoft.tenancy.persistence.LocationStatus;
+import java.sql.SQLException;
 import java.util.UUID;
-import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
+import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +37,12 @@ public class Locations {
     /** One page of the clinic's rooms; all of them, or only those with {@code status}. */
     @Transactional(readOnly = true)
     public Page<LocationDetails> list(@Nullable LocationStatus status, Pageable pageable) {
-        Pageable bounded = PageLimits.bounded(pageable, LocationRepository.SORTABLE);
+        Pageable requested = PageLimits.bounded(pageable, LocationRepository.SORTABLE);
+        // The id last: names and statuses repeat, and rows that tie have no fixed order, so pages could overlap.
+        Pageable bounded = PageRequest.of(
+                requested.getPageNumber(),
+                requested.getPageSize(),
+                requested.getSort().and(Sort.by("id")));
         Page<Location> page = status == null ? locations.findAll(bounded) : locations.findAllByStatus(status, bounded);
         return page.map(LocationDetails::of);
     }
@@ -121,12 +131,30 @@ public class Locations {
         try {
             Versions.flush(locations);
         } catch (DataIntegrityViolationException violation) {
-            if (violation.getCause() instanceof ConstraintViolationException constraint
-                    && Location.ACTIVE_NAME_KEY.equals(constraint.getConstraintName())) {
+            if (violatesActiveNameKey(violation)) {
                 throw new LocationNameTakenException();
             }
             throw violation;
         }
+    }
+
+    /**
+     * Whether PostgreSQL refused the write for {@link Location#ACTIVE_NAME_KEY}. Read from the SQLSTATE and the
+     * constraint field of the server's error, not from its message: Hibernate takes the constraint name from the
+     * message text, which is in the server's language ({@code lc_messages}) and only parses in English.
+     */
+    static boolean violatesActiveNameKey(Throwable violation) {
+        for (Throwable cause = violation; cause != null; cause = cause.getCause()) {
+            // A batched write reports the statement's own error as the next exception.
+            for (Throwable error = cause; error instanceof SQLException sql; error = sql.getNextException()) {
+                if (error instanceof PSQLException psql
+                        && PSQLState.UNIQUE_VIOLATION.getState().equals(psql.getSQLState())) {
+                    ServerErrorMessage server = psql.getServerErrorMessage();
+                    return server != null && Location.ACTIVE_NAME_KEY.equals(server.getConstraint());
+                }
+            }
+        }
+        return false;
     }
 
     /** What a room is made of, when created or changed; already validated by the web layer. */

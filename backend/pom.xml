@@ -87,7 +87,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
-      <scope>runtime</scope>
+      <!-- Compile scope: the constraint a unique violation names is read from the driver's server message (M01-T06). -->
     </dependency>
 
     <dependency>

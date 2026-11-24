@@ -14,7 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 public interface ClinicRepository extends JpaRepository<Clinic, UUID> {
 
     /**
-     * The clinic, locked until the transaction ends ({@code SELECT … FOR UPDATE}): changes that must not run at the
+     * The clinic, locked until the transaction ends ({@code SELECT … FOR NO KEY UPDATE}): changes that must not run at the
      * same time for one clinic, such as replacing its opening hours, take this lock first.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
