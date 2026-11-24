@@ -9,6 +9,9 @@ import es.crisbr.dentasoft.platform.PlatformTestDatabase;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.ClinicDetails;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.NewClinic;
 import es.crisbr.dentasoft.platform.persistence.ClinicStatus;
+import es.crisbr.dentasoft.shared.PageLimits;
+import es.crisbr.dentasoft.shared.PageOutOfRangeException;
+import es.crisbr.dentasoft.shared.UnsupportedSortException;
 import es.crisbr.dentasoft.tenancy.TenantContext;
 import es.crisbr.dentasoft.tenancy.persistence.ClinicSettings;
 import es.crisbr.dentasoft.tenancy.persistence.ClinicSettingsRepository;
@@ -176,16 +179,15 @@ class ClinicAdministrationTests {
     void cutsPagesLargerThanTheMaximum() {
         create("Grande", null, null);
 
-        assertThat(administration.list(PageRequest.of(0, 1_000)).getSize())
-                .isEqualTo(ClinicAdministration.MAX_PAGE_SIZE);
+        assertThat(administration.list(PageRequest.of(0, 1_000)).getSize()).isEqualTo(PageLimits.MAX_PAGE_SIZE);
     }
 
     @Test
     void rejectsAPageNumberTooHighForTheOffset() {
-        assertThatThrownBy(() -> administration.list(PageRequest.of(ClinicAdministration.MAX_PAGE_NUMBER + 1, 100)))
+        assertThatThrownBy(() -> administration.list(PageRequest.of(PageLimits.MAX_PAGE_NUMBER + 1, 100)))
                 .isInstanceOf(PageOutOfRangeException.class);
         assertThat(administration
-                        .list(PageRequest.of(ClinicAdministration.MAX_PAGE_NUMBER, 100))
+                        .list(PageRequest.of(PageLimits.MAX_PAGE_NUMBER, 100))
                         .getContent())
                 .isEmpty();
     }
