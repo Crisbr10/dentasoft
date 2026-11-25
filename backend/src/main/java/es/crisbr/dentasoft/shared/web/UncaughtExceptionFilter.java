@@ -9,7 +9,6 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.DisconnectedClientHelper;
@@ -21,7 +20,8 @@ import org.springframework.web.util.DisconnectedClientHelper;
  *
  * <p>It runs inside {@link RequestIdFilter}, so the log line keeps the request ID, and around every other filter, whose
  * headers the error keeps. The HTTP observation, outside it, still tags the request with the failure's class:
- * {@code GlobalExceptionHandler} leaves a 500's exception in the request for it. Three cases go on to Tomcat as before:
+ * {@code GlobalExceptionHandler}, through Spring, leaves a 500's exception in the request for it (and so would hand its
+ * messages to a tracing handler, if one is ever added). Three cases go on to Tomcat as before:
  *
  * <ul>
  *   <li>A client that went away: Tomcat logs it at debug, and its message says only that the connection closed.
@@ -60,10 +60,8 @@ class UncaughtExceptionFilter extends OncePerRequestFilter {
                     ? exceptionResolver.resolveException(request, response, null, exception)
                     : null;
             if (handled == null || !handled.isEmpty()) {
-                // Unresolved, or answered with a view this API does not render: a bare 500. The observation gets the
-                // failure here, as nothing leaves it in the request; its metrics keep only the class.
-                ServerHttpObservationFilter.findObservationContext(request)
-                        .ifPresent(context -> context.setError(failure));
+                // Unresolved, or answered with a view this API does not render: a bare 500. The observation is not
+                // given the failure: a tracing handler would record its messages, so its metrics go without the class.
                 logUnhandled(failure);
                 response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             }

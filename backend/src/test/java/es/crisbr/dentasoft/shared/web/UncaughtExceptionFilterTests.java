@@ -41,15 +41,19 @@ class UncaughtExceptionFilterTests {
 
         assertThat(resolved).containsExactly(failure);
         assertThat(response.getStatus()).isEqualTo(500);
-        assertThat(observation.getError()).isSameAs(failure);
+        // A tracing handler would record the messages of an error given to the observation.
+        assertThat(observation.getError()).isNull();
         assertLoggedWithoutMessages(output);
     }
 
     @Test
     void anExceptionAnsweredWithAViewIsAnsweredAs500Instead(CapturedOutput output) throws Exception {
+        ServerRequestObservationContext observation = observe();
+
         run(resolving(new ModelAndView("error")), failure());
 
         assertThat(response.getStatus()).isEqualTo(500);
+        assertThat(observation.getError()).isNull();
         assertLoggedWithoutMessages(output);
     }
 
