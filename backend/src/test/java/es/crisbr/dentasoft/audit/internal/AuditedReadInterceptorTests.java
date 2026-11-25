@@ -82,6 +82,11 @@ class AuditedReadInterceptorTests {
 
         assertThatThrownBy(() -> new AuditedReadInterceptor(provider).invoke(invocation))
                 .isSameAs(denied);
+        // The denial carries the failure on to whoever handles it, without its messages either.
+        assertThat(denied.getSuppressed()).singleElement().satisfies(suppressed -> {
+            assertThat(suppressed).hasToString("[redacted] java.lang.IllegalStateException");
+            assertThat(suppressed.getCause()).hasMessage("java.lang.IllegalArgumentException");
+        });
 
         assertThat(output.getAll())
                 .contains("Could not record a denied read of CLINIC " + id)

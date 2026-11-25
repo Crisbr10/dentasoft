@@ -9,6 +9,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.filter.ServerHttpObservationFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.util.DisconnectedClientHelper;
@@ -25,7 +26,8 @@ import org.springframework.web.util.DisconnectedClientHelper;
  * <ul>
  *   <li>A client that went away: Tomcat logs it at debug, and its message says only that the connection closed.
  *   <li>A response already committed, which can no longer be answered: logged here, then rethrown without its messages,
- *       so that Tomcat closes the connection instead of ending a truncated response as if it were whole.
+ *       so that Tomcat closes the connection instead of ending a truncated response as if it were whole. Tomcat logs
+ *       it a second time, also without messages, and the observation tags it with the class of that copy.
  *   <li>An error of the virtual machine (out of memory, for instance), whose message carries no data.
  * </ul>
  */
@@ -57,7 +59,11 @@ class UncaughtExceptionFilter extends OncePerRequestFilter {
             ModelAndView handled = failure instanceof Exception exception
                     ? exceptionResolver.resolveException(request, response, null, exception)
                     : null;
-            if (handled == null) {
+            if (handled == null || !handled.isEmpty()) {
+                // Unresolved, or answered with a view this API does not render: a bare 500. The observation gets the
+                // failure here, as nothing leaves it in the request; its metrics keep only the class.
+                ServerHttpObservationFilter.findObservationContext(request)
+                        .ifPresent(context -> context.setError(failure));
                 logUnhandled(failure);
                 response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             }
