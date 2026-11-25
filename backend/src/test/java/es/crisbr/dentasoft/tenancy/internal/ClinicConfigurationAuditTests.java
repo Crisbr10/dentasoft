@@ -8,9 +8,12 @@ import es.crisbr.dentasoft.audit.AuditLogDatabase;
 import es.crisbr.dentasoft.audit.AuditLogDatabase.StoredEntry;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
 import es.crisbr.dentasoft.tenancy.internal.ClinicConfiguration.ClinicChanges;
+import es.crisbr.dentasoft.tenancy.internal.ClinicConfiguration.SettingsChanges;
 import es.crisbr.dentasoft.tenancy.internal.ClinicOpeningHours.Slot;
 import es.crisbr.dentasoft.tenancy.internal.Locations.LocationData;
 import es.crisbr.dentasoft.tenancy.internal.Locations.LocationDetails;
+import es.crisbr.dentasoft.tenancy.persistence.ClinicSettings;
+import es.crisbr.dentasoft.tenancy.persistence.ClinicSettingsRepository;
 import es.crisbr.dentasoft.tenancy.persistence.HoursOfOperation;
 import es.crisbr.dentasoft.tenancy.persistence.HoursOfOperationRepository;
 import es.crisbr.dentasoft.tenancy.persistence.LocationRepository;
@@ -45,6 +48,9 @@ class ClinicConfigurationAuditTests extends ClinicConfigurationTestBase {
 
     @Autowired
     private LocationRepository locationRepository;
+
+    @Autowired
+    private ClinicSettingsRepository settingsRepository;
 
     @Autowired
     private TransactionTemplate transaction;
@@ -89,6 +95,22 @@ class ClinicConfigurationAuditTests extends ClinicConfigurationTestBase {
             assertThat(entry.action()).isEqualTo("UPDATE");
             assertThat(entry.entityType()).isEqualTo("CLINIC");
         });
+    }
+
+    /** The settings were created by the set-up of these tests, through the same audited entity. */
+    @Test
+    void changingTheSettingsIsRecorded() throws SQLException {
+        UUID settings = asClinicA(() -> transaction.execute(status -> settingsRepository.findAll().stream()
+                .map(ClinicSettings::getId)
+                .findFirst()
+                .orElseThrow()));
+        long version = asClinicA(() -> configuration.settings().version());
+
+        asClinicA(() -> configuration.updateSettings(new SettingsChanges(45, null, null, version)));
+
+        assertThat(AuditLogDatabase.entries(CLINIC_A, settings))
+                .extracting(StoredEntry::action, StoredEntry::entityType)
+                .containsExactly(tuple("CREATE", "CLINIC_SETTINGS"), tuple("UPDATE", "CLINIC_SETTINGS"));
     }
 
     /** Replacing the week deletes the old slots one by one, so each deletion is recorded too. */

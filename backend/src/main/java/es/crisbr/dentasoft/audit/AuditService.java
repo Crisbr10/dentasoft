@@ -25,12 +25,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Service
 public class AuditService {
 
-    private final AuditLogWriter writer;
+    private final AuditLogWriter writer = new AuditLogWriter();
     private final JdbcTemplate jdbc;
     private final TransactionTemplate ownTransaction;
 
-    AuditService(AuditLogWriter writer, JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
-        this.writer = writer;
+    AuditService(JdbcTemplate jdbc, PlatformTransactionManager transactionManager) {
         this.jdbc = jdbc;
         this.ownTransaction = new TransactionTemplate(transactionManager);
         this.ownTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);

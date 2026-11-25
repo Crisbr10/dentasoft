@@ -25,6 +25,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,6 +77,20 @@ class AuditedReadTests {
 
         assertThatThrownBy(() -> TenantContext.callAs(clinic, () -> reader.read(patient)))
                 .isInstanceOf(AccessDeniedException.class);
+
+        assertThat(AuditLogDatabase.entries(clinic, patient))
+                .extracting(StoredEntry::action, StoredEntry::outcome)
+                .containsExactly(tuple("READ", "DENIED"));
+    }
+
+    /** Without any authentication at all, the read is denied and recorded as such too. */
+    @Test
+    void anUnauthenticatedReadIsRecordedAsDenied() throws SQLException {
+        UUID patient = UUID.randomUUID();
+        SecurityContextHolder.clearContext();
+
+        assertThatThrownBy(() -> TenantContext.callAs(clinic, () -> reader.read(patient)))
+                .isInstanceOf(AuthenticationException.class);
 
         assertThat(AuditLogDatabase.entries(clinic, patient))
                 .extracting(StoredEntry::action, StoredEntry::outcome)

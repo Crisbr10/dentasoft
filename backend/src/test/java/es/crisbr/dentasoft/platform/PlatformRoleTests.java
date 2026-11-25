@@ -57,7 +57,6 @@ class PlatformRoleTests {
             "clinic_settings.version: INSERT",
             "audit_log.id: INSERT",
             "audit_log.tenant_id: INSERT",
-            "audit_log.occurred_at: INSERT",
             "audit_log.actor_type: INSERT",
             "audit_log.actor_id: INSERT",
             "audit_log.action: INSERT",

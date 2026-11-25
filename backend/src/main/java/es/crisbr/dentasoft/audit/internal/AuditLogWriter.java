@@ -4,47 +4,33 @@ import es.crisbr.dentasoft.shared.RequestId;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.time.InstantSource;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
 import org.hibernate.id.uuid.UuidVersion7Strategy;
-import org.springframework.stereotype.Component;
 
 /**
  * Writes entries to {@code audit_log} on the connection it is given, which must be the one of the transaction the
- * entry belongs to: the database takes the clinic from it ({@code app.tenant_id}, V004) and fails without one.
+ * entry belongs to. The database fills in the clinic, from that transaction ({@code app.tenant_id}), and the time,
+ * from its own clock (V004): without an active clinic the insert fails.
  *
  * <p>Plain JDBC, so it writes from inside a Hibernate flush ({@code AuditChangeListener}) as well as from a
- * transaction of its own ({@code AuditService}). Entries of the main unit carry no details.
+ * transaction of its own ({@code AuditService}). Entries of the main unit carry no details: the application may not
+ * even write that column.
  */
-@Component
-public class AuditLogWriter {
+public final class AuditLogWriter {
 
-    static final String INSERT = "INSERT INTO audit_log (id, occurred_at, actor_type, actor_id, action, entity_type,"
-            + " entity_id, outcome, request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-    private final InstantSource clock;
-
-    AuditLogWriter() {
-        this(InstantSource.system());
-    }
-
-    AuditLogWriter(InstantSource clock) {
-        this.clock = clock;
-    }
+    static final String INSERT = "INSERT INTO audit_log (id, actor_type, actor_id, action, entity_type, entity_id,"
+            + " outcome, request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
     public void write(Connection connection, AuditEntry entry) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(INSERT)) {
             statement.setObject(1, newId());
-            statement.setObject(2, OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
-            statement.setString(3, entry.actorType().name());
-            statement.setObject(4, entry.actorId());
-            statement.setString(5, entry.action().name());
-            statement.setString(6, entry.entityType().name());
-            statement.setObject(7, entry.entityId());
-            statement.setString(8, entry.outcome().name());
-            statement.setObject(9, RequestId.serverGenerated().orElse(null));
+            statement.setString(2, entry.actorType().name());
+            statement.setObject(3, entry.actorId());
+            statement.setString(4, entry.action().name());
+            statement.setString(5, entry.entityType().name());
+            statement.setObject(6, entry.entityId());
+            statement.setString(7, entry.outcome().name());
+            statement.setObject(8, RequestId.serverGenerated().orElse(null));
             statement.executeUpdate();
         }
     }

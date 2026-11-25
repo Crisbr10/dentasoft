@@ -22,6 +22,10 @@ import org.jspecify.annotations.Nullable;
  */
 public final class AuditLogDatabase {
 
+    /** The columns the application may insert (V004): the database fills in the clinic, the time and the details. */
+    public static final List<String> APPLICATION_INSERT_COLUMNS =
+            List.of("id", "actor_type", "actor_id", "action", "entity_type", "entity_id", "outcome", "request_id");
+
     private AuditLogDatabase() {}
 
     /** One stored entry, without its id and time. */
@@ -71,7 +75,8 @@ public final class AuditLogDatabase {
 
     /**
      * Runs {@code action} while the application cannot write to the log, as when the database rejects an entry; the
-     * privilege is given back afterwards, whatever happens. Tests run one at a time, so no other test sees it.
+     * privilege is given back afterwards, whatever happens, exactly as V004 grants it (column by column, which {@code
+     * AuditLogDatabaseTests} pins). Tests run one at a time, so no other test sees it.
      */
     public static void withoutApplicationInsert(Runnable action) throws SQLException {
         try (Connection owner = connectAsOwner();
@@ -80,7 +85,8 @@ public final class AuditLogDatabase {
             try {
                 action.run();
             } finally {
-                statement.execute("GRANT INSERT ON audit_log TO " + APP_USER);
+                statement.execute("GRANT INSERT (%s) ON audit_log TO %s"
+                        .formatted(String.join(", ", APPLICATION_INSERT_COLUMNS), APP_USER));
             }
         }
     }

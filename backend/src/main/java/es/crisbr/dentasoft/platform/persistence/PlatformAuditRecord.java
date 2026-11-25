@@ -12,7 +12,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.ColumnTransformer;
 import org.hibernate.annotations.Immutable;
@@ -23,7 +22,8 @@ import org.jspecify.annotations.Nullable;
  * An {@code audit_log} entry for what the platform does to a clinic, written in the same transaction as the change.
  * Insert-only, as everything in the log (V004).
  *
- * <p>The platform has no active clinic, so it names the affected clinic itself in {@code tenant_id}; its policy only
+ * <p>{@code occurred_at} is not mapped: the database's clock sets it, and the platform may not. The platform has no
+ * active clinic, so it names the affected clinic itself in {@code tenant_id}; its policy only
  * lets it write {@link AuditActorType#PLATFORM} entries. Not a {@code BaseEntity}: an entry is never updated, so it
  * has no {@code updated_*} columns and no version. The clinic's own entries are written by the audit module.
  */
@@ -39,9 +39,6 @@ public class PlatformAuditRecord {
 
     @Column(name = "tenant_id", nullable = false, updatable = false)
     private UUID clinicId;
-
-    @Column(name = "occurred_at", nullable = false, updatable = false)
-    private Instant occurredAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "actor_type", nullable = false, updatable = false)
@@ -77,14 +74,12 @@ public class PlatformAuditRecord {
     protected PlatformAuditRecord() {
         // For Hibernate.
         clinicId = new UUID(0L, 0L);
-        occurredAt = Instant.EPOCH;
         action = AuditAction.READ;
         entityId = clinicId;
     }
 
     private PlatformAuditRecord(UUID clinicId, AuditAction action, @Nullable AuditDetails details) {
         this.clinicId = clinicId;
-        this.occurredAt = Instant.now();
         this.action = action;
         this.entityId = clinicId;
         this.requestId = RequestId.serverGenerated().orElse(null);

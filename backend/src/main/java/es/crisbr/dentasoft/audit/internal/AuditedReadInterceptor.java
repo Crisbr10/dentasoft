@@ -10,10 +10,13 @@ import java.util.UUID;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 
 /**
  * Records the read of an {@link AuditedRead} method once it has returned, and a denied one when {@code @PreAuthorize}
@@ -23,6 +26,8 @@ import org.springframework.security.access.AccessDeniedException;
  * <p>If the entry cannot be written, the method throws and its result is lost: nothing read goes out unrecorded.
  */
 final class AuditedReadInterceptor implements MethodInterceptor {
+
+    private static final Logger log = LoggerFactory.getLogger(AuditedReadInterceptor.class);
 
     private final ObjectProvider<AuditService> audit;
 
@@ -42,10 +47,13 @@ final class AuditedReadInterceptor implements MethodInterceptor {
         Object result;
         try {
             result = invocation.proceed();
-        } catch (AccessDeniedException denied) {
+        } catch (AccessDeniedException | AuthenticationException denied) {
+            // Denied for want of a role, or of any authentication at all.
             try {
                 audit.getObject().recordDeniedRead(entityType, entityId);
             } catch (RuntimeException failure) {
+                // The read failed anyway; the caller gets the denial, and the lost entry is logged, by id only.
+                log.error("Could not record a denied read of {} {}", entityType, entityId, failure);
                 denied.addSuppressed(failure);
             }
             throw denied;

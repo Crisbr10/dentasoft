@@ -20,7 +20,7 @@ Además hay tres restricciones técnicas:
   | --- | --- | --- |
   | `id` | UUID v7 | `id` |
   | `tenant_id` | clínica del registro | — |
-  | `occurred_at` | cuándo ocurrió | `recorded` |
+  | `occurred_at` | cuándo ocurrió, con el reloj de la base de datos | `recorded` |
   | `actor_type` | `USER`, `SYSTEM` o `PLATFORM` | `agent.type` |
   | `actor_id` | `sub` de Keycloak, vacío hasta M02 | `agent.who` |
   | `action` | `CREATE`, `READ`, `UPDATE` o `DELETE` | `action` |
@@ -32,19 +32,19 @@ Además hay tres restricciones técnicas:
   - Es inmutable: no tiene `updated_*` ni `@Version` y no extiende `BaseEntity`.
   - Índice `(tenant_id, occurred_at)` y RLS con `tenant_isolation`.
   - Sin clave foránea a `clinic`: el historial sobrevive a la fila.
-- **La clínica la pone la base de datos**: `tenant_id` toma por defecto `app.tenant_id`. Quien escribe no la elige, y sin clínica activa la fila se rechaza.
+- **La clínica y la hora las pone la base de datos**: `tenant_id` toma por defecto `app.tenant_id` y `occurred_at`, `clock_timestamp()`. Quien escribe no las elige, así que no puede fechar una entrada en el pasado, y sin clínica activa la fila se rechaza.
 - **Sin datos personales por diseño**:
   - Ninguna columna admite texto libre: o son códigos con `CHECK`, o UUID.
   - `details` solo se escribe desde el record `AuditDetails`, cuyos componentes solo pueden ser UUID, enumerados, números, booleanos u otros records con la misma regla. `AuditDetailsTests` falla si se añade un `String`, una fecha o una colección.
   - **No se guarda la IP**, ni en claro ni con HMAC. La clave del límite de peticiones solo es obligatoria con el límite activado, y si rota, los hash dejan de ser comparables justo durante los años que se conserva el registro. Además, un hash de IP sigue siendo un dato seudónimo.
   - La correlación con una petición se hace con `request_id`, que solo se guarda si lo generó el servidor. El id que envía un cliente, aunque tenga forma de UUID, podría repetir el de otra petición, así que nunca llega al registro. Los logs indican el origen del id en `requestIdOrigin`.
 - **Solo se añade**:
-  - `dentasoft_app` solo tiene `INSERT`; V001 le daba por defecto `SELECT` y `UPDATE`, y se revocan. El `SELECT` lo concederá M01-T09 para consultar el registro de la propia clínica.
+  - `dentasoft_app` solo tiene `INSERT`, y solo de las columnas que rellena: ni `tenant_id`, ni `occurred_at`, ni `details`, así que ni un SQL escrito a mano puede meter texto en `details`. V001 le daba por defecto `SELECT`, `INSERT` y `UPDATE` sobre toda la tabla, y se revocan. El `SELECT` lo concederá M01-T09 para consultar el registro de la propia clínica.
   - Un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE` a cualquier rol, también al dueño. Reescribir el historial exige un `DROP TRIGGER` en una migración, a la vista en la revisión.
 - **Los cambios se registran en la misma transacción**:
   - Un listener de Hibernate (PostInsert, PostUpdate y PostDelete) actúa sobre las entidades `@AuditedEntity` y escribe el registro con JDBC en la misma conexión, durante el flush.
   - Si el registro falla, falla el cambio; si el cambio se deshace, el registro también.
-  - El listener se añade al `EventListenerRegistry` de la unidad principal, no a la lista de integradores de `TenancyHibernateSettings`, que instala el `TenantWriteGuard`.
+  - Lo añade un `BeanPostProcessor` al `EventListenerRegistry` de cada fábrica de `EntityManager` en cuanto se crea. Así no se puede saltar ni con la inicialización diferida, y `AuditListenerRegistrationTests` comprueba que está. No se usa la lista de integradores de `TenancyHibernateSettings`, que instala el `TenantWriteGuard`.
 - **Las lecturas se registran después de leer**:
   - `@AuditedRead` es un `MethodInterceptor` de Spring AOP con este orden: auditoría, `@PreAuthorize`, `@Transactional`.
   - La lectura termina y devuelve su conexión al pool; después se escribe el registro en una transacción propia de escritura, que vuelve a fijar la clínica activa (ADR 0010).
@@ -54,7 +54,7 @@ Además hay tres restricciones técnicas:
 - **Excepción documentada**: si el método se llama desde dentro de una transacción ya abierta, el registro va en `REQUIRES_NEW` y ese hilo retiene dos conexiones un momento. Por eso las lecturas auditadas se llaman fuera de cualquier transacción.
 - **Acciones de la plataforma**:
   - Crear, suspender y reactivar una clínica se registra en la transacción de plataforma, con `PlatformAuditRecord` en `platform.persistence`. El `tenant_id` es la clínica afectada y el subtipo va en `details`.
-  - `dentasoft_platform` tiene `INSERT` por columnas y la política `platform_insert ... WITH CHECK (actor_type = 'PLATFORM')`. No puede leer el registro ni escribir entradas de otro actor.
+  - `dentasoft_platform` tiene `INSERT` por columnas (sin `occurred_at`) y la política `platform_insert`. Esa política solo admite entradas `PLATFORM`, sobre la propia clínica bajo la que se guardan (`entity_type = 'CLINIC'` y `entity_id = tenant_id`) y de alta o cambio (`CREATE` o `UPDATE`). No puede leer el registro.
 - **Actor**: hasta M02 no hay usuarios, así que los registros de la aplicación son `SYSTEM` sin id y los de la plataforma, `PLATFORM` sin id. M02 los rellenará con el `sub` (`CurrentActor` y `PlatformAuditRecord`).
 
 ## Consecuencias
@@ -64,6 +64,13 @@ Además hay tres restricciones técnicas:
   - `AuditedRepositoriesTests` impide las consultas `@Modifying` en los repositorios de entidades auditadas y las llamadas a sus borrados en lote.
   - El JPQL o SQL escrito a mano con el `EntityManager` o `JdbcClient` queda a la revisión de código.
   - Por esta regla, `replaceWeek` borra el horario entidad a entidad.
+- **Lo que la base de datos no impide**: la aplicación elige `actor_type` y `actor_id` dentro de su clínica. Si el código de la aplicación falla o lo comprometen, puede escribir entradas falsas de `SYSTEM` o `USER`, y también de `PLATFORM`. Prohibirle solo `PLATFORM` apenas añadiría protección, y el guardián de RLS no admite políticas restrictivas para la app. La autenticidad del actor depende del código (M02) y de la revisión.
+- **Lo que `@AuditedRead` no ve**:
+  - una llamada desde la propia clase (límite de los proxies de Spring AOP);
+  - una lectura que termina con otra excepción, como no encontrado: no deja entrada;
+  - una lectura de varios registros, para la que M01-T09 necesitará una forma de registrar listados.
+
+  Un aumento de versión forzado por un modo de bloqueo tampoco dispara `PostUpdate`. La fila de `clinic_settings` que crea la plataforma no tiene entrada propia: la cubre la entrada `CREATE` de la clínica.
 - Una lectura auditada cuesta un `INSERT` en una transacción aparte, con su propia conexión. El test con el pool de 2 conexiones y lecturas en paralelo comprueba que no se bloquea.
 - Los tests no pueden limpiar el registro: miran solo las entradas de los ids que crean.
 - `entity_type` acepta cualquier código en mayúsculas, así que cada módulo añade sus entidades a `AuditEntityType` sin migración.
