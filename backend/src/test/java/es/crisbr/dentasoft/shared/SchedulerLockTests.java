@@ -106,6 +106,18 @@ class SchedulerLockTests {
         assertThat(lockRowExists(SchedulerLockProbe.LOCK_NAME)).isTrue();
     }
 
+    /**
+     * A short task is over before the other replica's trigger fires, a few milliseconds later: the default
+     * {@code lockAtLeastFor} keeps the lock until then, so the late replica skips it.
+     */
+    @Test
+    void aShortTaskWithTheDefaultLockDoesNotRunAgainOnALateReplica() {
+        probe.runWithDefaults();
+        probe.runWithDefaults();
+
+        assertThat(probe.runsWithDefaults()).hasValue(1);
+    }
+
     @Test
     void theApplicationLockProviderUsesTheLockTable() throws SQLException {
         assertThat(applicationLockProvider.lock(configuration(lockName))).isPresent();

@@ -46,7 +46,10 @@ public class ClinicTransactions {
         if (TenantContext.isBound()) {
             throw new IllegalStateException("Cannot start a clinic's work inside an active clinic");
         }
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+        // Synchronization is active without an actual transaction too, in a SUPPORTS scope: its entity manager, opened
+        // without a clinic, would be reused for this clinic's work.
+        if (TransactionSynchronizationManager.isActualTransactionActive()
+                || TransactionSynchronizationManager.isSynchronizationActive()) {
             throw new IllegalStateException("Cannot start a clinic's work inside a transaction");
         }
         return TenantContext.callAs(clinicId, () -> transaction.execute(status -> work.get()));

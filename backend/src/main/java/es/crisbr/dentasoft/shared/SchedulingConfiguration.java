@@ -24,11 +24,14 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * </ul>
  *
  * <p>A lock is held at most 10 minutes unless the task says otherwise ({@code lockAtMostFor}): if a replica dies
- * holding it, the task runs again after that time.
+ * holding it, the task runs again after that time. It is also held at least 30 seconds ({@code lockAtLeastFor}), even
+ * when the task ends sooner: the triggers of two replicas never fire at exactly the same instant, and without it a
+ * short task would be over, and its lock free, by the time the other replica's trigger fires, so it would run twice. A
+ * task that runs more often than every 30 seconds sets a smaller {@code lockAtLeastFor}.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
-@EnableSchedulerLock(defaultLockAtMostFor = "PT10M")
+@EnableSchedulerLock(defaultLockAtMostFor = "PT10M", defaultLockAtLeastFor = "PT30S")
 class SchedulingConfiguration {
 
     static final String LOCK_TABLE = "scheduler.shedlock";

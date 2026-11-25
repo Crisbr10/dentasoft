@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -83,6 +84,11 @@ class ClinicTransactionsTests {
         assertThatThrownBy(() -> TenantContext.runAs(CLINIC_A, () -> transactions.run(CLINIC_A, store)))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> transactions.run(CLINIC_A, store)))
+                .isInstanceOf(IllegalStateException.class);
+        // SUPPORTS opens no transaction, but its entity manager, without a clinic, would be reused.
+        TransactionTemplate supports = new TransactionTemplate(transaction.getTransactionManager());
+        supports.setPropagationBehavior(TransactionDefinition.PROPAGATION_SUPPORTS);
+        assertThatThrownBy(() -> supports.executeWithoutResult(status -> transactions.run(CLINIC_A, store)))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(TenancyTestDatabase.countStored(CLINIC_A)).isZero();
     }

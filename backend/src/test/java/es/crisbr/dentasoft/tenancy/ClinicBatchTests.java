@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -161,6 +163,21 @@ class ClinicBatchTests {
         assertThat(storedPerClinic()).containsExactly(1, 0, 0, 0);
     }
 
+    /** Wrapped in a {@code RuntimeException}, as {@code CompletableFuture.join()} would do, an error still stops it. */
+    @Test
+    void aWrappedErrorStopsTheProcess() {
+        assertThatThrownBy(() -> batch.forEachActiveClinic("test-job", clinicId -> {
+                    records.save(new TenancyTestRecord("batch"));
+                    if (clinicId.equals(CLINIC_B)) {
+                        throw new CompletionException(new SimulatedError());
+                    }
+                }))
+                .isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(SimulatedError.class);
+
+        assertThat(storedPerClinic()).containsExactly(1, 0, 0, 0);
+    }
+
     @Test
     void aBatchCannotStartWithAnActiveClinicOrInsideATransaction() {
         AtomicInteger runs = new AtomicInteger();
@@ -170,6 +187,9 @@ class ClinicBatchTests {
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(
                         () -> transaction.executeWithoutResult(status -> batch.forEachActiveClinic("test-job", task)))
+                .isInstanceOf(IllegalStateException.class);
+        // SUPPORTS opens no transaction, but its entity manager would be shared by every clinic.
+        assertThatThrownBy(() -> supports().executeWithoutResult(status -> batch.forEachActiveClinic("test-job", task)))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(runs).hasValue(0);
     }
@@ -192,6 +212,12 @@ class ClinicBatchTests {
             assertThat(entry.actorType()).isEqualTo("SYSTEM");
             assertThat(entry.actorId()).isNull();
         });
+    }
+
+    private TransactionTemplate supports() {
+        TransactionTemplate supports = new TransactionTemplate(transaction.getTransactionManager());
+        supports.setPropagationBehavior(TransactionDefinition.PROPAGATION_SUPPORTS);
+        return supports;
     }
 
     /** Records stored for A, B, C and the suspended clinic, in that order. */

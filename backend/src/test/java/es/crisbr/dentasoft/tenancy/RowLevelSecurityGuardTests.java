@@ -124,7 +124,21 @@ class RowLevelSecurityGuardTests {
                 .containsExactlyInAnyOrderElementsOf(allowed);
     }
 
-    /** The scheduler schema holds the lock table alone, and the application can only use it, not change it. */
+    /**
+     * The checks below are written for {@code scheduler} alone: a new entry in {@link #SCHEMA_EXCEPTIONS} needs checks of
+     * its own, or its tables and grants would go unchecked.
+     */
+    @Test
+    void everySchemaExceptionHasItsOwnChecks() {
+        assertThat(SCHEMA_EXCEPTIONS.keySet())
+                .as("schema exceptions; add checks of its tables, functions and grants for a new one")
+                .containsExactly("scheduler");
+    }
+
+    /**
+     * The scheduler schema holds the lock table alone, and no function, and the application can only use it, not change
+     * it.
+     */
     @Test
     void schedulerSchemaHoldsOnlyTheLockTableWithExactGrants() throws SQLException {
         List<String> objects = new ArrayList<>();
@@ -139,6 +153,12 @@ class RowLevelSecurityGuardTests {
         assertThat(objects)
                 .as("tables, views and sequences of schema scheduler")
                 .containsExactly("shedlock");
+        try (PreparedStatement statement = connection.prepareStatement("SELECT count(*) FROM pg_proc p"
+                        + " JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'scheduler'");
+                ResultSet count = statement.executeQuery()) {
+            count.next();
+            assertThat(count.getLong(1)).as("functions of schema scheduler").isZero();
+        }
 
         for (Map.Entry<String, Set<String>> role : SCHEDULER_TABLE_PRIVILEGES.entrySet()) {
             Set<String> granted = new HashSet<>();

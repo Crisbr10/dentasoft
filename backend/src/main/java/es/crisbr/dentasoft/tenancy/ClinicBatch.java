@@ -1,12 +1,18 @@
 package es.crisbr.dentasoft.tenancy;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
@@ -16,7 +22,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>Each clinic runs with {@link ClinicTransactions}: its clinic active and a transaction of its own, so a failure
  * only rolls back that clinic's work. A {@link RuntimeException} is logged with the clinic's id and the exception's
  * type, and the process goes on with the next clinic; the message is never logged, since it can carry personal data.
- * An {@link Error}, such as {@code OutOfMemoryError}, is not caught: it stops the process.
+ * An {@link Error}, such as {@code OutOfMemoryError}, is not caught: it stops the process, also when it arrives
+ * wrapped in a {@code RuntimeException}.
  *
  * <p>Changes are recorded in the audit log as {@code SYSTEM}: there is no user.
  */
@@ -42,7 +49,9 @@ public class ClinicBatch {
     public Result forEachActiveClinic(String job, ClinicTask task) {
         Objects.requireNonNull(job, "job");
         Objects.requireNonNull(task, "task");
-        if (TenantContext.isBound() || TransactionSynchronizationManager.isActualTransactionActive()) {
+        if (TenantContext.isBound()
+                || TransactionSynchronizationManager.isActualTransactionActive()
+                || TransactionSynchronizationManager.isSynchronizationActive()) {
             throw new IllegalStateException(
                     "A clinic batch runs each clinic in its own transaction: start it without an active clinic or"
                             + " transaction");
@@ -54,6 +63,9 @@ public class ClinicBatch {
                 transactions.run(clinicId, () -> task.run(clinicId));
                 succeeded.add(clinicId);
             } catch (RuntimeException e) {
+                if (causedByError(e)) {
+                    throw e;
+                }
                 String errorType = e.getClass().getName();
                 log.warn("Job {} failed for clinic {}: {}", job, clinicId, errorType);
                 failed.add(new Failure(clinicId, errorType));
@@ -71,6 +83,33 @@ public class ClinicBatch {
                     result.failedClinicIds());
         }
         return result;
+    }
+
+    /**
+     * Whether an {@link Error} lies behind {@code exception}: wrapped as its cause (a {@code CompletionException}, for
+     * example) or hidden by a failed rollback, which Spring reports as a {@link TransactionSystemException} that keeps
+     * the original failure apart. It stops the process like the {@code Error} itself would.
+     */
+    private static boolean causedByError(Throwable exception) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Deque<Throwable> pending = new ArrayDeque<>(List.of(exception));
+        while (!pending.isEmpty()) {
+            Throwable current = pending.pop();
+            if (!seen.add(current)) {
+                continue;
+            }
+            if (current instanceof Error) {
+                return true;
+            }
+            if (current.getCause() != null) {
+                pending.push(current.getCause());
+            }
+            if (current instanceof TransactionSystemException failedRollback
+                    && failedRollback.getApplicationException() != null) {
+                pending.push(failedRollback.getApplicationException());
+            }
+        }
+        return false;
     }
 
     /** The work of one clinic, with that clinic active and inside its transaction. */
