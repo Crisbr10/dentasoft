@@ -65,14 +65,21 @@ class WebConfiguration {
         return registration(new RequestIdFilter(), Ordered.HIGHEST_PRECEDENCE);
     }
 
+    /** Right inside the request ID, which its log line keeps, and around every other filter. */
+    @Bean
+    FilterRegistrationBean<UncaughtExceptionFilter> uncaughtExceptionFilter(
+            @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
+        return registration(new UncaughtExceptionFilter(exceptionResolver), Ordered.HIGHEST_PRECEDENCE + 1);
+    }
+
     @Bean
     FilterRegistrationBean<SecurityHeadersFilter> securityHeadersFilter() {
-        return registration(new SecurityHeadersFilter(), Ordered.HIGHEST_PRECEDENCE + 1);
+        return registration(new SecurityHeadersFilter(), Ordered.HIGHEST_PRECEDENCE + 2);
     }
 
     @Bean
     FilterRegistrationBean<CorsFilter> corsFilter(CorsConfigurationSource corsConfigurationSource) {
-        return registration(new CorsFilter(corsConfigurationSource), Ordered.HIGHEST_PRECEDENCE + 2);
+        return registration(new CorsFilter(corsConfigurationSource), Ordered.HIGHEST_PRECEDENCE + 3);
     }
 
     @Bean
@@ -81,7 +88,7 @@ class WebConfiguration {
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
         return registration(
                 new RequestSizeFilter(properties.maxRequestBodySize().toBytes(), exceptionResolver),
-                Ordered.HIGHEST_PRECEDENCE + 3);
+                Ordered.HIGHEST_PRECEDENCE + 4);
     }
 
     @Bean

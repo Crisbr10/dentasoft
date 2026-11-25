@@ -11,9 +11,10 @@ import org.jspecify.annotations.Nullable;
  * logged: messages often carry the values that caused the error, which may be personal or clinical data. A
  * {@link SQLException} keeps its SQLSTATE, a five-character code of the kind of error that carries no values.
  *
- * <p>Used wherever an exception is logged that nobody handled: in requests ({@code GlobalExceptionHandler}),
- * {@code @Async} methods and listeners ({@code SharedConfiguration}) and scheduled tasks ({@code
- * SchedulingConfiguration}).
+ * <p>Used wherever an exception is logged that nobody handled: in requests ({@code GlobalExceptionHandler}, and
+ * {@code UncaughtExceptionFilter} for those thrown in filters), {@code @Async} methods and listeners ({@code
+ * SharedConfiguration}) and scheduled tasks ({@code SchedulingConfiguration}). Other modules reach it through {@link
+ * es.crisbr.dentasoft.shared.Logging#redacted(Throwable)}.
  */
 public final class RedactedException extends RuntimeException {
 
