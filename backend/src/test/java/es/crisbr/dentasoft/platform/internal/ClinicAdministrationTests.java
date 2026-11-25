@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.audit.AuditLogDatabase;
+import es.crisbr.dentasoft.audit.AuditLogDatabase.StoredEntry;
 import es.crisbr.dentasoft.platform.ClinicCreated;
 import es.crisbr.dentasoft.platform.PlatformTestDatabase;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.ClinicDetails;
@@ -138,6 +140,7 @@ class ClinicAdministrationTests {
         assertThat(clinic).isNotNull();
         assertThat(PlatformTestDatabase.status(clinic)).isEmpty();
         assertThat(PlatformTestDatabase.defaultAppointmentMinutes(clinic)).isEmpty();
+        assertThat(AuditLogDatabase.entries(clinic, clinic)).isEmpty();
     }
 
     @Test
@@ -224,6 +227,29 @@ class ClinicAdministrationTests {
         administration.suspend(clinic.id());
         assertThatThrownBy(() -> administration.suspend(clinic.id())).isInstanceOf(ClinicStatusConflictException.class);
         assertThat(PlatformTestDatabase.status(clinic.id())).contains("SUSPENDED");
+        // Only what happened is recorded: the creation and the one suspension.
+        assertThat(AuditLogDatabase.actions(clinic.id(), clinic.id())).containsExactly("CREATE", "UPDATE");
+    }
+
+    @Test
+    void recordsWhatItDoesToAClinicUnderThatClinic() throws SQLException {
+        ClinicDetails clinic = create("Norte", null, null);
+        administration.suspend(clinic.id());
+        administration.reactivate(clinic.id());
+
+        List<StoredEntry> entries = AuditLogDatabase.entries(clinic.id(), clinic.id());
+        assertThat(entries).extracting(StoredEntry::action).containsExactly("CREATE", "UPDATE", "UPDATE");
+        assertThat(entries)
+                .extracting(StoredEntry::details)
+                .containsExactly(null, "{\"subtype\": \"CLINIC_SUSPENDED\"}", "{\"subtype\": \"CLINIC_REACTIVATED\"}");
+        assertThat(entries).allSatisfy(entry -> {
+            assertThat(entry.tenantId()).isEqualTo(clinic.id());
+            assertThat(entry.actorType()).isEqualTo("PLATFORM");
+            // The platform administrator's sub arrives with M02.
+            assertThat(entry.actorId()).isNull();
+            assertThat(entry.entityType()).isEqualTo("CLINIC");
+            assertThat(entry.outcome()).isEqualTo("SUCCESS");
+        });
     }
 
     @Test

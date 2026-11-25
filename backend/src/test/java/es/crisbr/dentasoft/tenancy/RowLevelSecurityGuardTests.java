@@ -38,13 +38,22 @@ class RowLevelSecurityGuardTests {
     /**
      * Policies allowed next to {@code tenant_isolation}. Every entry needs a reason: the platform administration
      * (ADR 0011, V002) lists, creates and changes the status of every clinic, and creates their initial settings, as
-     * {@code dentasoft_platform} only. No DELETE policy, and none on any other table.
+     * {@code dentasoft_platform} only. It also records what it does in {@code audit_log}, under the affected clinic,
+     * but only as itself and only about that clinic, creating or changing it (V004). No DELETE policy, and none on any other table.
      */
     private static final Set<AllowedPolicy> ALLOWED_POLICIES = Set.of(
             new AllowedPolicy("clinic", "platform_select", PLATFORM_USER, "SELECT", "true", null),
             new AllowedPolicy("clinic", "platform_insert", PLATFORM_USER, "INSERT", null, "true"),
             new AllowedPolicy("clinic", "platform_update", PLATFORM_USER, "UPDATE", "true", "true"),
-            new AllowedPolicy("clinic_settings", "platform_insert", PLATFORM_USER, "INSERT", null, "true"));
+            new AllowedPolicy("clinic_settings", "platform_insert", PLATFORM_USER, "INSERT", null, "true"),
+            new AllowedPolicy(
+                    "audit_log",
+                    "platform_insert",
+                    PLATFORM_USER,
+                    "INSERT",
+                    null,
+                    "((actor_type = 'PLATFORM'::text) AND (entity_type = 'CLINIC'::text) AND (entity_id = tenant_id)"
+                            + " AND (action = ANY (ARRAY['CREATE'::text, 'UPDATE'::text])))"));
 
     @Autowired
     private Flyway flyway;

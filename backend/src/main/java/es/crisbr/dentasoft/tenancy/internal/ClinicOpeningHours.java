@@ -54,8 +54,10 @@ public class ClinicOpeningHours {
         requireNoOverlaps(week);
         clinics.lockById(TenantContext.current())
                 .orElseThrow(() -> new IllegalStateException("The active clinic does not exist"));
-        // A JPQL delete: Hibernate limits it to the active clinic, and so does Row Level Security.
-        hours.deleteAllInBatch();
+        // One by one, not a bulk JPQL delete: each slot is an audited entity, and a bulk delete would bypass the
+        // audit log. Flushed before the new slots go in, as Hibernate otherwise inserts before it deletes.
+        hours.deleteAll();
+        hours.flush();
         hours.saveAll(week.stream()
                 .map(slot -> new HoursOfOperation(slot.dayOfWeek(), slot.openingTime(), slot.closingTime()))
                 .toList());

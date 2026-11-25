@@ -1,5 +1,7 @@
 package es.crisbr.dentasoft.tenancy.persistence;
 
+import es.crisbr.dentasoft.audit.AuditEntityType;
+import es.crisbr.dentasoft.audit.AuditedEntity;
 import es.crisbr.dentasoft.tenancy.TenantScopedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,6 +15,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Never holds secrets: channel credentials (SMTP, WhatsApp) go to their own encrypted table (M07-T07).
  */
 @Entity
+@AuditedEntity(AuditEntityType.CLINIC_SETTINGS)
 @Table(name = "clinic_settings")
 public class ClinicSettings extends TenantScopedEntity {
 
