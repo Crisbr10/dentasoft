@@ -54,7 +54,18 @@ class PlatformRoleTests {
             "clinic_settings.created_by: INSERT",
             "clinic_settings.updated_at: INSERT",
             "clinic_settings.updated_by: INSERT",
-            "clinic_settings.version: INSERT");
+            "clinic_settings.version: INSERT",
+            "audit_log.id: INSERT",
+            "audit_log.tenant_id: INSERT",
+            "audit_log.occurred_at: INSERT",
+            "audit_log.actor_type: INSERT",
+            "audit_log.actor_id: INSERT",
+            "audit_log.action: INSERT",
+            "audit_log.entity_type: INSERT",
+            "audit_log.entity_id: INSERT",
+            "audit_log.outcome: INSERT",
+            "audit_log.request_id: INSERT",
+            "audit_log.details: INSERT");
 
     @Test
     void isAnOrdinaryRoleThatDoesNotBypassRowLevelSecurity() throws SQLException {
