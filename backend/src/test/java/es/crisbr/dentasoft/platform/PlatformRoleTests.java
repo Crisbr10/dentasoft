@@ -44,6 +44,8 @@ class PlatformRoleTests {
             "clinic.updated_at: INSERT",
             "clinic.updated_by: INSERT",
             "clinic.version: INSERT",
+            "clinic.legal_name: UPDATE",
+            "clinic.tax_id: UPDATE",
             "clinic.status: UPDATE",
             "clinic.updated_at: UPDATE",
             "clinic.updated_by: UPDATE",
@@ -160,6 +162,8 @@ class PlatformRoleTests {
                         + " VALUES (gen_random_uuid(), gen_random_uuid(), 60, now(), now())",
                 "UPDATE clinic SET name = 'Renombrada'",
                 "UPDATE clinic SET keycloak_org_id = 'org'",
+                "UPDATE clinic SET timezone = 'UTC'",
+                "UPDATE clinic SET locale = 'en-GB'",
                 "DELETE FROM clinic",
                 "DELETE FROM clinic_settings",
                 "TRUNCATE clinic",
@@ -189,6 +193,37 @@ class PlatformRoleTests {
             assertThat(countById(platform, clinic)).isEqualTo(1);
             try (Connection application = connectAsApplication()) {
                 assertThat(countById(application, clinic)).isZero();
+            }
+        } finally {
+            PlatformTestDatabase.deleteClinics(List.of(clinic));
+        }
+    }
+
+    /** The fiscal data correction (M01-T11): {@code legal_name} and {@code tax_id}, and nothing else of the clinic. */
+    @Test
+    void correctsTheFiscalDataOfAnyClinic() throws SQLException {
+        UUID clinic = UUID.randomUUID();
+        try (Connection platform = connectAsPlatform()) {
+            try (PreparedStatement insert = platform.prepareStatement(
+                    "INSERT INTO clinic (id, name, legal_name, tax_id, created_at, updated_at)"
+                            + " VALUES (?, 'Clínica Fiscal', 'Clínica Fiscal S.L.', 'B12345674', now(), now())")) {
+                insert.setObject(1, clinic);
+                insert.executeUpdate();
+            }
+            try (PreparedStatement update = platform.prepareStatement(
+                    "UPDATE clinic SET legal_name = 'Clínica Fiscal Corregida S.L.', tax_id = 'B00000000',"
+                            + " updated_at = now(), version = version + 1 WHERE id = ?")) {
+                update.setObject(1, clinic);
+                assertThat(update.executeUpdate()).isEqualTo(1);
+            }
+            try (PreparedStatement read =
+                    platform.prepareStatement("SELECT legal_name, tax_id FROM clinic WHERE id = ?")) {
+                read.setObject(1, clinic);
+                try (ResultSet result = read.executeQuery()) {
+                    assertThat(result.next()).isTrue();
+                    assertThat(result.getString("legal_name")).isEqualTo("Clínica Fiscal Corregida S.L.");
+                    assertThat(result.getString("tax_id")).isEqualTo("B00000000");
+                }
             }
         } finally {
             PlatformTestDatabase.deleteClinics(List.of(clinic));

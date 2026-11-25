@@ -30,7 +30,7 @@ class PlatformApiClosedTests {
     private static final String CLINIC = "/api/v1/platform/clinics/0190a6e8-0000-7000-8000-0000000000aa";
 
     private static final String VALID_CLINIC =
-            "{\"name\":\"Clínica Cerrada\",\"legalName\":\"Clínica Cerrada S.L.\",\"taxId\":\"B12345678\"}";
+            "{\"name\":\"Clínica Cerrada\",\"legalName\":\"Clínica Cerrada S.L.\",\"taxId\":\"B12345674\"}";
 
     @Autowired
     private MockMvcTester mvc;
@@ -42,6 +42,7 @@ class PlatformApiClosedTests {
                 "POST /api/v1/platform/clinics",
                 "POST " + CLINIC + "/suspension",
                 "POST " + CLINIC + "/reactivation",
+                "PUT " + CLINIC + "/fiscal-data",
                 "GET /api/v1/platform",
                 "GET /api/v1/platform/",
                 "GET /api/v1/platform/clinics/",
@@ -58,7 +59,8 @@ class PlatformApiClosedTests {
                 "GET /api/v1/platform/clinics",
                 "POST /api/v1/platform/clinics",
                 "POST " + CLINIC + "/suspension",
-                "POST " + CLINIC + "/reactivation"
+                "POST " + CLINIC + "/reactivation",
+                "PUT " + CLINIC + "/fiscal-data"
             })
     @WithMockUser(roles = "PLATFORM_ADMIN")
     void deniesEvenThePlatformAdministrator(String request) throws SQLException {

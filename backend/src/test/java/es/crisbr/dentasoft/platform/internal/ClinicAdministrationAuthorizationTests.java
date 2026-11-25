@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.platform.internal.ClinicAdministration.FiscalDataCorrection;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.NewClinic;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -71,7 +72,7 @@ class ClinicAdministrationAuthorizationTests {
     }
 
     static Stream<String> operationNames() {
-        return Stream.of("create", "list", "suspend", "reactivate");
+        return Stream.of("create", "list", "suspend", "reactivate", "correctFiscalData");
     }
 
     private Stream<Runnable> operations() {
@@ -81,10 +82,14 @@ class ClinicAdministrationAuthorizationTests {
     private Runnable operation(String name) {
         UUID anyClinic = UUID.randomUUID();
         return switch (name) {
-            case "create" -> () -> administration.create(new NewClinic("Denegada", "Denegada S.L.", "B1", null, null));
+            case "create" ->
+                () -> administration.create(new NewClinic("Denegada", "Denegada S.L.", "B12345674", null, null));
             case "list" -> () -> administration.list(PageRequest.of(0, 10));
             case "suspend" -> () -> administration.suspend(anyClinic);
             case "reactivate" -> () -> administration.reactivate(anyClinic);
+            case "correctFiscalData" ->
+                () -> administration.correctFiscalData(
+                        anyClinic, new FiscalDataCorrection("Denegada S.L.", "B12345674", 0));
             default -> throw new IllegalArgumentException(name);
         };
     }

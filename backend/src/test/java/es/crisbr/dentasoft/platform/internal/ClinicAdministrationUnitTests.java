@@ -27,7 +27,7 @@ class ClinicAdministrationUnitTests {
     @Test
     void aConcurrentStatusChangeIsAConflict() {
         UUID id = UUID.randomUUID();
-        PlatformClinic clinic = new PlatformClinic("Clínica", "Clínica S.L.", "B1", "Europe/Madrid", "es-ES");
+        PlatformClinic clinic = new PlatformClinic("Clínica", "Clínica S.L.", "B12345674", "Europe/Madrid", "es-ES");
         when(clinics.find(id)).thenReturn(Optional.of(clinic));
         doThrow(new ObjectOptimisticLockingFailureException(PlatformClinic.class, id))
                 .when(clinics)
