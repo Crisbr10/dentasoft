@@ -171,10 +171,22 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 `@EnableAsync` (`SharedConfiguration`) hace que `@Async` y `@ApplicationModuleListener` se ejecuten en su propio hilo virtual. Sin él, se ejecutarían en el hilo de quien los llama y con su clínica.
 
 - **Un `@Async` sin `@Transactional`** empieza sin transacción. Fija su clínica con `runAs` y dentro llama a un servicio `@Transactional`.
-- **Un `@ApplicationModuleListener` no puede trabajar con datos de una clínica.** Abre su transacción (`REQUIRES_NEW`) antes de ejecutar el método, así que dentro ya no se puede fijar la clínica: `runAs` lo rechaza.
-  - Hasta que M01-T08 dé una utilidad para esto, el listener se declara con `@Async` y `@TransactionalEventListener`, sin `@Transactional`.
-  - Toma el id de la clínica del evento y llama, dentro de `runAs`, a un servicio `@Transactional`.
-  - `TenantContextPropagationTests` comprueba los dos casos.
+- **Un `@ApplicationModuleListener` no puede trabajar con datos de una clínica.** Abre su transacción (`REQUIRES_NEW`) antes de ejecutar el método, así que dentro ya no se puede fijar la clínica: `runAs` lo rechaza. `TenantContextPropagationTests` lo comprueba.
+- **Un listener que trabaja con datos de una clínica** se declara con `@Async` y `@TransactionalEventListener`, sin `@Transactional`:
+  - El evento lleva el id de la clínica.
+  - El listener llama a `ClinicTransactions.run(event.clinicId(), …)`, que fija la clínica y abre dentro su propia transacción (ejemplo en `ClinicListenerProbe` y `ClinicTransactionsTests`).
+  - **Si el listener falla, el evento se pierde**: su trabajo se deshace y no hay reintentos. Para tenerlos hay que activar el registro de publicaciones de eventos de Spring Modulith, que se hará en M06-T02 (ADR 0013).
+
+### Procesos sin usuario y tareas programadas
+
+Un proceso sin usuario que recorre las clínicas (M01-T08, ADR 0013) usa `ClinicBatch.forEachActiveClinic(job, tarea)`:
+
+- Las clínicas salen de `ActiveClinicIds`, que implementa `platform`: solo ids y solo de clínicas activas. Las suspendidas no se procesan.
+- Cada clínica se ejecuta con su clínica activa y en su propia transacción (`ClinicTransactions`). Nunca hay una transacción que abarque varias: `ClinicBatch` se rechaza dentro de una transacción o con una clínica activa.
+- Si una clínica falla con una `RuntimeException`, se deshace su trabajo y se registra con su id y la clase de la excepción, sin el mensaje. El proceso sigue con la siguiente y al final escribe un resumen con las que fallaron. Un `Error` detiene el proceso.
+- Sus cambios se auditan con el actor `SYSTEM`.
+
+Para que una tarea programada se ejecute una sola vez con varias réplicas, se añade `@SchedulerLock(name = "…")` a su método `@Scheduled`. ShedLock guarda el bloqueo en `scheduler.shedlock` con la hora de la base de datos. Por defecto, el bloqueo dura como máximo 10 minutos; se cambia con `lockAtMostFor` en tareas más largas.
 
 ### Tests
 
