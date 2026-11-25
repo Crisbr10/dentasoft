@@ -62,6 +62,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Criterios de aceptación**:
   - [ ] Un usuario puede pertenecer a varias clínicas con roles distintos
   - [ ] Un usuario sin membresías activas no puede operar
+- **Nota**: cuando el registro de auditoría empiece a guardar `USER` con el usuario del token, los procesos sin usuario (`ClinicBatch`, listeners con `ClinicTransactions`, M01-T08) deben seguir registrándose como `SYSTEM`: sin usuario autenticado, `SYSTEM`. Hoy `ClinicBatchTests.changesMadeByABatchAreAuditedAsTheSystem` pasa siempre porque todo es `SYSTEM`; a partir de aquí tiene que comprobarlo de verdad, también con un lote lanzado desde un hilo con usuario.
 
 ### M02-T04 · Filtro de clínica activa
 

@@ -183,10 +183,11 @@ Un proceso sin usuario que recorre las clínicas (M01-T08, ADR 0013) usa `Clinic
 
 - Las clínicas salen de `ActiveClinicIds`, que implementa `platform`: solo ids y solo de clínicas activas. Las suspendidas no se procesan.
 - Cada clínica se ejecuta con su clínica activa y en su propia transacción (`ClinicTransactions`). Nunca hay una transacción que abarque varias: `ClinicBatch` se rechaza dentro de una transacción o con una clínica activa.
-- Si una clínica falla con una `RuntimeException`, se deshace su trabajo y se registra con su id y la clase de la excepción, sin el mensaje. El proceso sigue con la siguiente y al final escribe un resumen con las que fallaron. Un `Error` detiene el proceso.
+- Si una clínica falla con una `RuntimeException`, se deshace su trabajo y se registra con su id y la clase de la excepción, sin el mensaje. El proceso sigue con la siguiente y al final escribe un resumen con las que fallaron. Un `Error` detiene el proceso, también si llega envuelto en una `RuntimeException` (la causa de un `CompletionException`, o una `TransactionSystemException` de un rollback fallido).
+- `ClinicTransactions` y `ClinicBatch` también se rechazan con la sincronización de transacciones activa sin transacción real (`SUPPORTS`): la sesión de Hibernate se compartiría entre clínicas.
 - Sus cambios se auditan con el actor `SYSTEM`.
 
-Para que una tarea programada se ejecute una sola vez con varias réplicas, se añade `@SchedulerLock(name = "…")` a su método `@Scheduled`. ShedLock guarda el bloqueo en `scheduler.shedlock` con la hora de la base de datos. Por defecto, el bloqueo dura como máximo 10 minutos; se cambia con `lockAtMostFor` en tareas más largas.
+Para que una tarea programada se ejecute una sola vez con varias réplicas, se añade `@SchedulerLock(name = "…")` a su método `@Scheduled`. ShedLock guarda el bloqueo en `scheduler.shedlock` con la hora de la base de datos. Por defecto, el bloqueo dura como máximo 10 minutos (`lockAtMostFor`, se sube en tareas más largas) y como mínimo 30 segundos (`lockAtLeastFor`): los disparadores de dos réplicas nunca saltan en el mismo instante, y sin ese mínimo una tarea corta ya habría terminado y liberado el bloqueo cuando salta el de la otra réplica, que la ejecutaría otra vez. Una tarea que se ejecuta más de una vez cada 30 segundos baja `lockAtLeastFor`.
 
 ### Tests
 

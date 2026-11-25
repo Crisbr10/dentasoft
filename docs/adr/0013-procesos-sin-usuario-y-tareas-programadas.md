@@ -15,13 +15,13 @@ Los recordatorios de citas, las caducidades o los reintentos de envío son proce
 
 - **Lista de clínicas**: la interfaz `ActiveClinicIds` está en la raíz de `tenancy` y la implementa `platform` en `internal`, en su unidad de persistencia de solo lectura. Devuelve solo los ids de las clínicas `ACTIVE`, ordenados. Las suspendidas no se procesan. `dentasoft_app` no recibe ningún permiso nuevo.
 - **Una clínica, una transacción**:
-  - `ClinicTransactions.run/call` hace `runAs(clinicId)` y dentro abre su propio `TransactionTemplate`. Lo rechaza si ya hay una clínica activa o una transacción abierta.
+  - `ClinicTransactions.run/call` hace `runAs(clinicId)` y dentro abre su propio `TransactionTemplate`. Lo rechaza si ya hay una clínica activa, una transacción abierta o la sincronización de transacciones activa (`SUPPORTS`), que compartiría la sesión de Hibernate.
   - `ClinicBatch.forEachActiveClinic` lo aplica a cada clínica activa. Nunca hay una transacción exterior que abarque varias, así que un fallo solo deshace el trabajo de su clínica.
 - **Fallos**:
   - Se captura `RuntimeException` y se registra el job, el id de la clínica y la clase de la excepción, nunca su mensaje, que puede llevar datos personales. Después se sigue con la siguiente clínica.
   - Al final hay un resumen con las clínicas que fallaron. `ClinicBatch.Result` las devuelve.
-  - Un `Error` (`OutOfMemoryError`…) no se captura y detiene el proceso.
-- **Actor de auditoría**: `SYSTEM`, porque no hay usuario.
+  - Un `Error` (`OutOfMemoryError`…) no se captura y detiene el proceso. Si llega envuelto en una `RuntimeException`, como causa o como la excepción original de una `TransactionSystemException`, también.
+- **Actor de auditoría**: `SYSTEM`, porque no hay usuario. Hasta M02 todo se registra como `SYSTEM`; M02-T03 tiene anotado que los procesos sin usuario deben seguir así cuando aparezca `USER`.
 - **Listeners que trabajan con datos de una clínica**:
   - Se declaran con `@Async` y `@TransactionalEventListener`, sin `@Transactional`.
   - El evento lleva el `clinicId`, y el listener llama a `ClinicTransactions.run(event.clinicId(), …)`.
@@ -29,6 +29,7 @@ Los recordatorios de citas, las caducidades o los reintentos de envío son proce
   - Usa la hora de la base de datos (`usingDbTime()`): las réplicas no dependen de su reloj.
   - No tiene un gestor de transacciones asignado. ShedLock usa uno propio para la fila del bloqueo, que no es un bean y no lo ve `TenantAwareJpaDialectPostProcessor`.
   - Por defecto, el bloqueo dura como máximo 10 minutos (`defaultLockAtMostFor`). Si una réplica muere con el bloqueo, la tarea vuelve a ejecutarse pasado ese tiempo.
+  - Y como mínimo 30 segundos (`defaultLockAtLeastFor`). Los disparadores de dos réplicas no saltan en el mismo instante: sin un mínimo, una tarea corta liberaría el bloqueo antes de que salte el de la otra réplica, que la ejecutaría otra vez. Las tareas que se ejecutan más de una vez cada 30 segundos lo bajan.
 - **Tabla de bloqueos fuera de `public`** (V005):
   - `scheduler.shedlock`, sin datos de clínica y sin RLS.
   - `dentasoft_app` solo tiene `USAGE` en el esquema y `SELECT`, `INSERT` y `UPDATE` en la tabla, sin `DELETE` ni `CREATE`.
