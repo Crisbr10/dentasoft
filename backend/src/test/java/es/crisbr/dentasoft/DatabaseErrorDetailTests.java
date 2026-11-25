@@ -7,13 +7,14 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import javax.sql.DataSource;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.postgresql.util.PSQLException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
- * Both connections, the application's and the platform's, leave the detail of PostgreSQL's errors out of the message
+ * Every connection, the application's, the platform's and Flyway's (#125), leaves the detail of PostgreSQL's errors out of the message
  * of the exception (#123): the detail repeats the values of the row, which may be personal data, and exception
  * messages end up in logs. The detail stays in the exception's server error, for code that needs its fields.
  */
@@ -40,6 +41,9 @@ class DatabaseErrorDetailTests {
     @Qualifier("platformDataSource")
     private DataSource platformDataSource;
 
+    @Autowired
+    private Flyway flyway;
+
     @Test
     void theApplicationConnectionLeavesTheValueOutOfTheMessage() throws SQLException {
         assertLeavesTheValueOutOfTheMessage(dataSource);
@@ -48,6 +52,15 @@ class DatabaseErrorDetailTests {
     @Test
     void thePlatformConnectionLeavesTheValueOutOfTheMessage() throws SQLException {
         assertLeavesTheValueOutOfTheMessage(platformDataSource);
+    }
+
+    /**
+     * Flyway migrates as the owner with a data source of its own, which Spring Boot derives from the main one without
+     * its pool properties. A migration that fails on existing rows would otherwise log their values at startup.
+     */
+    @Test
+    void theFlywayConnectionLeavesTheValueOutOfTheMessage() throws SQLException {
+        assertLeavesTheValueOutOfTheMessage(flyway.getConfiguration().getDataSource());
     }
 
     /**
