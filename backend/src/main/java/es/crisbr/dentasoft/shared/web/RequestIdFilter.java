@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.shared.web;
 
+import es.crisbr.dentasoft.shared.RequestId;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +23,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 class RequestIdFilter extends OncePerRequestFilter {
 
     static final String HEADER = "X-Request-Id";
-    static final String MDC_KEY = "requestId";
+    static final String MDC_KEY = RequestId.MDC_KEY;
     static final int MAX_LENGTH = 64;
 
     /** Keeps the ID for the error dispatch of the same request, which runs this filter again. */

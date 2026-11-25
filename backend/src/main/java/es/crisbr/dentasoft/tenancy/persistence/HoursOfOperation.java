@@ -1,5 +1,7 @@
 package es.crisbr.dentasoft.tenancy.persistence;
 
+import es.crisbr.dentasoft.audit.AuditEntityType;
+import es.crisbr.dentasoft.audit.AuditedEntity;
 import es.crisbr.dentasoft.tenancy.TenantScopedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -18,6 +20,7 @@ import java.time.LocalTime;
  * <p>Slots are not edited one by one: the clinic replaces its whole week, which deletes the old ones.
  */
 @Entity
+@AuditedEntity(AuditEntityType.HOURS_OF_OPERATION)
 @Table(name = "clinic_hours_of_operation")
 public class HoursOfOperation extends TenantScopedEntity {
 

@@ -1,5 +1,7 @@
 package es.crisbr.dentasoft.tenancy.persistence;
 
+import es.crisbr.dentasoft.audit.AuditEntityType;
+import es.crisbr.dentasoft.audit.AuditedEntity;
 import es.crisbr.dentasoft.tenancy.TenantScopedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,6 +17,7 @@ import org.jspecify.annotations.Nullable;
  * keeps pointing at it. Two active rooms of a clinic never share a name, whatever the case.
  */
 @Entity
+@AuditedEntity(AuditEntityType.LOCATION)
 @Table(name = "location")
 public class Location extends TenantScopedEntity {
 

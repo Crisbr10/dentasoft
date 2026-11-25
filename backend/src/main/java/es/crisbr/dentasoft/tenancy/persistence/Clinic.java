@@ -1,5 +1,7 @@
 package es.crisbr.dentasoft.tenancy.persistence;
 
+import es.crisbr.dentasoft.audit.AuditEntityType;
+import es.crisbr.dentasoft.audit.AuditedEntity;
 import es.crisbr.dentasoft.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,6 +20,7 @@ import jakarta.persistence.Table;
  * {@code locale}) or not at all ({@code status}, {@code keycloak_org_id}). The application cannot insert clinics.
  */
 @Entity
+@AuditedEntity(AuditEntityType.CLINIC)
 @Table(name = "clinic")
 public class Clinic extends BaseEntity {
 
