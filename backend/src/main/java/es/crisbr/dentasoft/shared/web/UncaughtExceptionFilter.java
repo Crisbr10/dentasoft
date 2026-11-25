@@ -19,9 +19,10 @@ import org.springframework.web.util.DisconnectedClientHelper;
  * whole, messages included, and those may carry personal data (#126).
  *
  * <p>It runs inside {@link RequestIdFilter}, so the log line keeps the request ID, and around every other filter, whose
- * headers the error keeps. The HTTP observation, outside it, still tags the request with the failure's class:
- * {@code GlobalExceptionHandler}, through Spring, leaves a 500's exception in the request for it (and so would hand its
- * messages to a tracing handler, if one is ever added). Three cases go on to Tomcat as before:
+ * headers the error keeps. When {@code GlobalExceptionHandler} answers, the HTTP observation, outside it, still tags
+ * the request with the failure's class: Spring leaves a 500's exception in the request for it (and so would hand its
+ * messages to a tracing handler, if one is ever added). The bare 500 this filter sends when nothing answers is observed
+ * without the class, so that no handler gets the messages. Three cases go on to Tomcat as before:
  *
  * <ul>
  *   <li>A client that went away: Tomcat logs it at debug, and its message says only that the connection closed.
