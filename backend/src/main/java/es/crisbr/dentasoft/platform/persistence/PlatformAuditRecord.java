@@ -87,7 +87,7 @@ public class PlatformAuditRecord {
         this.occurredAt = Instant.now();
         this.action = action;
         this.entityId = clinicId;
-        this.requestId = RequestId.currentUuid().orElse(null);
+        this.requestId = RequestId.serverGenerated().orElse(null);
         this.details = details == null ? null : details.toJson();
     }
 

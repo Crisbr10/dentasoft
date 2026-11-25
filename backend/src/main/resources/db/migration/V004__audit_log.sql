@@ -26,7 +26,8 @@ CREATE TABLE audit_log
     entity_type text        NOT NULL,
     entity_id   uuid        NOT NULL,
     outcome     text        NOT NULL,
-    -- The X-Request-Id of the request, only when it is a UUID: a client-chosen id is never stored.
+    -- The X-Request-Id of the request, only when the server generated it: an id the client chose, even a UUID,
+    -- could repeat another request's, so it is never stored.
     request_id  uuid,
     details     jsonb,
     CONSTRAINT audit_log_actor_type_check CHECK (actor_type IN ('USER', 'SYSTEM', 'PLATFORM')),

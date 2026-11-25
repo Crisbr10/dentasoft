@@ -37,7 +37,7 @@ Además hay tres restricciones técnicas:
   - Ninguna columna admite texto libre: o son códigos con `CHECK`, o UUID.
   - `details` solo se escribe desde el record `AuditDetails`, cuyos componentes solo pueden ser UUID, enumerados, números, booleanos u otros records con la misma regla. `AuditDetailsTests` falla si se añade un `String`, una fecha o una colección.
   - **No se guarda la IP**, ni en claro ni con HMAC. La clave del límite de peticiones solo es obligatoria con el límite activado, y si rota, los hash dejan de ser comparables justo durante los años que se conserva el registro. Además, un hash de IP sigue siendo un dato seudónimo.
-  - La correlación con una petición se hace con `request_id`, que solo se guarda si es un UUID: el id que elige un cliente nunca llega al registro.
+  - La correlación con una petición se hace con `request_id`, que solo se guarda si lo generó el servidor. El id que envía un cliente, aunque tenga forma de UUID, podría repetir el de otra petición, así que nunca llega al registro. Los logs indican el origen del id en `requestIdOrigin`.
 - **Solo se añade**:
   - `dentasoft_app` solo tiene `INSERT`; V001 le daba por defecto `SELECT` y `UPDATE`, y se revocan. El `SELECT` lo concederá M01-T09 para consultar el registro de la propia clínica.
   - Un trigger rechaza `UPDATE`, `DELETE` y `TRUNCATE` a cualquier rol, también al dueño. Reescribir el historial exige un `DROP TRIGGER` en una migración, a la vista en la revisión.

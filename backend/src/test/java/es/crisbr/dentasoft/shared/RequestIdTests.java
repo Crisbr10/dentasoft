@@ -7,34 +7,44 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
-/** Only an ID in the canonical UUID form leaves {@link RequestId}: what else a client sends is never stored. */
+/** Only an ID the server generated leaves {@link RequestId}: what a client sends is never stored as evidence. */
 class RequestIdTests {
 
     @AfterEach
     void clear() {
         MDC.remove(RequestId.MDC_KEY);
+        MDC.remove(RequestId.ORIGIN_MDC_KEY);
     }
 
     @Test
-    void givesTheIdOfTheRequestWhenItIsAUuid() {
+    void givesTheIdTheServerGenerated() {
         UUID id = UUID.randomUUID();
         MDC.put(RequestId.MDC_KEY, id.toString());
+        MDC.put(RequestId.ORIGIN_MDC_KEY, RequestId.ORIGIN_SERVER);
 
-        assertThat(RequestId.currentUuid()).contains(id);
+        assertThat(RequestId.serverGenerated()).contains(id);
     }
 
     @Test
     void givesNothingOutsideARequest() {
-        assertThat(RequestId.currentUuid()).isEmpty();
+        assertThat(RequestId.serverGenerated()).isEmpty();
+    }
+
+    /** Not even a UUID: the client could repeat the id of another request. */
+    @Test
+    void givesNothingForAnIdChosenByTheClient() {
+        for (String chosen : new String[] {UUID.randomUUID().toString(), "juan.perez", "pedido-42"}) {
+            MDC.put(RequestId.MDC_KEY, chosen);
+            MDC.put(RequestId.ORIGIN_MDC_KEY, RequestId.ORIGIN_CLIENT);
+
+            assertThat(RequestId.serverGenerated()).as(chosen).isEmpty();
+        }
     }
 
     @Test
-    void givesNothingForAnIdChosenByTheClient() {
-        for (String chosen :
-                new String[] {"juan.perez", "1-1-1-1-1", "pedido-42", "0190A1B2C3D47E5F8A9B0C1D2E3F4A5B"}) {
-            MDC.put(RequestId.MDC_KEY, chosen);
+    void givesNothingWithoutAnOrigin() {
+        MDC.put(RequestId.MDC_KEY, UUID.randomUUID().toString());
 
-            assertThat(RequestId.currentUuid()).as(chosen).isEmpty();
-        }
+        assertThat(RequestId.serverGenerated()).isEmpty();
     }
 }

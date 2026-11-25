@@ -44,7 +44,7 @@ public class AuditLogWriter {
             statement.setString(6, entry.entityType().name());
             statement.setObject(7, entry.entityId());
             statement.setString(8, entry.outcome().name());
-            statement.setObject(9, RequestId.currentUuid().orElse(null));
+            statement.setObject(9, RequestId.serverGenerated().orElse(null));
             statement.executeUpdate();
         }
     }

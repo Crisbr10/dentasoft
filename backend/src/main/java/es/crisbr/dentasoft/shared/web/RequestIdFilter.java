@@ -26,24 +26,37 @@ class RequestIdFilter extends OncePerRequestFilter {
     static final String MDC_KEY = RequestId.MDC_KEY;
     static final int MAX_LENGTH = 64;
 
-    /** Keeps the ID for the error dispatch of the same request, which runs this filter again. */
+    /** Keep the ID and its origin for the error dispatch of the same request, which runs this filter again. */
     private static final String ATTRIBUTE = RequestIdFilter.class.getName() + ".requestId";
+
+    private static final String ORIGIN_ATTRIBUTE = RequestIdFilter.class.getName() + ".requestIdOrigin";
 
     private static final Pattern VALID_ID = Pattern.compile("[A-Za-z0-9._-]{1," + MAX_LENGTH + "}");
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String requestId = request.getAttribute(ATTRIBUTE) instanceof String previous
-                ? previous
-                : acceptOrGenerate(request.getHeader(HEADER));
+        String requestId;
+        String origin;
+        if (request.getAttribute(ATTRIBUTE) instanceof String previous
+                && request.getAttribute(ORIGIN_ATTRIBUTE) instanceof String previousOrigin) {
+            requestId = previous;
+            origin = previousOrigin;
+        } else {
+            String candidate = request.getHeader(HEADER);
+            requestId = acceptOrGenerate(candidate);
+            origin = requestId.equals(candidate) ? RequestId.ORIGIN_CLIENT : RequestId.ORIGIN_SERVER;
+        }
         request.setAttribute(ATTRIBUTE, requestId);
+        request.setAttribute(ORIGIN_ATTRIBUTE, origin);
         MDC.put(MDC_KEY, requestId);
+        MDC.put(RequestId.ORIGIN_MDC_KEY, origin);
         response.setHeader(HEADER, requestId);
         try {
             chain.doFilter(request, response);
         } finally {
             MDC.remove(MDC_KEY);
+            MDC.remove(RequestId.ORIGIN_MDC_KEY);
         }
     }
 
