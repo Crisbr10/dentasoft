@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import es.crisbr.dentasoft.ContextLoggingExtension;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -15,13 +16,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.logging.LoggingInitializationContext;
-import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -30,8 +27,6 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.StandardEnvironment;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -43,7 +38,7 @@ import tools.jackson.databind.json.JsonMapper;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @WithTestEnvironment
 @Import({TestEndpoints.class, FilterExceptionLoggingTests.FailingFilterConfiguration.class})
-@ExtendWith(OutputCaptureExtension.class)
+@ExtendWith({OutputCaptureExtension.class, ContextLoggingExtension.class})
 class FilterExceptionLoggingTests {
 
     private static final String FAILING_PATH = "/api/v1/test/filter-failure";
@@ -59,23 +54,6 @@ class FilterExceptionLoggingTests {
 
     @Autowired
     private MeterRegistry meters;
-
-    /** As in {@link RequestLoggingTests}: the first test context of the JVM may have logged plain text. */
-    @BeforeEach
-    void useTheLoggingConfigurationOfThisContext(@Autowired ConfigurableEnvironment environment) {
-        LoggingSystem logging = LoggingSystem.get(getClass().getClassLoader());
-        logging.cleanUp();
-        logging.beforeInitialize();
-        logging.initialize(new LoggingInitializationContext(environment), null, null);
-    }
-
-    @AfterEach
-    void restoreTheDefaultLoggingConfiguration() {
-        LoggingSystem logging = LoggingSystem.get(getClass().getClassLoader());
-        logging.cleanUp();
-        logging.beforeInitialize();
-        logging.initialize(new LoggingInitializationContext(new StandardEnvironment()), null, null);
-    }
 
     @Test
     void anExceptionThrownInAFilterIsLoggedWithoutItsMessagesAndAnsweredAs500(CapturedOutput output) throws Exception {
