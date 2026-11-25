@@ -32,13 +32,16 @@ import org.springframework.core.io.FileSystemResource;
  *
  * <ul>
  *   <li>{@code spring.jpa.show-sql}, {@code hibernate.show_sql} and Spring Boot's {@code debug} and {@code trace} modes
- *       stay off.
+ *       stay off, in any spelling Spring Boot accepts.
  *   <li>The loggers of {@link #SENSITIVE} are not set below {@code WARN}, by name, by a logging group (Spring Boot's
  *       {@code sql} group holds two of them) or by a logger below them.
  *   <li>Their ancestors, {@code root} included, are not set to {@code DEBUG} or {@code TRACE}: those levels pass on to
  *       them. {@code INFO}, Spring Boot's default, writes nothing of theirs.
  *   <li>{@link #SQL_ERRORS}, Hibernate's log of failed statements, stays at {@code ERROR} or above: it writes the
  *       server's error message, which may carry values, at {@code WARN}.
+ *   <li>Every document of a file is checked on its own, so a later profile cannot hide an earlier one, and logging
+ *       groups count whichever file declares them.
+ *   <li>There is no Logback or Log4j2 file of our own, nor {@code logging.config}: this test does not read them.
  * </ul>
  *
  * <p>Only the files are checked: an environment variable such as {@code LOGGING_LEVEL_ORG_HIBERNATE_SQL} can still turn
@@ -48,21 +51,43 @@ class SqlLoggingConfigurationTests {
 
     static final String SQL_ERRORS = "org.hibernate.orm.jdbc.error";
 
-    /** Loggers that write SQL statements, their parameter values or the values they read. */
+    /**
+     * Loggers that write SQL statements, their parameter values or the values they read; the entities Hibernate
+     * flushes ({@code EntityPrinter}, at {@code DEBUG} on its event and core loggers); and the request and response
+     * bodies Spring MVC reads and writes.
+     */
     static final Set<String> SENSITIVE = Set.of(
             "org.hibernate.SQL",
             "org.hibernate.orm.jdbc.bind",
             "org.hibernate.orm.jdbc.extract",
             "org.hibernate.type.descriptor.sql",
+            "org.hibernate.orm.event",
+            "org.hibernate.orm.core",
             "org.springframework.jdbc.core",
+            "org.springframework.web",
             "org.postgresql",
             SQL_ERRORS);
 
     /** Spring Boot's predefined groups that hold any of {@link #SENSITIVE}. */
     private static final Map<String, List<String>> PREDEFINED_GROUPS = Map.of(
-            "sql", List.of("org.springframework.jdbc.core", "org.hibernate.SQL", "org.jooq.tools.LoggerListener"));
+            "sql",
+            List.of("org.springframework.jdbc.core", "org.hibernate.SQL", "org.jooq.tools.LoggerListener"),
+            "web",
+            List.of(
+                    "org.springframework.core.codec",
+                    "org.springframework.http",
+                    "org.springframework.web",
+                    "org.springframework.boot.actuate.endpoint.web",
+                    "org.springframework.boot.web.servlet.ServletContextInitializerBeans"));
+
+    /** Switches that log SQL, as {@link #canonical} spells their keys. */
+    private static final Set<String> SQL_SWITCHES =
+            Set.of("spring.jpa.showsql", "spring.jpa.properties.hibernate.showsql", "debug", "trace");
 
     private static final Pattern CONFIGURATION_FILE = Pattern.compile("application.*\\.(ya?ml|properties)");
+
+    private static final Pattern LOGGING_SYSTEM_FILE =
+            Pattern.compile("(logback|log4j2).*\\.(xml|ya?ml|json|properties)");
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{[^:}]+(?::([^}]*))?}");
 
@@ -125,6 +150,44 @@ class SqlLoggingConfigurationTests {
     }
 
     @Test
+    void detectsWhatOtherSpellingsFilesAndDocumentsTurnOn(@TempDir Path root) throws IOException {
+        Files.writeString(root.resolve("application.yml"), """
+                spring:
+                  jpa:
+                    showSql: true
+                logging:
+                  group:
+                    db: org.hibernate.SQL
+                  level:
+                    org.hibernate.orm.event: debug
+                ---
+                spring.config.activate.on-profile: local
+                logging.level.org.hibernate.orm.jdbc.bind: trace
+                ---
+                spring.config.activate.on-profile: prod
+                logging.level.org.hibernate.orm.jdbc.bind: warn
+                """);
+        Files.writeString(root.resolve("application-local.properties"), """
+                spring.jpa.properties[hibernate.show_sql]=true
+                logging.level.db=debug
+                logging.level.web=debug
+                logging.config=classpath:custom-logging.xml
+                """);
+        Files.writeString(root.resolve("logback-spring.xml"), "<configuration/>\n");
+
+        assertThat(violations(root))
+                .containsExactlyInAnyOrder(
+                        "application.yml: spring.jpa.showSql=true",
+                        "application.yml: logging.level.org.hibernate.orm.event=debug",
+                        "application.yml: logging.level.org.hibernate.orm.jdbc.bind=trace",
+                        "application-local.properties: spring.jpa.properties[hibernate.show_sql]=true",
+                        "application-local.properties: logging.level.db=debug",
+                        "application-local.properties: logging.level.web=debug",
+                        "application-local.properties: logging.config=classpath:custom-logging.xml",
+                        "logback-spring.xml: a logging system file, which this test does not read");
+    }
+
+    @Test
     void allowsQuietLevelsAndUnrelatedLoggers(@TempDir Path root) throws IOException {
         Files.writeString(root.resolve("application.yml"), """
                 spring:
@@ -147,26 +210,36 @@ class SqlLoggingConfigurationTests {
     }
 
     private static List<String> violations(Path root) {
+        Map<Path, List<Map<String, String>>> files = new LinkedHashMap<>();
+        for (Path file : files(root, CONFIGURATION_FILE)) {
+            files.put(file, documents(file));
+        }
+        Map<String, List<String>> groups =
+                groups(files.values().stream().flatMap(List::stream).toList());
+
         List<String> violations = new ArrayList<>();
-        for (Path file : configurationFiles(root)) {
-            Map<String, String> properties = properties(file);
-            Map<String, List<String>> groups = groups(properties);
-            properties.forEach((key, value) -> {
-                if (isViolation(key, value, groups)) {
-                    violations.add(file.getFileName() + ": " + key + "=" + value);
-                }
-            });
+        files.forEach((file, documents) -> {
+            for (Map<String, String> document : documents) {
+                document.forEach((key, value) -> {
+                    if (isViolation(key, value, groups)) {
+                        violations.add(file.getFileName() + ": " + key + "=" + value);
+                    }
+                });
+            }
+        });
+        for (Path file : files(root, LOGGING_SYSTEM_FILE)) {
+            violations.add(file.getFileName() + ": a logging system file, which this test does not read");
         }
         return violations;
     }
 
     private static boolean isViolation(String key, String value, Map<String, List<String>> groups) {
         String resolved = resolve(value);
-        if (key.equals("spring.jpa.show-sql")
-                || key.equals("spring.jpa.properties.hibernate.show_sql")
-                || key.equals("debug")
-                || key.equals("trace")) {
+        if (SQL_SWITCHES.contains(canonical(key))) {
             return resolved == null || !resolved.trim().equalsIgnoreCase("false");
+        }
+        if (canonical(key).equals("logging.config")) {
+            return true;
         }
         String name = nameAfter(key, "logging.level");
         if (name == null) {
@@ -205,18 +278,24 @@ class SqlLoggingConfigurationTests {
 
     private static Map<String, LogLevel> levels(Path file) {
         Map<String, LogLevel> levels = new LinkedHashMap<>();
-        properties(file).forEach((key, value) -> {
-            String name = nameAfter(key, "logging.level");
-            if (name != null) {
-                levels.put(name, level(resolve(value)));
-            }
-        });
+        documents(file).stream()
+                .flatMap(document -> document.entrySet().stream())
+                .forEach(entry -> {
+                    String key = entry.getKey();
+                    String value = entry.getValue();
+                    String name = nameAfter(key, "logging.level");
+                    if (name != null) {
+                        levels.put(name, level(resolve(value)));
+                    }
+                });
         return levels;
     }
 
-    private static Map<String, List<String>> groups(Map<String, String> properties) {
+    private static Map<String, List<String>> groups(List<Map<String, String>> documents) {
         Map<String, List<String>> groups = new LinkedHashMap<>(PREDEFINED_GROUPS);
-        properties.forEach((key, value) -> {
+        documents.stream().flatMap(document -> document.entrySet().stream()).forEach(entry -> {
+            String key = entry.getKey();
+            String value = entry.getValue();
             String group = nameAfter(INDEX.matcher(key).replaceAll(""), "logging.group");
             if (group != null) {
                 List<String> members = new ArrayList<>(groups.getOrDefault(group, List.of()));
@@ -252,6 +331,19 @@ class SqlLoggingConfigurationTests {
     }
 
     /**
+     * {@code key} as Spring Boot's relaxed binding reads it: lower case, without dashes or underscores, and with a
+     * bracketed part as a dotted one, so {@code spring.jpa.showSql} and {@code spring.jpa.properties[hibernate.show_sql]}
+     * match too.
+     */
+    private static String canonical(String key) {
+        return key.toLowerCase(Locale.ROOT)
+                .replace("-", "")
+                .replace("_", "")
+                .replace("[", ".")
+                .replace("]", "");
+    }
+
+    /**
      * The logger or group name that {@code key} sets under {@code prefix}, without the brackets that keep its dots;
      * {@code null} if {@code key} is not under {@code prefix}. A quoted {@code "[a.b]"} key in YAML comes as {@code
      * prefix[a.b]}, with no dot before it.
@@ -266,12 +358,10 @@ class SqlLoggingConfigurationTests {
                 .replace("]", "");
     }
 
-    private static List<Path> configurationFiles(Path root) {
+    private static List<Path> files(Path root, Pattern name) {
         try (Stream<Path> files = Files.walk(root)) {
             return files.filter(Files::isRegularFile)
-                    .filter(file -> CONFIGURATION_FILE
-                            .matcher(file.getFileName().toString())
-                            .matches())
+                    .filter(file -> name.matcher(file.getFileName().toString()).matches())
                     .sorted()
                     .toList();
         } catch (IOException e) {
@@ -279,22 +369,24 @@ class SqlLoggingConfigurationTests {
         }
     }
 
-    /** Every property of the file, from all its documents, with its value as written. */
-    private static Map<String, String> properties(Path file) {
+    /** The properties of each document of the file, with their values as written. */
+    private static List<Map<String, String>> documents(Path file) {
         PropertySourceLoader loader = file.toString().endsWith(".properties")
                 ? new PropertiesPropertySourceLoader()
                 : new YamlPropertySourceLoader();
-        Map<String, String> properties = new LinkedHashMap<>();
+        List<Map<String, String>> documents = new ArrayList<>();
         try {
             for (PropertySource<?> source : loader.load(file.toString(), new FileSystemResource(file))) {
                 EnumerablePropertySource<?> enumerable = (EnumerablePropertySource<?>) source;
+                Map<String, String> properties = new LinkedHashMap<>();
                 for (String name : enumerable.getPropertyNames()) {
                     properties.put(name, String.valueOf(enumerable.getProperty(name)));
                 }
+                documents.add(properties);
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        return properties;
+        return documents;
     }
 }

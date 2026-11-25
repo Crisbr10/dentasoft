@@ -40,8 +40,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * <p>An exception that escapes a task is logged without its messages ({@link RedactedException}), which may carry
  * personal data (#123), and the task runs again at its next time. Spring Boot's scheduler is a {@code
  * SimpleAsyncTaskScheduler} with virtual threads and a {@code ThreadPoolTaskScheduler} without them; both get the
- * handler. A task scheduled once by hand ({@code TaskScheduler.schedule}) gets it too, so its failure is logged rather
- * than kept in its {@code ScheduledFuture}.
+ * handler. So does anything given to the scheduler by hand: a task scheduled once ({@code schedule}), or one sent to it
+ * as an executor ({@code execute}, {@code submit}). Its failure is logged rather than kept in its future, which then
+ * completes with {@code null}: code that needs the failure runs on another executor.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
