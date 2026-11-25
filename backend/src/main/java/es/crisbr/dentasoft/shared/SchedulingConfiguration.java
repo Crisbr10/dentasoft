@@ -1,10 +1,15 @@
 package es.crisbr.dentasoft.shared;
 
+import es.crisbr.dentasoft.shared.internal.RedactedException;
 import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
 import net.javacrumbs.shedlock.provider.sql.DatabaseProduct;
 import net.javacrumbs.shedlock.spring.annotation.EnableSchedulerLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.task.SimpleAsyncTaskSchedulerCustomizer;
+import org.springframework.boot.task.ThreadPoolTaskSchedulerCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -31,6 +36,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * half of it: a lock that ends just as the next trigger fires makes runs skip at random. A task that lowers
  * {@code lockAtMostFor} below 30 seconds lowers {@code lockAtLeastFor} too: ShedLock refuses a minimum longer than the
  * maximum, and only when the task tries to take its lock, so the task would never run.
+ *
+ * <p>An exception that escapes a task is logged without its messages ({@link RedactedException}), which may carry
+ * personal data (#123), and the task runs again at its next time. Spring Boot's scheduler is a {@code
+ * SimpleAsyncTaskScheduler} with virtual threads and a {@code ThreadPoolTaskScheduler} without them; both get the
+ * handler. A task scheduled once by hand ({@code TaskScheduler.schedule}) gets it too, so its failure is logged rather
+ * than kept in its {@code ScheduledFuture}.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
@@ -38,6 +49,22 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 class SchedulingConfiguration {
 
     static final String LOCK_TABLE = "scheduler.shedlock";
+
+    private static final Logger log = LoggerFactory.getLogger(SchedulingConfiguration.class);
+
+    @Bean
+    SimpleAsyncTaskSchedulerCustomizer redactingSimpleAsyncTaskScheduler() {
+        return scheduler -> scheduler.setErrorHandler(SchedulingConfiguration::logUncaught);
+    }
+
+    @Bean
+    ThreadPoolTaskSchedulerCustomizer redactingThreadPoolTaskScheduler() {
+        return scheduler -> scheduler.setErrorHandler(SchedulingConfiguration::logUncaught);
+    }
+
+    static void logUncaught(Throwable exception) {
+        log.error("Unexpected error in a scheduled task", RedactedException.of(exception));
+    }
 
     @Bean
     LockProvider lockProvider(DataSource dataSource) {
