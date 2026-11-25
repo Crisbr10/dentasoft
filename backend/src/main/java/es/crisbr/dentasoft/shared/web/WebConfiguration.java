@@ -24,8 +24,9 @@ import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * Web configuration shared by every module: OpenAPI, CORS and the cross-cutting filters, in this order:
- * request ID, security headers, CORS, request size, (Spring Security from M02-T02), rate limit.
+ * Web configuration shared by every module: OpenAPI, CORS and the cross-cutting filters, in this order: request ID,
+ * Spring Boot's HTTP observation (metrics), uncaught exceptions, security headers, CORS, request size, (Spring Security
+ * from M02-T02), rate limit.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties({CorsProperties.class, HttpProperties.class, RateLimitProperties.class})
@@ -65,21 +66,24 @@ class WebConfiguration {
         return registration(new RequestIdFilter(), Ordered.HIGHEST_PRECEDENCE);
     }
 
-    /** Right inside the request ID, which its log line keeps, and around every other filter. */
+    /**
+     * Inside the request ID, which its log line keeps, and the observation Spring Boot registers at {@code
+     * HIGHEST_PRECEDENCE + 1}, which records the failure; around every other filter.
+     */
     @Bean
     FilterRegistrationBean<UncaughtExceptionFilter> uncaughtExceptionFilter(
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
-        return registration(new UncaughtExceptionFilter(exceptionResolver), Ordered.HIGHEST_PRECEDENCE + 1);
+        return registration(new UncaughtExceptionFilter(exceptionResolver), Ordered.HIGHEST_PRECEDENCE + 2);
     }
 
     @Bean
     FilterRegistrationBean<SecurityHeadersFilter> securityHeadersFilter() {
-        return registration(new SecurityHeadersFilter(), Ordered.HIGHEST_PRECEDENCE + 2);
+        return registration(new SecurityHeadersFilter(), Ordered.HIGHEST_PRECEDENCE + 3);
     }
 
     @Bean
     FilterRegistrationBean<CorsFilter> corsFilter(CorsConfigurationSource corsConfigurationSource) {
-        return registration(new CorsFilter(corsConfigurationSource), Ordered.HIGHEST_PRECEDENCE + 3);
+        return registration(new CorsFilter(corsConfigurationSource), Ordered.HIGHEST_PRECEDENCE + 4);
     }
 
     @Bean
@@ -88,7 +92,7 @@ class WebConfiguration {
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
         return registration(
                 new RequestSizeFilter(properties.maxRequestBodySize().toBytes(), exceptionResolver),
-                Ordered.HIGHEST_PRECEDENCE + 4);
+                Ordered.HIGHEST_PRECEDENCE + 5);
     }
 
     @Bean

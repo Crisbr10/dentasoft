@@ -3,6 +3,8 @@ package es.crisbr.dentasoft.shared.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.WithTestEnvironment;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import jakarta.servlet.Filter;
 import java.io.IOException;
 import java.net.URI;
@@ -10,6 +12,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +56,9 @@ class FilterExceptionLoggingTests {
 
     @LocalServerPort
     private int port;
+
+    @Autowired
+    private MeterRegistry meters;
 
     /** As in {@link RequestLoggingTests}: the first test context of the JVM may have logged plain text. */
     @BeforeEach
@@ -103,6 +110,27 @@ class FilterExceptionLoggingTests {
         assertThat(response.headers().firstValue("X-Content-Type-Options")).hasValue("nosniff");
         assertThat(response.headers().firstValue("X-Frame-Options")).hasValue("DENY");
         assertThat(response.headers().firstValue("Cache-Control")).hasValue("no-store");
+
+        // The HTTP observation, outside the filter, still tags the request with the class of the failure.
+        assertThat(serverRequests("IllegalStateException")).isNotNull();
+    }
+
+    /** The server's timer for requests failed with {@code exception}, once the observation has stopped. */
+    private Timer serverRequests(String exception) throws InterruptedException {
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(5));
+        Timer timer;
+        do {
+            timer = meters.find("http.server.requests")
+                    .tag("status", "500")
+                    .tag("exception", exception)
+                    .timer();
+        } while (timer == null && Instant.now().isBefore(deadline) && pause());
+        return timer;
+    }
+
+    private static boolean pause() throws InterruptedException {
+        Thread.sleep(50);
+        return true;
     }
 
     private HttpResponse<String> get(String path) throws IOException, InterruptedException {

@@ -56,7 +56,7 @@ final class AuditedReadInterceptor implements MethodInterceptor {
                 // The read failed anyway; the caller gets the denial, and the lost entry is logged, by id only and
                 // without the messages of the failure, which may quote what was being written (#126).
                 log.error("Could not record a denied read of {} {}", entityType, entityId, Logging.redacted(failure));
-                denied.addSuppressed(failure);
+                denied.addSuppressed(Logging.redacted(failure));
             }
             throw denied;
         }

@@ -24,9 +24,14 @@ import org.junit.jupiter.api.Test;
  * toString()}.
  *
  * <p>It reads the source, so it cannot know every type: an exception counts as one when its variable is declared with
- * a type named {@code *Exception}, {@code *Error} or {@code Throwable} in the same file, or has one of the usual names
- * ({@link #USUAL_NAMES}). The fluent API ({@code log.atError()}) and {@code printStackTrace()} are refused outright. A
+ * a type named {@code *Exception}, {@code *Error} or {@code Throwable} in the same file ({@code var} included, when it
+ * is given a {@code new} one), or has one of the usual names ({@link #USUAL_NAMES}). The fluent API ({@code
+ * log.atError()}), {@code printStackTrace()} and {@code System.out} or {@code System.err} are refused outright. A
  * justified exception goes in {@link #ALLOWED}, with the reason.
+ *
+ * <p>It misses an exception it cannot name: under an unusual name with no declared type (an untyped lambda parameter,
+ * or one returned by a method), in a message built in a variable before the call, or logged through a logger reached
+ * other than by a variable declared {@code Logger} (or named {@code log} or {@code logger}).
  */
 class LoggedExceptionsTests {
 
@@ -43,13 +48,17 @@ class LoggedExceptionsTests {
     private static final Pattern THROWABLE_VARIABLE = Pattern.compile(
             "\\b(?:Throwable|[A-Z]\\w*(?:Exception|Error))(?:\\s*\\|\\s*[\\w.]+)*\\s+(\\w+)\\s*[,)=;:]");
 
+    private static final Pattern NEW_THROWABLE_VARIABLE = Pattern.compile(
+            "\\bvar\\s+(\\w+)\\s*=\\s*new\\s+(?:\\w+\\.)*(?:Throwable|[A-Z]\\w*(?:Exception|Error))\\s*[(<]");
+
     private static final Pattern LOGGER_VARIABLE = Pattern.compile("\\bLogger\\s+(\\w+)\\s*[=;]");
 
     private static final Pattern REDACTED = Pattern.compile("\\b(?:Logging\\.redacted|RedactedException\\.of)\\s*\\(");
 
     private static final Pattern MESSAGE = Pattern.compile("\\.\\s*get(?:Localized)?Message\\s*\\(");
 
-    private static final Pattern PRINT_STACK_TRACE = Pattern.compile("\\.\\s*printStackTrace\\s*\\(");
+    private static final Pattern REFUSED =
+            Pattern.compile("\\.\\s*printStackTrace\\s*\\(\\s*\\)|\\bSystem\\s*\\.\\s*(?:out|err)\\b");
 
     @Test
     void mainSourcesLogNoExceptionWithItsMessages() {
@@ -104,15 +113,29 @@ class LoggedExceptionsTests {
     }
 
     @Test
-    void refusesTheFluentApiAndPrintStackTrace() {
+    void detectsAVarGivenANewException() {
+        assertThat(unredactedCalls("Job.java", """
+                class Job {
+                    void run() {
+                        var problem = new java.lang.IllegalStateException("Job failed");
+                        log.error("Job failed", problem);
+                    }
+                }
+                """)).containsExactly("Job.java: log.error(\"\", problem)");
+    }
+
+    @Test
+    void refusesTheFluentApiPrintStackTraceAndTheStandardStreams() {
         assertThat(unredactedCalls("Job.java", """
                 class Job {
                     void failed(Exception e) {
                         log.atError().setCause(e).log("Job failed");
                         e.printStackTrace();
+                        System.err.println("Job failed");
+                        System.out.printf("Job %s failed%n", e);
                     }
                 }
-                """)).hasSize(2);
+                """)).hasSize(4);
     }
 
     @Test
@@ -160,6 +183,7 @@ class LoggedExceptionsTests {
         String code = withoutCommentsAndStrings(source);
         Set<String> exceptions = new HashSet<>(USUAL_NAMES);
         collect(THROWABLE_VARIABLE, code, exceptions);
+        collect(NEW_THROWABLE_VARIABLE, code, exceptions);
         Set<String> loggers = new HashSet<>(Set.of("log", "logger", "LOG", "LOGGER"));
         collect(LOGGER_VARIABLE, code, loggers);
         Pattern exception =
@@ -184,9 +208,9 @@ class LoggedExceptionsTests {
                 found.add(describe(fileName, code.substring(calls.start(), close + 1)));
             }
         }
-        Matcher printStackTrace = PRINT_STACK_TRACE.matcher(code);
-        while (printStackTrace.find()) {
-            found.add(describe(fileName, code.substring(printStackTrace.start(), printStackTrace.end()) + ")"));
+        Matcher refused = REFUSED.matcher(code);
+        while (refused.find()) {
+            found.add(describe(fileName, code.substring(refused.start(), refused.end())));
         }
         return found;
     }
