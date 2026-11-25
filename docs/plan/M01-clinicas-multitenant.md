@@ -243,12 +243,12 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T07 · Auditoría transversal
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T02
 - **Descripción**: tabla `audit_log` (solo `INSERT` para la app) y servicio `AuditService` para registrar accesos y cambios a entidades sensibles, con anotación o listener reutilizable.
 - **Criterios de aceptación**:
-  - [ ] Ningún dato clínico ni personal en `details`
-  - [ ] La app no puede modificar ni borrar registros de auditoría (test)
+  - [x] Ningún dato clínico ni personal en `details`
+  - [x] La app no puede modificar ni borrar registros de auditoría (test)
 
 ### M01-T08 · Procesos sin usuario y tareas programadas
 
