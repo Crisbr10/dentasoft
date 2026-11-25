@@ -42,7 +42,7 @@ import org.springframework.core.io.FileSystemResource;
  * </ul>
  *
  * <p>Only the files are checked: an environment variable such as {@code LOGGING_LEVEL_ORG_HIBERNATE_SQL} can still turn
- * a logger on, as with any other property.
+ * a logger on, as with any other property: {@code docs/operaciones/logs.md} rules that out in testing and production.
  */
 class SqlLoggingConfigurationTests {
 
