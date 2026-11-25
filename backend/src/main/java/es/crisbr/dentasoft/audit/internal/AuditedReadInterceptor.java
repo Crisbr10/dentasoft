@@ -4,6 +4,7 @@ import es.crisbr.dentasoft.audit.AuditEntityType;
 import es.crisbr.dentasoft.audit.AuditService;
 import es.crisbr.dentasoft.audit.AuditedEntityId;
 import es.crisbr.dentasoft.audit.AuditedRead;
+import es.crisbr.dentasoft.shared.Logging;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.UUID;
@@ -52,9 +53,10 @@ final class AuditedReadInterceptor implements MethodInterceptor {
             try {
                 audit.getObject().recordDeniedRead(entityType, entityId);
             } catch (RuntimeException failure) {
-                // The read failed anyway; the caller gets the denial, and the lost entry is logged, by id only.
-                log.error("Could not record a denied read of {} {}", entityType, entityId, failure);
-                denied.addSuppressed(failure);
+                // The read failed anyway; the caller gets the denial, and the lost entry is logged, by id only and
+                // without the messages of the failure, which may quote what was being written (#126).
+                log.error("Could not record a denied read of {} {}", entityType, entityId, Logging.redacted(failure));
+                denied.addSuppressed(Logging.redacted(failure));
             }
             throw denied;
         }
