@@ -27,7 +27,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * holding it, the task runs again after that time. It is also held at least 30 seconds ({@code lockAtLeastFor}), even
  * when the task ends sooner: the triggers of two replicas never fire at exactly the same instant, and without it a
  * short task would be over, and its lock free, by the time the other replica's trigger fires, so it would run twice. A
- * task that runs more often than every 30 seconds sets a smaller {@code lockAtLeastFor}.
+ * task that runs every 30 seconds or more often sets a {@code lockAtLeastFor} clearly shorter than its interval, such as
+ * half of it: a lock that ends just as the next trigger fires makes runs skip at random. A task that lowers
+ * {@code lockAtMostFor} below 30 seconds lowers {@code lockAtLeastFor} too: ShedLock refuses a minimum longer than the
+ * maximum, and only when the task tries to take its lock, so the task would never run.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling

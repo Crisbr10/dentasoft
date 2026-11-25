@@ -29,7 +29,7 @@ Los recordatorios de citas, las caducidades o los reintentos de envío son proce
   - Usa la hora de la base de datos (`usingDbTime()`): las réplicas no dependen de su reloj.
   - No tiene un gestor de transacciones asignado. ShedLock usa uno propio para la fila del bloqueo, que no es un bean y no lo ve `TenantAwareJpaDialectPostProcessor`.
   - Por defecto, el bloqueo dura como máximo 10 minutos (`defaultLockAtMostFor`). Si una réplica muere con el bloqueo, la tarea vuelve a ejecutarse pasado ese tiempo.
-  - Y como mínimo 30 segundos (`defaultLockAtLeastFor`). Los disparadores de dos réplicas no saltan en el mismo instante: sin un mínimo, una tarea corta liberaría el bloqueo antes de que salte el de la otra réplica, que la ejecutaría otra vez. Las tareas que se ejecutan más de una vez cada 30 segundos lo bajan.
+  - Y como mínimo 30 segundos (`defaultLockAtLeastFor`). Los disparadores de dos réplicas no saltan en el mismo instante: sin un mínimo, una tarea corta liberaría el bloqueo antes de que salte el de la otra réplica, que la ejecutaría otra vez. Las tareas que se ejecutan cada 30 segundos o más a menudo lo bajan claramente por debajo de su intervalo (por ejemplo, a la mitad). Si una tarea baja `lockAtMostFor` por debajo de 30 segundos, tiene que bajar también `lockAtLeastFor`: ShedLock rechaza la combinación cada vez que intenta coger el bloqueo, y la tarea no se ejecuta.
 - **Tabla de bloqueos fuera de `public`** (V005):
   - `scheduler.shedlock`, sin datos de clínica y sin RLS.
   - `dentasoft_app` solo tiene `USAGE` en el esquema y `SELECT`, `INSERT` y `UPDATE` en la tabla, sin `DELETE` ni `CREATE`.

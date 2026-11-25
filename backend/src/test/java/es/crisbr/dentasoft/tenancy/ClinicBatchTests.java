@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -174,6 +175,26 @@ class ClinicBatchTests {
                 }))
                 .isInstanceOf(CompletionException.class)
                 .hasCauseInstanceOf(SimulatedError.class);
+
+        assertThat(storedPerClinic()).containsExactly(1, 0, 0, 0);
+    }
+
+    /**
+     * A rollback that fails after the task's error hides it: Spring throws a {@code TransactionSystemException} that
+     * keeps the error apart, as its application exception. It still stops the process.
+     */
+    @Test
+    void anErrorHiddenByAFailedRollbackStopsTheProcess() {
+        assertThatThrownBy(() -> batch.forEachActiveClinic("test-job", clinicId -> {
+                    records.save(new TenancyTestRecord("batch"));
+                    if (clinicId.equals(CLINIC_B)) {
+                        TransactionSystemException failedRollback =
+                                new TransactionSystemException("Simulated failed rollback");
+                        failedRollback.initApplicationException(new SimulatedError());
+                        throw failedRollback;
+                    }
+                }))
+                .isInstanceOf(TransactionSystemException.class);
 
         assertThat(storedPerClinic()).containsExactly(1, 0, 0, 0);
     }
