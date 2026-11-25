@@ -264,12 +264,12 @@ Para que una tarea programada se ejecute una sola vez con varias réplicas, se a
 
 ### M01-T08 · Procesos sin usuario y tareas programadas
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T03
 - **Descripción**: utilidad para ejecutar un proceso clínica a clínica con su `TenantContext`, y ShedLock sobre PostgreSQL para que una tarea programada se ejecute una sola vez aunque haya varias réplicas.
 - **Criterios de aceptación**:
-  - [ ] Test con dos instancias: la tarea se ejecuta una vez
-  - [ ] Un fallo en una clínica no detiene el proceso para las demás
+  - [x] Test con dos instancias: la tarea se ejecuta una vez
+  - [x] Un fallo en una clínica no detiene el proceso para las demás
 
 ### M01-T09 · Consulta del registro de auditoría
 
