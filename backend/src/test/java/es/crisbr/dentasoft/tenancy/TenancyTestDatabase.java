@@ -45,13 +45,31 @@ public final class TenancyTestDatabase {
      * cannot delete; the owner can, one clinic at a time, as Row Level Security is forced.
      */
     public static void deleteClinicsAnd(List<String> tables) throws SQLException {
+        for (UUID clinic : CLINICS) {
+            deleteClinicAnd(clinic, tables);
+        }
+    }
+
+    /** Deletes the rows of {@code clinic} from {@code tables}, in that order, and then the clinic. */
+    public static void deleteClinicAnd(UUID clinic, List<String> tables) throws SQLException {
         try (Connection connection = connectAsOwner()) {
-            for (UUID clinic : CLINICS) {
-                setSessionClinic(connection, clinic);
-                for (String table : tables) {
-                    execute(connection, "DELETE FROM %s WHERE tenant_id = ?".formatted(checkedTable(table)), clinic);
-                }
-                execute(connection, "DELETE FROM clinic WHERE id = ?", clinic);
+            setSessionClinic(connection, clinic);
+            for (String table : tables) {
+                execute(connection, "DELETE FROM %s WHERE tenant_id = ?".formatted(checkedTable(table)), clinic);
+            }
+            execute(connection, "DELETE FROM clinic WHERE id = ?", clinic);
+        }
+    }
+
+    /** Creates {@code clinic} as the owner, with {@code status} ({@code ACTIVE} or {@code SUSPENDED}). */
+    public static void insertClinic(TestData.Clinic clinic, String status) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            insertClinic(connection, clinic);
+            try (PreparedStatement statement =
+                    connection.prepareStatement("UPDATE clinic SET status = ? WHERE id = ?")) {
+                statement.setString(1, status);
+                statement.setObject(2, clinic.id());
+                statement.executeUpdate();
             }
         }
     }
