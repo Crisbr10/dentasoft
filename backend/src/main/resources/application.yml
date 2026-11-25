@@ -23,7 +23,8 @@ spring:
       data-source-properties:
         # The driver leaves the server's detail out of exception messages: it repeats the row's values, such as the
         # key of a unique constraint, and messages reach logs. Code reads the error's fields from
-        # PSQLException.getServerErrorMessage(), which keeps them (#123). The platform pool sets it too.
+        # PSQLException.getServerErrorMessage(), which keeps them (#123). The platform pool sets it too, and
+        # FlywayErrorDetailCustomizer adds it to Flyway's data source, which does not inherit these properties (#125).
         logServerErrorDetail: false
   flyway:
     # Never let `flyway clean` (drop every object) run against a real database.
