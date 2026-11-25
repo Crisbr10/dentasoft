@@ -22,7 +22,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * Each persistence unit has exactly its entities (ADR 0011): the main unit, the application's, never maps a platform
- * entity, and the platform unit maps only the clinic and the initial clinic settings, never clinic data.
+ * entity, and the platform unit maps only the clinic, the initial clinic settings and its own audit log entries, never
+ * clinic data.
  */
 @IntegrationTest
 class PersistenceUnitsTests {
@@ -30,6 +31,7 @@ class PersistenceUnitsTests {
     private static final String PLATFORM_PACKAGE = "es.crisbr.dentasoft.platform.";
 
     private static final Set<String> PLATFORM_ENTITIES = Set.of(
+            "es.crisbr.dentasoft.platform.persistence.PlatformAuditRecord",
             "es.crisbr.dentasoft.platform.persistence.PlatformClinic",
             "es.crisbr.dentasoft.platform.persistence.PlatformClinicSettings");
 

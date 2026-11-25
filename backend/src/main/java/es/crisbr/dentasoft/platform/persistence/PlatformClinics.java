@@ -47,6 +47,11 @@ public class PlatformClinics {
         entityManager.persist(settings);
     }
 
+    /** Written with the change it records: on the next {@link #flush()} or at commit, never without it. */
+    public void add(PlatformAuditRecord record) {
+        entityManager.persist(record);
+    }
+
     /** Writes pending changes now, so a constraint violation surfaces here and not at commit. */
     public void flush() {
         entityManager.flush();

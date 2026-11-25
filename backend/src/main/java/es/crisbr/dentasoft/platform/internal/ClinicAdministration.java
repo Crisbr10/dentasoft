@@ -1,7 +1,11 @@
 package es.crisbr.dentasoft.platform.internal;
 
+import es.crisbr.dentasoft.audit.AuditAction;
+import es.crisbr.dentasoft.audit.AuditDetails;
+import es.crisbr.dentasoft.audit.AuditSubtype;
 import es.crisbr.dentasoft.platform.ClinicCreated;
 import es.crisbr.dentasoft.platform.persistence.ClinicStatus;
+import es.crisbr.dentasoft.platform.persistence.PlatformAuditRecord;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinic;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinicSettings;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinics;
@@ -21,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Clinic administration for {@code PLATFORM_ADMIN}: create, list, suspend and reactivate clinics (M01-T05). Every
  * method runs in the platform unit, as {@code dentasoft_platform} (ADR 0011), and without an active clinic.
+ *
+ * <p>Every change is recorded in {@code audit_log} under the affected clinic, in the same transaction (ADR 0012): if the
+ * entry cannot be written, the change fails too.
  */
 @Service
 @PreAuthorize("hasRole('PLATFORM_ADMIN')")
@@ -47,6 +54,7 @@ public class ClinicAdministration {
         // The id is generated on persist, and the settings need it.
         clinics.add(clinic);
         clinics.add(new PlatformClinicSettings(clinic.getId()));
+        clinics.add(PlatformAuditRecord.ofClinic(clinic.getId(), AuditAction.CREATE, null));
         // Both rows are written before anyone hears of the clinic.
         clinics.flush();
         events.publishEvent(new ClinicCreated(clinic.getId()));
@@ -62,21 +70,22 @@ public class ClinicAdministration {
 
     @Transactional(PlatformPersistenceConfiguration.TRANSACTION_MANAGER)
     public ClinicDetails suspend(UUID clinicId) {
-        return changeStatus(clinicId, ClinicStatus.ACTIVE, ClinicStatus.SUSPENDED);
+        return changeStatus(clinicId, ClinicStatus.ACTIVE, ClinicStatus.SUSPENDED, AuditSubtype.CLINIC_SUSPENDED);
     }
 
     @Transactional(PlatformPersistenceConfiguration.TRANSACTION_MANAGER)
     public ClinicDetails reactivate(UUID clinicId) {
-        return changeStatus(clinicId, ClinicStatus.SUSPENDED, ClinicStatus.ACTIVE);
+        return changeStatus(clinicId, ClinicStatus.SUSPENDED, ClinicStatus.ACTIVE, AuditSubtype.CLINIC_REACTIVATED);
     }
 
-    private ClinicDetails changeStatus(UUID clinicId, ClinicStatus from, ClinicStatus to) {
+    private ClinicDetails changeStatus(UUID clinicId, ClinicStatus from, ClinicStatus to, AuditSubtype subtype) {
         requireNoActiveClinic();
         PlatformClinic clinic = clinics.find(clinicId).orElseThrow(ClinicNotFoundException::new);
         if (clinic.getStatus() != from) {
             throw new ClinicStatusConflictException(to);
         }
         clinic.setStatus(to);
+        clinics.add(PlatformAuditRecord.ofClinic(clinicId, AuditAction.UPDATE, AuditDetails.of(subtype)));
         try {
             clinics.flush();
         } catch (OptimisticLockingFailureException concurrentChange) {
