@@ -19,7 +19,7 @@
 | `clinic_settings` | `id`, `tenant_id` (único: una fila por clínica), `default_appointment_minutes`, `contact_email`, `contact_phone` (M01-T05); el logo llega con la subida segura de ficheros (M05-T06). Nunca secretos: las credenciales de los canales van cifradas en su propia tabla (M07-T07) |
 | `clinic_hours_of_operation` | `tenant_id`, `day_of_week` (1 = lunes … 7 = domingo, ISO 8601), `opening_time`, `closing_time` (tipo `time`, hora de reloj de la clínica en su zona horaria). Varios tramos por día, sin solaparse (M01-T06) |
 | `location` | `tenant_id`, `name`, `color`, `status` (activo, inactivo). Gabinete, alineado con el recurso FHIR `Location`; el nombre es único entre los activos de la clínica (M01-T06) |
-| `audit_log` | `tenant_id`, `occurred_at`, `actor_id`, `action`, `entity`, `entity_id`, `ip`, `details` (sin datos clínicos) |
+| `audit_log` | `tenant_id`, `occurred_at`, `actor_type`, `actor_id`, `action`, `entity_type`, `entity_id`, `outcome`, `request_id`, `details` (tipo cerrado, sin datos personales ni clínicos). Sin IP. Solo se añade (ADR 0012) |
 
 ## Roles de base de datos y Row Level Security
 
