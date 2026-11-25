@@ -2,23 +2,18 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import es.crisbr.dentasoft.ContextLoggingExtension;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import java.util.List;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.logging.LoggingInitializationContext;
-import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.StandardEnvironment;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import tools.jackson.databind.JsonNode;
@@ -29,7 +24,7 @@ import tools.jackson.databind.json.JsonMapper;
 @AutoConfigureMockMvc
 @WithTestEnvironment
 @Import(TestEndpoints.class)
-@ExtendWith(OutputCaptureExtension.class)
+@ExtendWith({OutputCaptureExtension.class, ContextLoggingExtension.class})
 class RequestLoggingTests {
 
     private static final String REQUEST_ID = "log-test-0001";
@@ -38,27 +33,6 @@ class RequestLoggingTests {
 
     @Autowired
     private MockMvcTester mvc;
-
-    /**
-     * Logback is initialised once per JVM, by the first test context, which may use another profile (local logs
-     * plain text). Re-initialise it with this context's configuration so the production format is what is tested.
-     */
-    @BeforeEach
-    void useTheLoggingConfigurationOfThisContext(@Autowired ConfigurableEnvironment environment) {
-        LoggingSystem logging = LoggingSystem.get(getClass().getClassLoader());
-        logging.cleanUp();
-        logging.beforeInitialize();
-        logging.initialize(new LoggingInitializationContext(environment), null, null);
-    }
-
-    /** Leaves the default configuration behind, so later test classes do not inherit this JSON format. */
-    @AfterEach
-    void restoreTheDefaultLoggingConfiguration() {
-        LoggingSystem logging = LoggingSystem.get(getClass().getClassLoader());
-        logging.cleanUp();
-        logging.beforeInitialize();
-        logging.initialize(new LoggingInitializationContext(new StandardEnvironment()), null, null);
-    }
 
     @Test
     void everyLineOfARequestIsJsonWithItsIdAndNoPersonalData(CapturedOutput output) throws InterruptedException {
