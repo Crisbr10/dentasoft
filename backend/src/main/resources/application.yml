@@ -18,6 +18,13 @@ spring:
   # Flyway migrates as dentasoft_owner with its own credentials: SPRING_FLYWAY_USER, SPRING_FLYWAY_PASSWORD.
   # Without them Flyway would use dentasoft_app, which cannot create tables, so startup fails instead of
   # running with the wrong role.
+  datasource:
+    hikari:
+      data-source-properties:
+        # The driver leaves the server's detail out of exception messages: it repeats the row's values, such as the
+        # key of a unique constraint, and messages reach logs. Code reads the error's fields from
+        # PSQLException.getServerErrorMessage(), which keeps them (#123). The platform pool sets it too.
+        logServerErrorDetail: false
   flyway:
     # Never let `flyway clean` (drop every object) run against a real database.
     clean-disabled: true
@@ -100,6 +107,11 @@ logging:
   structured:
     format:
       console: ${DENTASOFT_LOG_FORMAT:ecs}
+  level:
+    # Hibernate logs the server's message of every failed statement at WARN, and it may quote a value (#123). The
+    # exception still reaches the caller; one nobody handles is logged without messages (RedactedException).
+    # SqlLoggingConfigurationTests keeps this and the loggers that write SQL or its parameters quiet.
+    org.hibernate.orm.jdbc.error: error
 
 # OpenAPI and Swagger UI are off unless a non-production profile turns them on.
 springdoc:

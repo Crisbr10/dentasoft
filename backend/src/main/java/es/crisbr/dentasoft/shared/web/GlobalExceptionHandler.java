@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.shared.web;
 
+import es.crisbr.dentasoft.shared.internal.RedactedException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
