@@ -61,6 +61,14 @@ public class PlatformClinics {
         return Optional.ofNullable(entityManager.find(PlatformClinic.class, id));
     }
 
+    /** The ids of the clinics with {@code status}, in id order: the ids only, nothing else of the clinic. */
+    public List<UUID> idsWithStatus(ClinicStatus status) {
+        return entityManager
+                .createQuery("SELECT c.id FROM PlatformClinic c WHERE c.status = :status ORDER BY c.id", UUID.class)
+                .setParameter("status", status)
+                .getResultList();
+    }
+
     /** One page, ordered as {@code pageable} says and then by id, so pages never overlap. */
     public Page<PlatformClinic> page(Pageable pageable) {
         CriteriaBuilder criteria = entityManager.getCriteriaBuilder();

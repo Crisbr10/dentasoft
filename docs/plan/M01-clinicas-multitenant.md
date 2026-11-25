@@ -171,10 +171,23 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 `@EnableAsync` (`SharedConfiguration`) hace que `@Async` y `@ApplicationModuleListener` se ejecuten en su propio hilo virtual. Sin él, se ejecutarían en el hilo de quien los llama y con su clínica.
 
 - **Un `@Async` sin `@Transactional`** empieza sin transacción. Fija su clínica con `runAs` y dentro llama a un servicio `@Transactional`.
-- **Un `@ApplicationModuleListener` no puede trabajar con datos de una clínica.** Abre su transacción (`REQUIRES_NEW`) antes de ejecutar el método, así que dentro ya no se puede fijar la clínica: `runAs` lo rechaza.
-  - Hasta que M01-T08 dé una utilidad para esto, el listener se declara con `@Async` y `@TransactionalEventListener`, sin `@Transactional`.
-  - Toma el id de la clínica del evento y llama, dentro de `runAs`, a un servicio `@Transactional`.
-  - `TenantContextPropagationTests` comprueba los dos casos.
+- **Un `@ApplicationModuleListener` no puede trabajar con datos de una clínica.** Abre su transacción (`REQUIRES_NEW`) antes de ejecutar el método, así que dentro ya no se puede fijar la clínica: `runAs` lo rechaza. `TenantContextPropagationTests` lo comprueba.
+- **Un listener que trabaja con datos de una clínica** se declara con `@Async` y `@TransactionalEventListener`, sin `@Transactional`:
+  - El evento lleva el id de la clínica.
+  - El listener llama a `ClinicTransactions.run(event.clinicId(), …)`, que fija la clínica y abre dentro su propia transacción (ejemplo en `ClinicListenerProbe` y `ClinicTransactionsTests`).
+  - **Si el listener falla, el evento se pierde**: su trabajo se deshace y no hay reintentos. Para tenerlos hay que activar el registro de publicaciones de eventos de Spring Modulith, que se hará en M06-T02 (ADR 0013).
+
+### Procesos sin usuario y tareas programadas
+
+Un proceso sin usuario que recorre las clínicas (M01-T08, ADR 0013) usa `ClinicBatch.forEachActiveClinic(job, tarea)`:
+
+- Las clínicas salen de `ActiveClinicIds`, que implementa `platform`: solo ids y solo de clínicas activas. Las suspendidas no se procesan.
+- Cada clínica se ejecuta con su clínica activa y en su propia transacción (`ClinicTransactions`). Nunca hay una transacción que abarque varias: `ClinicBatch` se rechaza dentro de una transacción o con una clínica activa.
+- Si una clínica falla con una `RuntimeException`, se deshace su trabajo y se registra con su id y la clase de la excepción, sin el mensaje. El proceso sigue con la siguiente y al final escribe un resumen con las que fallaron. Un `Error` detiene el proceso, también si llega envuelto en una `RuntimeException` (la causa de un `CompletionException`, o una `TransactionSystemException` de un rollback fallido).
+- `ClinicTransactions` y `ClinicBatch` también se rechazan con la sincronización de transacciones activa sin transacción real (`SUPPORTS`): la sesión de Hibernate se compartiría entre clínicas.
+- Sus cambios se auditan con el actor `SYSTEM`.
+
+Para que una tarea programada se ejecute una sola vez con varias réplicas, se añade `@SchedulerLock(name = "…")` a su método `@Scheduled`. ShedLock guarda el bloqueo en `scheduler.shedlock` con la hora de la base de datos. Por defecto, el bloqueo dura como máximo 10 minutos (`lockAtMostFor`, se sube en tareas más largas) y como mínimo 30 segundos (`lockAtLeastFor`): los disparadores de dos réplicas nunca saltan en el mismo instante, y sin ese mínimo una tarea corta ya habría terminado y liberado el bloqueo cuando salta el de la otra réplica, que la ejecutaría otra vez. Una tarea que se ejecuta cada 30 segundos o más a menudo fija un `lockAtLeastFor` claramente menor que su intervalo, por ejemplo la mitad: si el bloqueo vence justo cuando salta el siguiente disparo, unas veces se ejecuta y otras no. Y si una tarea baja `lockAtMostFor` por debajo de 30 segundos, baja también `lockAtLeastFor`: ShedLock rechaza un mínimo mayor que el máximo, y no al arrancar sino cada vez que la tarea intenta coger el bloqueo, así que la tarea no llegaría a ejecutarse nunca.
 
 ### Tests
 
@@ -252,12 +265,12 @@ La clínica no se hereda ni en las tareas enviadas a un executor, ni en hilos nu
 
 ### M01-T08 · Procesos sin usuario y tareas programadas
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T03
 - **Descripción**: utilidad para ejecutar un proceso clínica a clínica con su `TenantContext`, y ShedLock sobre PostgreSQL para que una tarea programada se ejecute una sola vez aunque haya varias réplicas.
 - **Criterios de aceptación**:
-  - [ ] Test con dos instancias: la tarea se ejecuta una vez
-  - [ ] Un fallo en una clínica no detiene el proceso para las demás
+  - [x] Test con dos instancias: la tarea se ejecuta una vez
+  - [x] Un fallo en una clínica no detiene el proceso para las demás
 
 ### M01-T09 · Consulta del registro de auditoría
 

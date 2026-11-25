@@ -35,6 +35,7 @@ Estados: `programada` → `confirmada` → `en_sala` → `en_curso` → `finaliz
 - **Criterios de aceptación**:
   - [ ] Una transición no permitida devuelve 409 con `ProblemDetail`
   - [ ] Eventos publicados en el registro de eventos de Spring Modulith
+- **Nota**: es la primera tarea que publica eventos importantes. Hay que activar el registro de publicaciones de eventos de Spring Modulith (`spring-modulith-starter-jpa`): sin él, si un listener falla, el evento se pierde y no se reintenta (ADR 0013).
 
 ### M06-T03 · Disponibilidad y búsqueda de huecos
 

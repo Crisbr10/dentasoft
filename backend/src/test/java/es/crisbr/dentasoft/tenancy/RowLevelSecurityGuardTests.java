@@ -11,6 +11,9 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.flywaydb.core.Flyway;
@@ -55,6 +58,21 @@ class RowLevelSecurityGuardTests {
                     "((actor_type = 'PLATFORM'::text) AND (entity_type = 'CLINIC'::text) AND (entity_id = tenant_id)"
                             + " AND (action = ANY (ARRAY['CREATE'::text, 'UPDATE'::text])))"));
 
+    /**
+     * Schemas other than {@code public}, which hold no clinic data and so have no Row Level Security. Every entry needs a
+     * reason, and its tables and grants are checked one by one: {@code scheduler} holds ShedLock's lock rows (V005,
+     * ADR 0013).
+     */
+    private static final Map<String, String> SCHEMA_EXCEPTIONS =
+            Map.of("scheduler", "locks of scheduled tasks, without clinic data (V005, ADR 0013)");
+
+    /** The only privileges anyone but the owner has in {@code scheduler}: the application's, on its lock table. */
+    private static final Map<String, Set<String>> SCHEDULER_TABLE_PRIVILEGES =
+            Map.of(APP_USER, Set.of("SELECT", "INSERT", "UPDATE"), PLATFORM_USER, Set.of());
+
+    private static final List<String> TABLE_PRIVILEGES =
+            List.of("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER");
+
     @Autowired
     private Flyway flyway;
 
@@ -85,6 +103,83 @@ class RowLevelSecurityGuardTests {
                 .isEmpty();
     }
 
+    /** A table outside {@code public} escapes the check above: only the listed schemas may exist. */
+    @Test
+    void noSchemaOtherThanPublicAndTheListedExceptions() throws SQLException {
+        List<String> schemas = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("SELECT nspname FROM pg_namespace"
+                        // Names starting with pg_ are reserved to PostgreSQL (pg_catalog, pg_toast, pg_temp_N…).
+                        + " WHERE left(nspname, 3) <> 'pg_' AND nspname <> 'information_schema'"
+                        + " ORDER BY nspname");
+                ResultSet rows = statement.executeQuery()) {
+            while (rows.next()) {
+                schemas.add(rows.getString(1));
+            }
+        }
+
+        Set<String> allowed = new HashSet<>(SCHEMA_EXCEPTIONS.keySet());
+        allowed.add(SCHEMA);
+        assertThat(schemas)
+                .as("schemas; a new one needs its own reason in SCHEMA_EXCEPTIONS")
+                .containsExactlyInAnyOrderElementsOf(allowed);
+    }
+
+    /**
+     * The checks below are written for {@code scheduler} alone: a new entry in {@link #SCHEMA_EXCEPTIONS} needs checks of
+     * its own, or its tables and grants would go unchecked.
+     */
+    @Test
+    void everySchemaExceptionHasItsOwnChecks() {
+        assertThat(SCHEMA_EXCEPTIONS.keySet())
+                .as("schema exceptions; add checks of its tables, functions and grants for a new one")
+                .containsExactly("scheduler");
+    }
+
+    /**
+     * The scheduler schema holds the lock table alone, and no function, and the application can only use it, not change
+     * it.
+     */
+    @Test
+    void schedulerSchemaHoldsOnlyTheLockTableWithExactGrants() throws SQLException {
+        List<String> objects = new ArrayList<>();
+        try (PreparedStatement statement = connection.prepareStatement("SELECT c.relname FROM pg_class c"
+                        + " JOIN pg_namespace n ON n.oid = c.relnamespace"
+                        + " WHERE n.nspname = 'scheduler' AND c.relkind IN ('r', 'p', 'v', 'm', 'f', 'S')");
+                ResultSet rows = statement.executeQuery()) {
+            while (rows.next()) {
+                objects.add(rows.getString(1));
+            }
+        }
+        assertThat(objects)
+                .as("tables, views and sequences of schema scheduler")
+                .containsExactly("shedlock");
+        try (PreparedStatement statement = connection.prepareStatement("SELECT count(*) FROM pg_proc p"
+                        + " JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'scheduler'");
+                ResultSet count = statement.executeQuery()) {
+            count.next();
+            assertThat(count.getLong(1)).as("functions of schema scheduler").isZero();
+        }
+
+        for (Map.Entry<String, Set<String>> role : SCHEDULER_TABLE_PRIVILEGES.entrySet()) {
+            Set<String> granted = new HashSet<>();
+            for (String privilege : TABLE_PRIVILEGES) {
+                if (hasPrivilege("has_table_privilege", role.getKey(), "scheduler.shedlock", privilege)) {
+                    granted.add(privilege);
+                }
+            }
+            assertThat(granted)
+                    .as("privileges of %s on scheduler.shedlock", role.getKey())
+                    .isEqualTo(role.getValue());
+            assertThat(hasPrivilege("has_schema_privilege", role.getKey(), "scheduler", "CREATE"))
+                    .as("%s can create objects in scheduler", role.getKey())
+                    .isFalse();
+        }
+        assertThat(hasPrivilege("has_schema_privilege", APP_USER, "scheduler", "USAGE"))
+                .isTrue();
+        assertThat(hasPrivilege("has_schema_privilege", PLATFORM_USER, "scheduler", "USAGE"))
+                .isFalse();
+    }
+
     @Test
     void applicationRoleDoesNotBypassRowLevelSecurity() throws SQLException {
         try (PreparedStatement statement =
@@ -112,5 +207,26 @@ class RowLevelSecurityGuardTests {
                 assertThat(result.getLong(1)).isZero();
             }
         }
+    }
+
+    /** {@code function} is one of PostgreSQL's privilege functions: never a value from outside the test. */
+    private boolean hasPrivilege(String function, String role, String object, String privilege) throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement("SELECT %s(?, ?, ?)".formatted(privilegeFunction(function)))) {
+            statement.setString(1, role);
+            statement.setString(2, object);
+            statement.setString(3, privilege);
+            try (ResultSet result = statement.executeQuery()) {
+                result.next();
+                return result.getBoolean(1);
+            }
+        }
+    }
+
+    private static String privilegeFunction(String function) {
+        if (!Set.of("has_table_privilege", "has_schema_privilege").contains(function)) {
+            throw new IllegalArgumentException("not a privilege function: " + function);
+        }
+        return function;
     }
 }

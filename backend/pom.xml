@@ -21,6 +21,7 @@
     <spring-modulith.version>2.2.0</spring-modulith.version>
     <springdoc.version>3.2.1</springdoc.version>
     <bucket4j.version>8.22.0</bucket4j.version>
+    <shedlock.version>7.11.0</shedlock.version>
     <spotless.version>3.11.0</spotless.version>
     <palantir-java-format.version>2.103.0</palantir-java-format.version>
     <jacoco.version>0.8.16</jacoco.version>
@@ -79,6 +80,17 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-flyway</artifactId>
+    </dependency>
+    <!-- Runs a scheduled task once across replicas, with a lock row in PostgreSQL (M01-T08, ADR 0013). -->
+    <dependency>
+      <groupId>net.javacrumbs.shedlock</groupId>
+      <artifactId>shedlock-spring</artifactId>
+      <version>${shedlock.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>net.javacrumbs.shedlock</groupId>
+      <artifactId>shedlock-provider-jdbc-template</artifactId>
+      <version>${shedlock.version}</version>
     </dependency>
     <dependency>
       <groupId>org.flywaydb</groupId>

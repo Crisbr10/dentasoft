@@ -26,7 +26,7 @@ Hibernate 7.4 pregunta la clínica al `CurrentTenantIdentifierResolver` cada vez
 - La aplicación arranca normalmente. La plataforma, los jobs y el registro de eventos pueden abrir sesiones sin clínica para lo que no pertenece a ninguna.
 - Leer sin clínica no da error: un `runAs` olvidado parece «no hay datos». Escribir sí falla.
 - Hay un valor especial que nunca puede ser una clínica real: `runAs` lo rechaza y los id de clínica son UUID v7.
-- Un `@ApplicationModuleListener` no puede fijar la clínica, porque su transacción ya está abierta. Hasta M01-T08, los listeners que tocan datos de una clínica se escriben con `@Async` y `@TransactionalEventListener`.
+- Un `@ApplicationModuleListener` no puede fijar la clínica, porque su transacción ya está abierta. Los listeners que tocan datos de una clínica se escriben con `@Async` y `@TransactionalEventListener` y usan `ClinicTransactions` (M01-T08, ADR 0013).
 - El filtro de Hibernate no cubre las consultas nativas, `JdbcClient`, el SQL propio, un `INSERT` en JPQL ni un `UPDATE` en JPQL que asigna `tenantId`: ahí solo protege el RLS de ADR 0002.
 
 ## Alternativas descartadas

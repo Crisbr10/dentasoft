@@ -46,7 +46,7 @@ class ClinicProbe {
     /** Published by the tests; the listener without a transaction completes {@code observed}. */
     record NonTransactionalProbeEvent(CompletableFuture<Observation> observed) {}
 
-    /** The documented way, until M01-T08, for a listener that works with a clinic's data. */
+    /** The shape of a listener that works with a clinic's data: see {@link ClinicListenerProbe}. */
     @Async
     @TransactionalEventListener
     void on(NonTransactionalProbeEvent event) {

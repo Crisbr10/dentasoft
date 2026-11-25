@@ -83,7 +83,9 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 ### Datos
 
 - Identificadores UUID v7 generados en la aplicación.
-- Fechas con `timestamptz` (`OffsetDateTime`/`Instant` en Java); zona por defecto de la clínica, `Europe/Madrid`. Única excepción: las horas de reloj que se repiten cada semana, como el horario de apertura (`clinic_hours_of_operation`), van en `time` (`LocalTime`), porque son la hora local de la clínica en su zona horaria y no un instante (V003).
+- Fechas con `timestamptz` (`OffsetDateTime`/`Instant` en Java); zona por defecto de la clínica, `Europe/Madrid`. Dos excepciones:
+  - Las horas de reloj que se repiten cada semana, como el horario de apertura (`clinic_hours_of_operation`), van en `time` (`LocalTime`), porque son la hora local de la clínica en su zona horaria y no un instante (V003).
+  - La tabla de bloqueos de ShedLock (`scheduler.shedlock`) usa `timestamp` en UTC, porque ShedLock escribe la hora de la base de datos sin zona y con `timestamptz` dos réplicas en zonas distintas no coincidirían (V005, ADR 0013).
 - Importes en `numeric(12,2)` (`BigDecimal`), nunca `double`.
 - Columnas de auditoría `created_at`, `created_by`, `updated_at`, `updated_by`; bloqueo optimista con `@Version` en lo editable.
 - Borrado lógico (`deleted_at`) en pacientes y datos clínicos. Nunca `DELETE` físico de datos clínicos.
