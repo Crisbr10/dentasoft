@@ -47,6 +47,8 @@ class PlatformPersistenceConfiguration {
         dataSource.setPassword(properties.password());
         dataSource.setMaximumPoolSize(MAXIMUM_POOL_SIZE);
         dataSource.setMinimumIdle(0);
+        // As the main pool (application.yml): no row values in the messages of the driver's exceptions (#123).
+        dataSource.addDataSourceProperty("logServerErrorDetail", "false");
         return dataSource;
     }
 

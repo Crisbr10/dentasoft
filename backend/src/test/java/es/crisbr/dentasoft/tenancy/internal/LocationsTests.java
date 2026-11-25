@@ -2,12 +2,15 @@ package es.crisbr.dentasoft.tenancy.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import es.crisbr.dentasoft.shared.PageLimits;
 import es.crisbr.dentasoft.shared.UnsupportedSortException;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
 import es.crisbr.dentasoft.tenancy.internal.Locations.LocationData;
 import es.crisbr.dentasoft.tenancy.internal.Locations.LocationDetails;
+import es.crisbr.dentasoft.tenancy.persistence.Location;
+import es.crisbr.dentasoft.tenancy.persistence.LocationRepository;
 import es.crisbr.dentasoft.tenancy.persistence.LocationStatus;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -15,8 +18,10 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * {@code ADMIN_CLINICA} manages its clinic's treatment rooms (M01-T06): rooms are deactivated, never deleted, and two
@@ -28,6 +33,12 @@ class LocationsTests extends ClinicConfigurationTestBase {
 
     @Autowired
     private Locations locations;
+
+    @Autowired
+    private LocationRepository repository;
+
+    @Autowired
+    private TransactionTemplate transaction;
 
     @Test
     void createsARoomThatIsActive() {
@@ -47,6 +58,20 @@ class LocationsTests extends ClinicConfigurationTestBase {
         assertThatThrownBy(() -> create("GABINETE 1", null)).isInstanceOf(LocationNameTakenException.class);
         assertThat(asClinicA(() -> locations.list(null, BY_NAME)).getTotalElements())
                 .isOne();
+    }
+
+    /**
+     * The database's own refusal, which a race between two requests reaches (LocationNameRaceTests), is still told
+     * apart from the server's error fields, now that the driver leaves their detail out of the message (#123).
+     */
+    @Test
+    void tellsATakenNameFromTheDatabaseError() {
+        insertRoomDirectly("Gabinete 1");
+
+        DataIntegrityViolationException violation =
+                catchThrowableOfType(DataIntegrityViolationException.class, () -> insertRoomDirectly("GABINETE 1"));
+
+        assertThat(Locations.violatesActiveNameKey(violation)).isTrue();
     }
 
     @Test
@@ -223,6 +248,11 @@ class LocationsTests extends ClinicConfigurationTestBase {
                     .isInstanceOf(LocationNotFoundException.class);
         }
         assertThat(asClinicB(() -> locations.get(clinicBRoom.id()))).isEqualTo(clinicBRoom);
+    }
+
+    /** Past the service's own check, as only a race would get. */
+    private void insertRoomDirectly(String name) {
+        asClinicA(() -> transaction.execute(status -> repository.saveAndFlush(new Location(name, null))));
     }
 
     private LocationDetails create(String name, String color) {
