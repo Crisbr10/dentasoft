@@ -23,8 +23,8 @@ import org.springframework.transaction.TransactionException;
  * the transaction fails. Nothing is set when the connection is taken from the pool or for the whole session.
  *
  * <p>The clinic is the session's ({@link ActiveClinicResolver}), which must be the active one: if they differ, the
- * transaction does not start. Without a clinic ({@code NO_CLINIC}) it is not set and tables with Row Level Security
- * return no rows. Code that runs outside a Spring transaction never gets here, so it sees no clinic data either.
+ * transaction does not start. Without a clinic ({@code NO_CLINIC}) it is not set and tables isolated by clinic return
+ * no rows, except what the user's own policies of V007 let through (their account, memberships and clinics). Code that runs outside a Spring transaction never gets here, so it sees no clinic data either.
  *
  * <p>The signed-in user ({@link CurrentUser}, the {@code sub} of the validated token) is passed the same way, as
  * {@code app.user_id}, with or without a clinic: the tables and policies of V007 use it to show each user only their

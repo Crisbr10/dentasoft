@@ -5,7 +5,7 @@
 -- without a user (jobs, asynchronous listeners) leave it unset, so the policies below let them see nothing.
 --
 -- To undo it by hand, as the owner: DROP POLICY member_select ON clinic; DROP TABLE clinic_membership, user_account;
--- DROP FUNCTION enable_user_isolation(text, text);
+-- DROP FUNCTION enable_user_isolation(text, text); (the grants go with the tables).
 
 -- Like enable_tenant_isolation (V001), for a table whose rows belong to one user instead of one clinic: Row Level
 -- Security enabled and forced, and a `user_isolation` policy that only lets through rows whose p_column equals
@@ -76,6 +76,13 @@ CREATE TABLE clinic_membership
     -- One role per clinic.
     CONSTRAINT clinic_membership_tenant_id_user_id_key UNIQUE (tenant_id, user_id)
 );
+
+-- A membership never changes hands: by V001's default privileges the application could give another member's row to
+-- someone else, or to itself, within the active clinic. Without UPDATE on user_id it cannot (Hibernate maps it as not
+-- updatable). tenant_id keeps it: tenant_isolation's WITH CHECK already rejects moving a row to another clinic, which
+-- the isolation test checks.
+REVOKE UPDATE ON clinic_membership FROM dentasoft_app;
+GRANT UPDATE (tenant_id, role, active, updated_at, updated_by, version) ON clinic_membership TO dentasoft_app;
 
 -- The policies own_memberships and member_select look memberships up by user on every read, without a clinic.
 CREATE INDEX clinic_membership_user_id_idx ON clinic_membership (user_id);

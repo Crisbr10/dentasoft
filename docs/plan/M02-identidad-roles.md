@@ -101,6 +101,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
   - [ ] Desactivar una membresía impide el acceso a esa clínica de inmediato
   - [ ] Cada cambio queda en `audit_log`
 - **Nota**: la FK `clinic_membership.user_id → user_account` (V007) exige que el invitado tenga cuenta, pero con `user_isolation` (ADR 0015) la aplicación solo puede crear la del usuario que hace la petición. Aquí se decide entre una política de solo `INSERT` en `user_account` (con `status = 'ACTIVE'`) y quitar la FK.
+- **Nota**: dentro de la clínica activa, la base de datos deja cambiar el rol y el estado de cualquier membresía de esa clínica, también la propia. Que solo `ADMIN_CLINICA` lo haga, y que nadie se ascienda ni se reactive a sí mismo, lo garantiza la autorización de esta tarea. M02-T04 rechaza las membresías inactivas. Una cuenta `DISABLED` todavía lee sus clínicas por SQL (`member_select` no mira `user_account.status`): se decide cuando exista la forma de desactivar cuentas.
 
 ### M02-T06 · Profesionales
 

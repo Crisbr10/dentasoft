@@ -28,7 +28,7 @@ Un usuario trabaja en una o varias clínicas, con un rol en cada una (M02-T03). 
 - **Usuario en cada transacción**: el dialecto JPA fija `app.user_id` con `set_config(…, true)`, igual que la clínica (ADR 0010). Lo hace con clínica o sin ella, también en las transacciones `REQUIRES_NEW` de la misma petición. Los procesos sin usuario no lo fijan.
 - **Políticas** (V007):
   - `user_account` usa `user_isolation` (`id = app.user_id`), creada con `enable_user_isolation`. Cada usuario solo ve y crea su fila, y la aplicación no tiene `UPDATE` sobre ella.
-  - `clinic_membership` usa `tenant_isolation` y además `own_memberships` (`FOR SELECT TO dentasoft_app`, `user_id = app.user_id`). Sin clínica activa, el usuario ve solo sus membresías. Con la clínica A activa, ve las de A más las suyas en otras clínicas. Las escrituras siguen limitadas a la clínica activa, así que nadie puede darse de alta, cambiar de rol ni reactivarse en otra clínica.
+  - `clinic_membership` usa `tenant_isolation` y además `own_memberships` (`FOR SELECT TO dentasoft_app`, `user_id = app.user_id`). Sin clínica activa, el usuario ve solo sus membresías. Con la clínica A activa, ve las de A más las suyas en otras clínicas. Las escrituras siguen limitadas a la clínica activa, así que nadie puede darse de alta, cambiar de rol ni reactivarse en otra clínica. La aplicación no tiene `UPDATE` sobre `user_id`, así que una membresía nunca cambia de usuario.
   - `clinic` añade `member_select` (`FOR SELECT TO dentasoft_app`): el usuario lee las clínicas en las que tiene una membresía activa. Al desactivarla, deja de leer esa clínica.
   - El test guardián declara cada política y cada tabla aislada por usuario con su motivo.
 - **Alta en el primer acceso**:

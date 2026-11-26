@@ -118,6 +118,24 @@ class UserRowLevelSecurityTests {
                 .containsExactly("ODONTOLOGO/false");
     }
 
+    /**
+     * In the active clinic a membership's role and status may change, but never whose or which clinic's it is: no
+     * privilege on {@code user_id}, and Row Level Security on {@code tenant_id}.
+     */
+    @Test
+    void inTheActiveClinicAMembershipCannotBeMovedToAnotherUserOrClinic() throws SQLException {
+        String where = " WHERE tenant_id = '" + CLINIC_B + "' AND user_id = '" + USER_B + "'";
+
+        assertRejected(USER_A, CLINIC_B, "UPDATE clinic_membership SET user_id = '" + USER_A + "'" + where);
+        assertRejected(USER_A, CLINIC_B, "UPDATE clinic_membership SET tenant_id = '" + CLINIC_A + "'" + where);
+        int roleChanged = inTransaction(
+                USER_A,
+                CLINIC_B,
+                connection -> update(connection, "UPDATE clinic_membership SET role = 'RECEPCION'" + where));
+
+        assertThat(roleChanged).isEqualTo(1);
+    }
+
     @Test
     void theApplicationCannotCreateAnotherUsersAccountNorChangeAnyAccount() throws SQLException {
         UUID other = UUID.fromString("5f0c2b1e-0000-4000-8000-0000000000d4");
