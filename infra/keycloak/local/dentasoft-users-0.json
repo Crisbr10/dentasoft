@@ -24,6 +24,7 @@
       "lastName": "Admin Prueba",
       "enabled": true,
       "realmRoles": ["default-roles-dentasoft"],
+      "groups": ["/clinic-users"],
       "credentials": [
         {
           "type": "password",
@@ -39,6 +40,7 @@
       "lastName": "Odontóloga Prueba",
       "enabled": true,
       "realmRoles": ["default-roles-dentasoft"],
+      "groups": ["/clinic-users"],
       "credentials": [
         {
           "type": "password",
@@ -54,6 +56,7 @@
       "lastName": "Recepción Prueba",
       "enabled": true,
       "realmRoles": ["default-roles-dentasoft"],
+      "groups": ["/clinic-users"],
       "credentials": [
         {
           "type": "password",

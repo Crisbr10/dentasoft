@@ -84,6 +84,9 @@ services:
       # Tokens carry the public URL (DENTASOFT_URLS_AUTH) as issuer, but from inside Docker
       # Keycloak's signing keys are at http://keycloak:8080 (M02-T02).
       DENTASOFT_AUTH_JWK_SET_URI: http://keycloak:8080/realms/dentasoft/protocol/openid-connect/certs
+      # Keycloak Admin API (M02-T05), with the dentasoft-backend client and the same secret as Keycloak.
+      DENTASOFT_KEYCLOAK_ADMIN_BASE_URL: http://keycloak:8080
+      DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET: ${DENTASOFT_KC_BACKEND_CLIENT_SECRET:?set DENTASOFT_KC_BACKEND_CLIENT_SECRET in .env}
     depends_on:
       postgres:
         condition: service_healthy

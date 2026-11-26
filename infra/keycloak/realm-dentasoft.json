@@ -12,6 +12,7 @@
   "verifyEmail": true,
   "resetPasswordAllowed": true,
   "organizationsEnabled": true,
+  "adminPermissionsEnabled": true,
   "internationalizationEnabled": true,
   "supportedLocales": [
     "es"
@@ -67,6 +68,14 @@
       }
     ]
   },
+  "groups": [
+    {
+      "id": "5b597034-44d8-49d0-a878-5d4fe5a6efbb",
+      "name": "clinic-users",
+      "path": "/clinic-users",
+      "description": "Every clinic user. Platform administrators are never members: dentasoft-backend manages only the members of this group. Its id is fixed because the backend-manages-clinic-users permission names it."
+    }
+  ],
   "defaultDefaultClientScopes": [
     "basic",
     "acr",
@@ -640,6 +649,284 @@
         "dentasoft-api"
       ],
       "optionalClientScopes": []
+    },
+    {
+      "clientId": "dentasoft-backend",
+      "name": "Dentasoft backend",
+      "description": "Service account of the backend for the Keycloak Admin API: invites clinic users and manages their organization memberships. Fine-grained admin permissions limit it to the members of clinic-users, so it never sees or changes a platform administrator.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${DENTASOFT_KC_BACKEND_CLIENT_SECRET}",
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "consentRequired": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "roles",
+        "kc-admin-api"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "admin-permissions",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "consentRequired": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "realm_client": "false"
+      },
+      "authorizationSettings": {
+        "allowRemoteResourceManagement": true,
+        "policyEnforcementMode": "ENFORCING",
+        "decisionStrategy": "UNANIMOUS",
+        "resources": [
+          {
+            "name": "Users",
+            "type": "Users",
+            "ownerManagedAccess": false,
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "manage-group-membership"
+              },
+              {
+                "name": "reset-password"
+              },
+              {
+                "name": "impersonate"
+              },
+              {
+                "name": "delegate"
+              }
+            ]
+          },
+          {
+            "name": "Groups",
+            "type": "Groups",
+            "ownerManagedAccess": false,
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "view-members"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "manage-members"
+              },
+              {
+                "name": "manage-membership"
+              },
+              {
+                "name": "manage-membership-of-members"
+              },
+              {
+                "name": "delegate-members"
+              },
+              {
+                "name": "impersonate-members"
+              }
+            ]
+          },
+          {
+            "name": "Clients",
+            "type": "Clients",
+            "ownerManagedAccess": false,
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "map-roles"
+              },
+              {
+                "name": "map-roles-client-scope"
+              },
+              {
+                "name": "map-roles-composite"
+              }
+            ]
+          },
+          {
+            "name": "Roles",
+            "type": "Roles",
+            "ownerManagedAccess": false,
+            "scopes": [
+              {
+                "name": "map-role"
+              },
+              {
+                "name": "map-role-client-scope"
+              },
+              {
+                "name": "map-role-composite"
+              }
+            ]
+          },
+          {
+            "name": "Organizations",
+            "type": "Organizations",
+            "ownerManagedAccess": false,
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "manage"
+              }
+            ]
+          },
+          {
+            "name": "5b597034-44d8-49d0-a878-5d4fe5a6efbb",
+            "ownerManagedAccess": false,
+            "scopes": [
+              {
+                "name": "view"
+              },
+              {
+                "name": "view-members"
+              },
+              {
+                "name": "manage"
+              },
+              {
+                "name": "manage-members"
+              },
+              {
+                "name": "manage-membership"
+              },
+              {
+                "name": "manage-membership-of-members"
+              },
+              {
+                "name": "delegate-members"
+              },
+              {
+                "name": "impersonate-members"
+              }
+            ]
+          }
+        ],
+        "policies": [
+          {
+            "name": "backend-service-account",
+            "description": "The service account of dentasoft-backend.",
+            "type": "user",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "users": "[\"service-account-dentasoft-backend\"]"
+            }
+          },
+          {
+            "name": "backend-manages-clinic-users",
+            "description": "dentasoft-backend sees and manages only the members of clinic-users.",
+            "type": "scope",
+            "logic": "POSITIVE",
+            "decisionStrategy": "UNANIMOUS",
+            "config": {
+              "defaultResourceType": "Groups",
+              "resources": "[\"5b597034-44d8-49d0-a878-5d4fe5a6efbb\"]",
+              "scopes": "[\"view\",\"view-members\",\"manage-members\",\"manage-membership\"]",
+              "applyPolicies": "[\"backend-service-account\"]"
+            }
+          }
+        ],
+        "scopes": [
+          {
+            "name": "view"
+          },
+          {
+            "name": "manage"
+          },
+          {
+            "name": "map-roles"
+          },
+          {
+            "name": "manage-group-membership"
+          },
+          {
+            "name": "reset-password"
+          },
+          {
+            "name": "impersonate"
+          },
+          {
+            "name": "delegate"
+          },
+          {
+            "name": "view-members"
+          },
+          {
+            "name": "manage-members"
+          },
+          {
+            "name": "manage-membership"
+          },
+          {
+            "name": "manage-membership-of-members"
+          },
+          {
+            "name": "delegate-members"
+          },
+          {
+            "name": "impersonate-members"
+          },
+          {
+            "name": "map-roles-client-scope"
+          },
+          {
+            "name": "map-roles-composite"
+          },
+          {
+            "name": "map-role"
+          },
+          {
+            "name": "map-role-client-scope"
+          },
+          {
+            "name": "map-role-composite"
+          }
+        ]
+      }
     }
   ],
   "scopeMappings": [
@@ -648,6 +935,32 @@
       "roles": [
         "PLATFORM_ADMIN"
       ]
+    }
+  ],
+  "clientScopeMappings": {
+    "realm-management": [
+      {
+        "client": "dentasoft-backend",
+        "roles": [
+          "query-users",
+          "query-groups",
+          "manage-organizations"
+        ]
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "service-account-dentasoft-backend",
+      "enabled": true,
+      "serviceAccountClientId": "dentasoft-backend",
+      "clientRoles": {
+        "realm-management": [
+          "query-users",
+          "query-groups",
+          "manage-organizations"
+        ]
+      }
     }
   ],
   "browserFlow": "dentasoft browser",

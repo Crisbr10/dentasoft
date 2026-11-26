@@ -1,6 +1,7 @@
 package es.crisbr.dentasoft;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -15,6 +16,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.yaml.snakeyaml.Yaml;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -60,6 +63,29 @@ class KeycloakRealmFileTests {
     /** Keys of exported credentials (hashes and salts): never allowed in a versioned file. */
     private static final List<String> EXPORTED_CREDENTIAL_KEYS =
             List.of("secretData", "credentialData", "hashedSaltedValue");
+
+    /** The confidential client the backend uses for the Keycloak Admin API (M02-T05). */
+    private static final String BACKEND_CLIENT = "dentasoft-backend";
+
+    private static final String SERVICE_ACCOUNT = "service-account-dentasoft-backend";
+
+    /** The group of every clinic user. Platform administrators are never in it (FGAP v2, M02-T05). */
+    private static final String CLINIC_USERS = "/clinic-users";
+
+    /**
+     * The only {@code realm-management} roles of the backend service account. With {@code manage-users} it could
+     * assign {@code PLATFORM_ADMIN} or reset a platform administrator's password or OTP; these roles, plus the
+     * fine-grained permission on {@link #CLINIC_USERS}, limit it to clinic users.
+     */
+    private static final Set<String> SERVICE_ACCOUNT_ROLES =
+            Set.of("query-users", "query-groups", "manage-organizations");
+
+    /** What the service account may do with the members of {@link #CLINIC_USERS}. */
+    private static final Set<String> CLINIC_USERS_SCOPES =
+            Set.of("view", "view-members", "manage-members", "manage-membership");
+
+    private static final Pattern UUID_PATTERN =
+            Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
     private static final JsonNode REALM = read(REALM_FILE);
 
@@ -168,6 +194,117 @@ class KeycloakRealmFileTests {
                 .isFalse();
         JsonNode mapping = named(REALM.path("scopeMappings"), "client", "dentasoft-web");
         assertThat(strings(mapping.path("roles"))).containsExactly("PLATFORM_ADMIN");
+        // Client roles (realm-management...) never reach the web client tokens either.
+        assertThat(clientScopeMappingClients(REALM)).doesNotContain("dentasoft-web");
+    }
+
+    @Test
+    void backendClientIsConfidentialWithOnlyAServiceAccount() {
+        assertBackendClientHasOnlyAServiceAccount(REALM);
+    }
+
+    @Test
+    void detectsInteractiveFlowsAndRedirectsOnTheBackendClient() {
+        ObjectNode flow = (ObjectNode) REALM.deepCopy();
+        ((ObjectNode) client(flow, BACKEND_CLIENT)).put("directAccessGrantsEnabled", true);
+        ObjectNode redirect = (ObjectNode) REALM.deepCopy();
+        ((ObjectNode) client(redirect, BACKEND_CLIENT)).putArray("redirectUris").add("${DENTASOFT_URLS_APP}/");
+
+        assertThatThrownBy(() -> assertBackendClientHasOnlyAServiceAccount(flow))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("directAccessGrantsEnabled");
+        assertThatThrownBy(() -> assertBackendClientHasOnlyAServiceAccount(redirect))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("redirectUris");
+    }
+
+    @Test
+    void backendServiceAccountHasOnlyTheMinimalRealmManagementRoles() {
+        assertBackendServiceAccountHasOnlyTheMinimalRoles(REALM);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"manage-users", "view-users", "manage-realm", "realm-admin", "manage-clients"})
+    void detectsMoreRealmManagementRolesForTheBackendServiceAccount(String role) {
+        ObjectNode realm = (ObjectNode) REALM.deepCopy();
+        JsonNode account = named(realm.path("users"), "username", SERVICE_ACCOUNT);
+        ((ArrayNode) account.path("clientRoles").path("realm-management")).add(role);
+
+        assertThatThrownBy(() -> assertBackendServiceAccountHasOnlyTheMinimalRoles(realm))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining(role);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"manage-users", "view-users", "manage-realm", "realm-admin", "manage-clients"})
+    void detectsMoreRealmManagementScopeMappingsForTheBackendClient(String role) {
+        ObjectNode realm = (ObjectNode) REALM.deepCopy();
+        JsonNode mapping = named(realm.path("clientScopeMappings").path("realm-management"), "client", BACKEND_CLIENT);
+        ((ArrayNode) mapping.path("roles")).add(role);
+
+        assertThatThrownBy(() -> assertBackendServiceAccountHasOnlyTheMinimalRoles(realm))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining(role);
+    }
+
+    @Test
+    void backendServiceAccountManagesOnlyTheMembersOfClinicUsers() {
+        assertBackendServiceAccountManagesOnlyClinicUsers(REALM);
+    }
+
+    @Test
+    void detectsAClientPolicyInsteadOfAUserPolicy() {
+        ObjectNode realm = (ObjectNode) REALM.deepCopy();
+        ObjectNode policy = (ObjectNode) named(adminPolicies(realm), "type", "user");
+        policy.put("type", "client");
+        ObjectNode config = (ObjectNode) policy.path("config");
+        config.remove("users");
+        config.put("clients", "[\"" + BACKEND_CLIENT + "\"]");
+
+        assertThatThrownBy(() -> assertBackendServiceAccountManagesOnlyClinicUsers(realm))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("policy types");
+    }
+
+    @Test
+    void detectsMoreScopesOnClinicUsers() {
+        ObjectNode realm = (ObjectNode) REALM.deepCopy();
+        ObjectNode config =
+                (ObjectNode) named(adminPolicies(realm), "type", "scope").path("config");
+        config.put("scopes", "[\"view\",\"view-members\",\"manage-members\",\"manage-membership\",\"manage\"]");
+
+        assertThatThrownBy(() -> assertBackendServiceAccountManagesOnlyClinicUsers(realm))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("scopes on " + CLINIC_USERS);
+    }
+
+    @Test
+    void detectsAPermissionOnUsers() {
+        ObjectNode realm = (ObjectNode) REALM.deepCopy();
+        ObjectNode permission = adminPolicies(realm).addObject();
+        permission.put("name", "backend-manages-users");
+        permission.put("type", "scope");
+        permission.putObject("config").put("defaultResourceType", "Users").put("scopes", "[\"manage\"]");
+
+        assertThatThrownBy(() -> assertBackendServiceAccountManagesOnlyClinicUsers(realm))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("permission resource types");
+    }
+
+    @Test
+    void localClinicUsersAreInClinicUsersAndThePlatformAdminIsNot() {
+        assertThat(strings(USERS.path("users"), "username")).contains("plataforma@dentasoft.test");
+        assertThat(misgroupedUsers(USERS)).isEmpty();
+    }
+
+    @Test
+    void detectsMisgroupedLocalUsers() {
+        ObjectNode users = (ObjectNode) USERS.deepCopy();
+        ((ObjectNode) users.path("users").get(0)).putArray("groups").add(CLINIC_USERS);
+        ((ObjectNode) users.path("users").get(1)).remove("groups");
+
+        assertThat(misgroupedUsers(users))
+                .containsExactlyInAnyOrder("plataforma@dentasoft.test", "admin@clinica-norte.test");
     }
 
     @Test
@@ -268,6 +405,163 @@ class KeycloakRealmFileTests {
                 .allSatisfy(email -> assertThat(email).endsWith(".test"));
         assertThat(list(keycloakService("compose.local.yml"), "volumes")).contains(USERS_MOUNT);
         assertThat(readString(INFRA.resolve("compose.yml"))).doesNotContain("keycloak/local");
+    }
+
+    /** Confidential, client credentials only, no browser or redirect, and only the token scopes it needs. */
+    private static void assertBackendClientHasOnlyAServiceAccount(JsonNode realm) {
+        JsonNode backend = client(realm, BACKEND_CLIENT);
+
+        assertThat(backend.path("publicClient").asBoolean(true))
+                .as("publicClient")
+                .isFalse();
+        assertThat(backend.path("serviceAccountsEnabled").asBoolean())
+                .as("serviceAccountsEnabled")
+                .isTrue();
+        for (String flag : List.of(
+                "standardFlowEnabled", "implicitFlowEnabled", "directAccessGrantsEnabled", "fullScopeAllowed")) {
+            assertThat(backend.path(flag).asBoolean(true)).as(flag).isFalse();
+        }
+        for (String grant : List.of("oauth2.device.authorization.grant.enabled", "oidc.ciba.grant.enabled")) {
+            assertThat(backend.path("attributes").path(grant).asString())
+                    .as(grant)
+                    .isEqualTo("false");
+        }
+        for (String field : List.of("redirectUris", "webOrigins")) {
+            assertThat(strings(backend.path(field))).as(field).isEmpty();
+        }
+        for (String field : List.of("rootUrl", "baseUrl", "adminUrl")) {
+            assertThat(backend.has(field)).as(field).isFalse();
+        }
+        assertThat(backend.path("secret").asString()).as("secret").isEqualTo("${DENTASOFT_KC_BACKEND_CLIENT_SECRET}");
+        // kc-admin-api adds the Admin API audience (without it the Admin API answers 401); roles adds resource_access.
+        assertThat(strings(backend.path("defaultClientScopes")))
+                .as("defaultClientScopes")
+                .containsExactlyInAnyOrder("basic", "roles", "kc-admin-api");
+        assertThat(strings(backend.path("optionalClientScopes")))
+                .as("optionalClientScopes")
+                .isEmpty();
+    }
+
+    /**
+     * The service account has exactly {@link #SERVICE_ACCOUNT_ROLES}, and so do the client scope mappings: with
+     * {@code fullScopeAllowed: false}, a role without its scope mapping never reaches the token.
+     */
+    private static void assertBackendServiceAccountHasOnlyTheMinimalRoles(JsonNode realm) {
+        assertThat(strings(realm.path("users"), "username")).as("realm users").containsExactly(SERVICE_ACCOUNT);
+        JsonNode account = named(realm.path("users"), "username", SERVICE_ACCOUNT);
+
+        assertThat(account.path("serviceAccountClientId").asString()).isEqualTo(BACKEND_CLIENT);
+        assertThat(strings(account.path("realmRoles")))
+                .as("service account realm roles")
+                .isEmpty();
+        assertThat(strings(account.path("groups"))).as("service account groups").isEmpty();
+        assertThat(keys(account.path("clientRoles")))
+                .as("service account clients")
+                .containsExactly("realm-management");
+        assertThat(strings(account.path("clientRoles").path("realm-management")))
+                .as("service account realm-management roles")
+                .containsExactlyInAnyOrderElementsOf(SERVICE_ACCOUNT_ROLES);
+
+        JsonNode mappings = realm.path("clientScopeMappings");
+        assertThat(keys(mappings)).as("clientScopeMappings").containsExactly("realm-management");
+        assertThat(strings(mappings.path("realm-management"), "client"))
+                .as("realm-management scope mappings")
+                .containsExactly(BACKEND_CLIENT);
+        JsonNode mapping = named(mappings.path("realm-management"), "client", BACKEND_CLIENT);
+        assertThat(strings(mapping.path("roles")))
+                .as("realm-management scope mappings of %s", BACKEND_CLIENT)
+                .containsExactlyInAnyOrderElementsOf(SERVICE_ACCOUNT_ROLES);
+        assertThat(strings(realm.path("scopeMappings"), "client"))
+                .as("realm role scope mappings")
+                .doesNotContain(BACKEND_CLIENT);
+    }
+
+    /**
+     * Fine-grained admin permissions (FGAP v2): one user policy for the service account and one permission on the
+     * members of {@link #CLINIC_USERS}, so it can never see or change a platform administrator. A client policy does
+     * not work (user search returns nothing), and the permission names the group by its id, which is why the id is
+     * fixed in the file.
+     */
+    private static void assertBackendServiceAccountManagesOnlyClinicUsers(JsonNode realm) {
+        assertThat(realm.path("adminPermissionsEnabled").asBoolean())
+                .as("adminPermissionsEnabled")
+                .isTrue();
+        assertThat(strings(realm.path("groups"), "path")).as("groups").containsExactly(CLINIC_USERS);
+        JsonNode group = named(realm.path("groups"), "path", CLINIC_USERS);
+        String groupId = group.path("id").asString();
+        assertThat(groupId).as("%s id", CLINIC_USERS).matches(UUID_PATTERN);
+        // Adding a user to the group must never grant a role.
+        for (String field : List.of("realmRoles", "clientRoles", "subGroups")) {
+            assertThat(group.path(field).isEmpty())
+                    .as("%s %s", CLINIC_USERS, field)
+                    .isTrue();
+        }
+
+        JsonNode authorization = client(realm, "admin-permissions").path("authorizationSettings");
+        assertThat(strings(authorization.path("resources"), "name"))
+                .as("resources")
+                .contains(groupId);
+        JsonNode policies = authorization.path("policies");
+        assertThat(StreamSupport.stream(policies.values().spliterator(), false)
+                        .map(p -> p.path("config").path("defaultResourceType").asString(""))
+                        .toList())
+                .as("permission resource types")
+                .doesNotContain("Users", "Roles", "Clients");
+        assertThat(strings(policies, "type")).as("policy types").containsExactlyInAnyOrder("user", "scope");
+
+        JsonNode policy = named(policies, "type", "user");
+        assertThat(jsonStrings(policy.path("config").path("users")))
+                .as("users of the policy")
+                .containsExactly(SERVICE_ACCOUNT);
+
+        JsonNode permission = named(policies, "type", "scope").path("config");
+        assertThat(permission.path("defaultResourceType").asString())
+                .as("resource type")
+                .isEqualTo("Groups");
+        assertThat(jsonStrings(permission.path("resources"))).as("resources").containsExactly(groupId);
+        assertThat(jsonStrings(permission.path("scopes")))
+                .as("scopes on %s", CLINIC_USERS)
+                .containsExactlyInAnyOrderElementsOf(CLINIC_USERS_SCOPES);
+        assertThat(jsonStrings(permission.path("applyPolicies")))
+                .as("policies of the permission")
+                .containsExactly(policy.path("name").asString());
+    }
+
+    private static ArrayNode adminPolicies(JsonNode realm) {
+        return (ArrayNode)
+                client(realm, "admin-permissions").path("authorizationSettings").path("policies");
+    }
+
+    /** Local users in the wrong place: a platform administrator in clinic-users, or a clinic user out of it. */
+    private static List<String> misgroupedUsers(JsonNode users) {
+        List<String> found = new ArrayList<>();
+        for (JsonNode user : users.path("users").values()) {
+            boolean platformAdmin = strings(user.path("realmRoles")).contains("PLATFORM_ADMIN");
+            boolean clinicUser = strings(user.path("groups")).contains(CLINIC_USERS);
+            if (platformAdmin == clinicUser) {
+                found.add(user.path("username").asString());
+            }
+        }
+        return found;
+    }
+
+    /** The clients that receive a client role through {@code clientScopeMappings}. */
+    private static List<String> clientScopeMappingClients(JsonNode realm) {
+        List<String> clients = new ArrayList<>();
+        for (Map.Entry<String, JsonNode> roles :
+                realm.path("clientScopeMappings").properties()) {
+            clients.addAll(strings(roles.getValue(), "client"));
+        }
+        return clients;
+    }
+
+    private static List<String> keys(JsonNode object) {
+        return object.properties().stream().map(Map.Entry::getKey).toList();
+    }
+
+    /** A list that Keycloak keeps as a JSON array inside a string, such as the {@code config} of a policy. */
+    private static List<String> jsonStrings(JsonNode value) {
+        return strings(JSON.readTree(value.asString("[]")));
     }
 
     /** The {@code keycloak} service of a Compose file of {@code infra/}. */
