@@ -25,7 +25,7 @@
 
 - **`dentasoft_owner`** es dueño del esquema y ejecuta las migraciones (`SPRING_FLYWAY_USER`, `SPRING_FLYWAY_PASSWORD`).
 - **`dentasoft_app`** es el rol con el que se conecta la aplicación (`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`). Es `NOBYPASSRLS`, no es dueño de nada y no puede crear objetos.
-- **`dentasoft_platform`** es el rol del módulo `platform`, la administración de clínicas de `PLATFORM_ADMIN` (`DENTASOFT_PLATFORM_DATASOURCE_USERNAME`, `DENTASOFT_PLATFORM_DATASOURCE_PASSWORD`; ADR 0011). Es `NOBYPASSRLS`, ningún rol es miembro suyo y solo tiene, en `V002`, `SELECT`, el alta y el cambio de estado en `clinic` y el alta de `clinic_settings`, con políticas `TO dentasoft_platform`. Lo crea el superusuario fuera de Flyway ([`docs/operaciones/rol-de-plataforma.md`](../operaciones/rol-de-plataforma.md)). Ninguna tabla nueva le da permisos: si un módulo los necesita, se conceden en su migración y se añaden a `PlatformRoleTests`.
+- **`dentasoft_platform`** es el rol del módulo `platform`, la administración de clínicas de `PLATFORM_ADMIN` (`DENTASOFT_PLATFORM_DATASOURCE_USERNAME`, `DENTASOFT_PLATFORM_DATASOURCE_PASSWORD`; ADR 0011). Es `NOBYPASSRLS`, ningún rol es miembro suyo y solo tiene, en `V002`, `SELECT`, el alta y el cambio de estado en `clinic` y el alta de `clinic_settings`, con políticas `TO dentasoft_platform`; en `V006`, el `UPDATE` de `legal_name` y `tax_id`, para corregir los datos fiscales (M01-T11). Lo crea el superusuario fuera de Flyway ([`docs/operaciones/rol-de-plataforma.md`](../operaciones/rol-de-plataforma.md)). Ninguna tabla nueva le da permisos: si un módulo los necesita, se conceden en su migración y se añaden a `PlatformRoleTests`.
 - **Permisos por defecto** (`V001`): toda tabla nueva de `dentasoft_owner` en `public` da a `dentasoft_app` `SELECT`, `INSERT` y `UPDATE`. Nunca `DELETE` ni `TRUNCATE`, porque lo clínico se borra de forma lógica. La única tabla con `DELETE` es `clinic_hours_of_operation` (`V003`): el horario se sustituye entero y no es un dato clínico.
 - **`clinic` para la aplicación** (`V003`): solo `SELECT` y `UPDATE` de `name`, `timezone`, `updated_at`, `updated_by` y `version`. Ni `INSERT` ni el resto de columnas: la clínica no puede reactivarse, cambiar su `keycloak_org_id` ni sus datos fiscales, ni crear clínicas. `dentasoft_app` no tiene acceso a `flyway_schema_history`.
 - **Política `tenant_isolation`**: compara la columna de clínica con `NULLIF(current_setting('app.tenant_id', true), '')::uuid`, en `USING` y en `WITH CHECK`. Falla cerrado: sin clínica activa, o con el valor vacío tras limpiarlo, las lecturas, los `UPDATE` y los `DELETE` no ven ninguna fila, sin error; un `INSERT` (o un `UPDATE` que mueva una fila a otra clínica) incumple el `WITH CHECK` y falla con `42501`. Un valor que no es UUID da error `22P02` en cualquier consulta.
@@ -292,9 +292,9 @@ Para que una tarea programada se ejecute una sola vez con varias réplicas, se a
 
 ### M01-T11 · Corrección de los datos fiscales por la plataforma
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T05
 - **Descripción**: la clínica no puede cambiar su `legal_name` ni su `tax_id` (M01-T06). Si hay que corregirlos, lo hace `PLATFORM_ADMIN` desde la administración de clínicas, con su propio permiso por columna para `dentasoft_platform` en una migración nueva.
 - **Criterios de aceptación**:
-  - [ ] Solo `PLATFORM_ADMIN` puede cambiar `legal_name` y `tax_id`, y `PlatformRoleTests` comprueba el nuevo permiso
-  - [ ] `dentasoft_app` sigue sin poder cambiarlos (test de permisos)
+  - [x] Solo `PLATFORM_ADMIN` puede cambiar `legal_name` y `tax_id`, y `PlatformRoleTests` comprueba el nuevo permiso
+  - [x] `dentasoft_app` sigue sin poder cambiarlos (test de permisos)

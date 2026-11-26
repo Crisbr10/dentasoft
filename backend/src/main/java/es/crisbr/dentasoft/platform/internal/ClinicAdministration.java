@@ -23,7 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Clinic administration for {@code PLATFORM_ADMIN}: create, list, suspend and reactivate clinics (M01-T05). Every
+ * Clinic administration for {@code PLATFORM_ADMIN}: create, list, suspend and reactivate clinics (M01-T05), and
+ * correct their fiscal data (M01-T11). Every
  * method runs in the platform unit, as {@code dentasoft_platform} (ADR 0011), and without an active clinic.
  *
  * <p>Every change is recorded in {@code audit_log} under the affected clinic, in the same transaction (ADR 0012): if the
@@ -78,6 +79,39 @@ public class ClinicAdministration {
         return changeStatus(clinicId, ClinicStatus.SUSPENDED, ClinicStatus.ACTIVE, AuditSubtype.CLINIC_REACTIVATED);
     }
 
+    /**
+     * Corrects the clinic's legal name and tax identifier, which the clinic itself cannot change. The values are not
+     * recorded in the audit log: only that they were corrected. Sending the values the clinic already has changes
+     * nothing and records nothing, whatever the version, so retrying a correction already made is safe.
+     *
+     * @throws ClinicVersionConflictException if the values differ from the clinic's and the clinic changed since the
+     *     client read {@code correction.version()}
+     */
+    @Transactional(PlatformPersistenceConfiguration.TRANSACTION_MANAGER)
+    public ClinicDetails correctFiscalData(UUID clinicId, FiscalDataCorrection correction) {
+        requireNoActiveClinic();
+        PlatformClinic clinic = clinics.find(clinicId).orElseThrow(ClinicNotFoundException::new);
+        // Checked before the version, so a client that retries a correction already made is not told it conflicts.
+        if (clinic.hasFiscalData(correction.legalName(), correction.taxId())) {
+            return ClinicDetails.of(clinic);
+        }
+        // @Version only compares the version loaded in this transaction: the one the client read is compared here.
+        Long current = clinic.getVersion();
+        if (current == null || current != correction.version()) {
+            throw new ClinicVersionConflictException();
+        }
+        clinic.correctFiscalData(correction.legalName(), correction.taxId());
+        clinics.add(PlatformAuditRecord.ofClinic(
+                clinicId, AuditAction.UPDATE, AuditDetails.of(AuditSubtype.CLINIC_FISCAL_DATA_CORRECTED)));
+        try {
+            clinics.flush();
+        } catch (OptimisticLockingFailureException concurrentChange) {
+            // Another request changed the clinic between the read and this write.
+            throw new ClinicVersionConflictException();
+        }
+        return ClinicDetails.of(clinic);
+    }
+
     private ClinicDetails changeStatus(UUID clinicId, ClinicStatus from, ClinicStatus to, AuditSubtype subtype) {
         requireNoActiveClinic();
         PlatformClinic clinic = clinics.find(clinicId).orElseThrow(ClinicNotFoundException::new);
@@ -117,7 +151,10 @@ public class ClinicAdministration {
             @Nullable String timezone,
             @Nullable String locale) {}
 
-    /** A clinic as the platform API returns it. */
+    /** A correction of the clinic's fiscal data, made on {@code version}; already validated by the web layer. */
+    public record FiscalDataCorrection(String legalName, String taxId, long version) {}
+
+    /** A clinic as the platform API returns it; {@code version} is what a correction sends back. */
     public record ClinicDetails(
             UUID id,
             String name,
@@ -127,7 +164,8 @@ public class ClinicAdministration {
             String locale,
             ClinicStatus status,
             Instant createdAt,
-            Instant updatedAt) {
+            Instant updatedAt,
+            long version) {
 
         static ClinicDetails of(PlatformClinic clinic) {
             return new ClinicDetails(
@@ -139,7 +177,8 @@ public class ClinicAdministration {
                     clinic.getLocale(),
                     clinic.getStatus(),
                     clinic.getCreatedAt(),
-                    clinic.getUpdatedAt());
+                    clinic.getUpdatedAt(),
+                    clinic.getVersion());
         }
     }
 }

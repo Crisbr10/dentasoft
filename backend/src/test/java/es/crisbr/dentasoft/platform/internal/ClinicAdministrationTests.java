@@ -2,13 +2,16 @@ package es.crisbr.dentasoft.platform.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.within;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.audit.AuditLogDatabase;
 import es.crisbr.dentasoft.audit.AuditLogDatabase.StoredEntry;
 import es.crisbr.dentasoft.platform.ClinicCreated;
 import es.crisbr.dentasoft.platform.PlatformTestDatabase;
+import es.crisbr.dentasoft.platform.PlatformTestDatabase.FiscalData;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.ClinicDetails;
+import es.crisbr.dentasoft.platform.internal.ClinicAdministration.FiscalDataCorrection;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.NewClinic;
 import es.crisbr.dentasoft.platform.persistence.ClinicStatus;
 import es.crisbr.dentasoft.shared.PageLimits;
@@ -20,6 +23,7 @@ import es.crisbr.dentasoft.tenancy.persistence.ClinicSettingsRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.sql.SQLException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -85,7 +89,7 @@ class ClinicAdministrationTests {
         assertThat(clinic.id().version()).isEqualTo(7);
         assertThat(clinic.name()).isEqualTo(PREFIX + "Norte");
         assertThat(clinic.legalName()).isEqualTo(PREFIX + "Norte S.L.");
-        assertThat(clinic.taxId()).isEqualTo("B12345678");
+        assertThat(clinic.taxId()).isEqualTo("B12345674");
         assertThat(clinic.timezone()).isEqualTo("Europe/Madrid");
         assertThat(clinic.locale()).isEqualTo("es-ES");
         assertThat(clinic.status()).isEqualTo(ClinicStatus.ACTIVE);
@@ -258,6 +262,113 @@ class ClinicAdministrationTests {
 
         assertThatThrownBy(() -> administration.suspend(unknown)).isInstanceOf(ClinicNotFoundException.class);
         assertThatThrownBy(() -> administration.reactivate(unknown)).isInstanceOf(ClinicNotFoundException.class);
+        assertThatThrownBy(() -> administration.correctFiscalData(
+                        unknown, new FiscalDataCorrection("Desconocida S.L.", "B12345674", 0)))
+                .isInstanceOf(ClinicNotFoundException.class);
+    }
+
+    @Test
+    void correctsTheFiscalDataAndNothingElse() throws SQLException {
+        ClinicDetails clinic = create("Fiscal", "Atlantic/Canary", "ca-ES");
+
+        ClinicDetails corrected = administration.correctFiscalData(
+                clinic.id(), new FiscalDataCorrection("Fiscal Corregida S.L.", "B00000000", clinic.version()));
+
+        assertThat(corrected.legalName()).isEqualTo("Fiscal Corregida S.L.");
+        assertThat(corrected.taxId()).isEqualTo("B00000000");
+        assertThat(corrected.version()).isEqualTo(clinic.version() + 1);
+        assertThat(corrected.updatedAt()).isAfterOrEqualTo(clinic.updatedAt());
+        assertThat(corrected)
+                .usingRecursiveComparison()
+                .comparingOnlyFields("id", "name", "timezone", "locale", "status")
+                .isEqualTo(clinic);
+        // Read back from PostgreSQL, which keeps microseconds and rounds the nanoseconds of the creation.
+        assertThat(corrected.createdAt()).isCloseTo(clinic.createdAt(), within(1, ChronoUnit.MICROS));
+        assertThat(PlatformTestDatabase.fiscalData(clinic.id()))
+                .contains(new FiscalData("Fiscal Corregida S.L.", "B00000000"));
+        assertThat(PlatformTestDatabase.status(clinic.id())).contains("ACTIVE");
+    }
+
+    /** Audited as the platform, with what happened and not with the values: they are free text. */
+    @Test
+    void recordsTheCorrectionWithoutTheValues() throws SQLException {
+        ClinicDetails clinic = create("Auditada", null, null);
+
+        administration.correctFiscalData(
+                clinic.id(), new FiscalDataCorrection("Auditada Nueva S.L.", "Q1234567D", clinic.version()));
+
+        List<StoredEntry> entries = AuditLogDatabase.entries(clinic.id(), clinic.id());
+        assertThat(entries).extracting(StoredEntry::action).containsExactly("CREATE", "UPDATE");
+        StoredEntry correction = entries.getLast();
+        assertThat(correction.details()).isEqualTo("{\"subtype\": \"CLINIC_FISCAL_DATA_CORRECTED\"}");
+        assertThat(correction.tenantId()).isEqualTo(clinic.id());
+        assertThat(correction.actorType()).isEqualTo("PLATFORM");
+        assertThat(correction.entityType()).isEqualTo("CLINIC");
+        assertThat(correction.outcome()).isEqualTo("SUCCESS");
+        assertThat(correction.toString()).doesNotContain("Auditada", "Q1234567D", "B12345674");
+    }
+
+    @Test
+    void refusesAVersionThatIsNoLongerTheCurrentOne() throws SQLException {
+        ClinicDetails clinic = create("Concurrente", null, null);
+        administration.correctFiscalData(
+                clinic.id(), new FiscalDataCorrection("Primera S.L.", "B00000000", clinic.version()));
+
+        // The version read before the first correction, and one that never existed.
+        assertThatThrownBy(() -> administration.correctFiscalData(
+                        clinic.id(), new FiscalDataCorrection("Segunda S.L.", "B87654323", clinic.version())))
+                .isInstanceOf(ClinicVersionConflictException.class);
+        assertThatThrownBy(() -> administration.correctFiscalData(
+                        clinic.id(), new FiscalDataCorrection("Futura S.L.", "B87654323", clinic.version() + 2)))
+                .isInstanceOf(ClinicVersionConflictException.class);
+
+        assertThat(PlatformTestDatabase.fiscalData(clinic.id())).contains(new FiscalData("Primera S.L.", "B00000000"));
+        assertThat(AuditLogDatabase.actions(clinic.id(), clinic.id())).containsExactly("CREATE", "UPDATE");
+    }
+
+    /**
+     * A client that retries a correction that was already made, with the version it read before it, is not told that
+     * someone else changed the clinic: nothing changes and nothing more is recorded.
+     */
+    @Test
+    void retryingACorrectionAlreadyMadeIsNotAConflict() throws SQLException {
+        ClinicDetails clinic = create("Reintento", null, null);
+        FiscalDataCorrection correction = new FiscalDataCorrection("Reintento S.L.", "B00000000", clinic.version());
+        ClinicDetails corrected = administration.correctFiscalData(clinic.id(), correction);
+
+        ClinicDetails retried = administration.correctFiscalData(clinic.id(), correction);
+
+        assertThat(retried.version()).isEqualTo(corrected.version());
+        assertThat(PlatformTestDatabase.fiscalData(clinic.id()))
+                .contains(new FiscalData("Reintento S.L.", "B00000000"));
+        assertThat(AuditLogDatabase.actions(clinic.id(), clinic.id())).containsExactly("CREATE", "UPDATE");
+    }
+
+    /** Sending the values the clinic already has changes nothing and records nothing. */
+    @Test
+    void theSameFiscalDataIsNotAChange() throws SQLException {
+        ClinicDetails clinic = create("Igual", null, null);
+
+        ClinicDetails same = administration.correctFiscalData(
+                clinic.id(), new FiscalDataCorrection(clinic.legalName(), clinic.taxId(), clinic.version()));
+
+        // An unchanged version means no UPDATE was sent.
+        assertThat(same.version()).isEqualTo(clinic.version());
+        assertThat(AuditLogDatabase.actions(clinic.id(), clinic.id())).containsExactly("CREATE");
+    }
+
+    /** Correcting is not reactivating: a suspended clinic keeps its status, and its fiscal data can still be fixed. */
+    @Test
+    void correctsTheFiscalDataOfASuspendedClinic() throws SQLException {
+        ClinicDetails clinic = create("Suspendida", null, null);
+        ClinicDetails suspended = administration.suspend(clinic.id());
+
+        ClinicDetails corrected = administration.correctFiscalData(
+                clinic.id(), new FiscalDataCorrection("Suspendida S.A.", "A58818501", suspended.version()));
+
+        assertThat(corrected.status()).isEqualTo(ClinicStatus.SUSPENDED);
+        assertThat(PlatformTestDatabase.fiscalData(clinic.id()))
+                .contains(new FiscalData("Suspendida S.A.", "A58818501"));
     }
 
     @Test
@@ -270,7 +381,10 @@ class ClinicAdministrationTests {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("active clinic");
             assertThatThrownBy(() -> administration.suspend(clinic.id())).isInstanceOf(IllegalStateException.class);
-            assertThatThrownBy(() -> administration.create(new NewClinic("x", "x", "B1", null, null)))
+            assertThatThrownBy(() -> administration.create(new NewClinic("x", "x", "B12345674", null, null)))
+                    .isInstanceOf(IllegalStateException.class);
+            assertThatThrownBy(() -> administration.correctFiscalData(
+                            clinic.id(), new FiscalDataCorrection("x", "B00000000", clinic.version())))
                     .isInstanceOf(IllegalStateException.class);
         });
 
@@ -279,7 +393,7 @@ class ClinicAdministrationTests {
 
     private ClinicDetails create(String name, @Nullable String timezone, @Nullable String locale) {
         ClinicDetails clinic = administration.create(
-                new NewClinic(PREFIX + name, PREFIX + name + " S.L.", "B12345678", timezone, locale));
+                new NewClinic(PREFIX + name, PREFIX + name + " S.L.", "B12345674", timezone, locale));
         created.add(clinic.id());
         return clinic;
     }

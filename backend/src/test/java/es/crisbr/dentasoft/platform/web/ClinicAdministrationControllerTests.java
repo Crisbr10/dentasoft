@@ -45,7 +45,7 @@ class ClinicAdministrationControllerTests {
     @Test
     void createsAClinicAndReturnsItsLocation() throws Exception {
         MvcTestResult result =
-                create("{\"name\":\" Clínica Web \",\"legalName\":\"Clínica Web S.L.\",\"taxId\":\"B12345678\"}");
+                create("{\"name\":\" Clínica Web \",\"legalName\":\"Clínica Web S.L.\",\"taxId\":\"B12345674\"}");
 
         assertThat(result).hasStatus(HttpStatus.CREATED);
         String body = result.getResponse().getContentAsString();
@@ -76,7 +76,7 @@ class ClinicAdministrationControllerTests {
     void rejectsControlCharactersInTheNames() {
         MvcTestResult result =
                 // JSON escapes: the request carries the characters themselves once parsed.
-                create("{\"name\":\"Clínica\\u0000\",\"legalName\":\"Clínica\\nS.L.\",\"taxId\":\"B1\"}");
+                create("{\"name\":\"Clínica\\u0000\",\"legalName\":\"Clínica\\nS.L.\",\"taxId\":\"B00000000\"}");
 
         assertThat(result)
                 .hasStatus(HttpStatus.BAD_REQUEST)
@@ -88,7 +88,7 @@ class ClinicAdministrationControllerTests {
 
     @Test
     void listsClinicsAsAPage() throws Exception {
-        created.add(idOf(create("{\"name\":\"Clínica Lista\",\"legalName\":\"Lista S.L.\",\"taxId\":\"B1\"}")));
+        created.add(idOf(create("{\"name\":\"Clínica Lista\",\"legalName\":\"Lista S.L.\",\"taxId\":\"B00000000\"}")));
 
         MvcTestResult result =
                 mvc.get().uri(CLINICS + "?size=5&sort=createdAt,desc").exchange();
@@ -123,7 +123,7 @@ class ClinicAdministrationControllerTests {
 
     @Test
     void suspendsAndReactivatesAndReportsConflicts() throws Exception {
-        UUID id = idOf(create("{\"name\":\"Clínica Estado\",\"legalName\":\"Estado S.L.\",\"taxId\":\"B2\"}"));
+        UUID id = idOf(create("{\"name\":\"Clínica Estado\",\"legalName\":\"Estado S.L.\",\"taxId\":\"B87654323\"}"));
         created.add(id);
 
         assertThat(mvc.post().uri(CLINICS + "/" + id + "/suspension"))
@@ -160,6 +160,99 @@ class ClinicAdministrationControllerTests {
     }
 
     @Test
+    void createsAClinicWithItsTaxIdNormalized() throws Exception {
+        MvcTestResult result = create(
+                "{\"name\":\"Clínica Normalizada\",\"legalName\":\"Normalizada S.L.\",\"taxId\":\" b-1234 5674 \"}");
+
+        UUID id = idOf(result);
+        created.add(id);
+        assertThat((String) JsonPath.read(result.getResponse().getContentAsString(), "$.taxId"))
+                .isEqualTo("B12345674");
+        assertThat(PlatformTestDatabase.fiscalData(id))
+                .hasValueSatisfying(data -> assertThat(data.taxId()).isEqualTo("B12345674"));
+    }
+
+    @Test
+    void rejectsATaxIdWithAWrongCheckCharacter() throws SQLException {
+        long before = PlatformTestDatabase.clinicCount();
+
+        assertThat(create("{\"name\":\"Clínica Mal\",\"legalName\":\"Mal S.L.\",\"taxId\":\"B12345678\"}"))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactly("taxId");
+        assertThat(PlatformTestDatabase.clinicCount()).isEqualTo(before);
+    }
+
+    @Test
+    void correctsTheFiscalDataWithTheTaxIdNormalized() throws Exception {
+        MvcTestResult creation =
+                create("{\"name\":\"Clínica Corrección\",\"legalName\":\"Corrección S.L.\",\"taxId\":\"B00000000\"}");
+        UUID id = idOf(creation);
+        created.add(id);
+        int version = JsonPath.read(creation.getResponse().getContentAsString(), "$.version");
+
+        MvcTestResult result = correct(
+                id,
+                "{\"legalName\":\" Corrección Nueva S.L. \",\"taxId\":\"q-1234567-d\",\"version\":" + version + "}");
+
+        assertThat(result).hasStatusOk();
+        String body = result.getResponse().getContentAsString();
+        assertThat((String) JsonPath.read(body, "$.legalName")).isEqualTo("Corrección Nueva S.L.");
+        assertThat((String) JsonPath.read(body, "$.taxId")).isEqualTo("Q1234567D");
+        assertThat((Integer) JsonPath.read(body, "$.version")).isEqualTo(version + 1);
+        assertThat((String) JsonPath.read(body, "$.name")).isEqualTo("Clínica Corrección");
+        assertThat(PlatformTestDatabase.fiscalData(id))
+                .contains(new PlatformTestDatabase.FiscalData("Corrección Nueva S.L.", "Q1234567D"));
+    }
+
+    @Test
+    void rejectsAnInvalidCorrectionNamingEveryField() throws Exception {
+        UUID id =
+                idOf(create("{\"name\":\"Clínica Inválida\",\"legalName\":\"Inválida S.L.\",\"taxId\":\"B00000000\"}"));
+        created.add(id);
+
+        assertThat(correct(id, "{\"legalName\":\"Inválida\\nS.L.\",\"taxId\":\"B12345678\"}"))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .containsExactlyInAnyOrder("legalName", "taxId", "version");
+        assertThat(correct(id, "{\"legalName\":\" \",\"taxId\":\"\",\"version\":0}"))
+                .hasStatus(HttpStatus.BAD_REQUEST)
+                .bodyJson()
+                .extractingPath("$.errors[*].field")
+                .asArray()
+                .contains("legalName", "taxId");
+        assertThat(PlatformTestDatabase.fiscalData(id))
+                .contains(new PlatformTestDatabase.FiscalData("Inválida S.L.", "B00000000"));
+    }
+
+    @Test
+    void reportsAStaleVersionAsAConflict() throws Exception {
+        UUID id = idOf(create("{\"name\":\"Clínica Antigua\",\"legalName\":\"Antigua S.L.\",\"taxId\":\"B00000000\"}"));
+        created.add(id);
+
+        assertThat(correct(id, "{\"legalName\":\"Antigua S.A.\",\"taxId\":\"A58818501\",\"version\":99}"))
+                .hasStatus(HttpStatus.CONFLICT)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .bodyJson()
+                .extractingPath("$.title")
+                .isEqualTo("Datos modificados por otra persona");
+    }
+
+    @Test
+    void correctingAnUnknownClinicIsNotFound() {
+        assertThat(correct(UUID.randomUUID(), "{\"legalName\":\"Nadie S.L.\",\"taxId\":\"B00000000\",\"version\":0}"))
+                .hasStatus(HttpStatus.NOT_FOUND)
+                .bodyJson()
+                .extractingPath("$.title")
+                .isEqualTo("Clínica no encontrada");
+    }
+
+    @Test
     @WithMockUser(roles = "ADMIN_CLINICA")
     void anotherRoleIsForbiddenByTheService() {
         assertThat(mvc.get().uri(CLINICS))
@@ -170,6 +263,14 @@ class ClinicAdministrationControllerTests {
     private MvcTestResult create(String json) {
         return mvc.post()
                 .uri(CLINICS)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json)
+                .exchange();
+    }
+
+    private MvcTestResult correct(UUID clinic, String json) {
+        return mvc.put()
+                .uri(CLINICS + "/" + clinic + "/fiscal-data")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json)
                 .exchange();

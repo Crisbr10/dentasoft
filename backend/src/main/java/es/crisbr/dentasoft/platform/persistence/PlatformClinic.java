@@ -13,9 +13,9 @@ import org.jspecify.annotations.Nullable;
  * A clinic as the platform administration sees it, through {@code dentasoft_platform} (ADR 0011). Not a {@code
  * TenantScopedEntity}: the platform unit works across clinics, and the clinic is the tenant itself.
  *
- * <p>The platform only creates clinics and changes their status. Every other column is not updatable, and
- * {@code @DynamicUpdate} keeps them out of the UPDATE, which only has privileges on {@code status} and the audit and
- * version columns (V002).
+ * <p>The platform creates clinics, changes their status and corrects their fiscal data ({@code legal_name} and
+ * {@code tax_id}, M01-T11). Every other column is not updatable, and {@code @DynamicUpdate} keeps them out of the
+ * UPDATE, which only has privileges on those columns and the audit and version columns (V002, V006).
  */
 @Entity(name = "PlatformClinic")
 @Table(name = "clinic")
@@ -28,10 +28,10 @@ public class PlatformClinic extends BaseEntity {
     @Column(name = "name", nullable = false, updatable = false, length = 200)
     private String name;
 
-    @Column(name = "legal_name", nullable = false, updatable = false, length = 200)
+    @Column(name = "legal_name", nullable = false, length = 200)
     private String legalName;
 
-    @Column(name = "tax_id", nullable = false, updatable = false, length = 20)
+    @Column(name = "tax_id", nullable = false, length = 20)
     private String taxId;
 
     @Column(name = "timezone", nullable = false, updatable = false, length = 64)
@@ -71,6 +71,17 @@ public class PlatformClinic extends BaseEntity {
 
     public String getTaxId() {
         return taxId;
+    }
+
+    /** Whether the clinic already has this legal name and tax identifier. */
+    public boolean hasFiscalData(String legalName, String taxId) {
+        return this.legalName.equals(legalName) && this.taxId.equals(taxId);
+    }
+
+    /** Corrects the legal name and the tax identifier, already validated and normalized by the web layer. */
+    public void correctFiscalData(String legalName, String taxId) {
+        this.legalName = legalName;
+        this.taxId = taxId;
     }
 
     public String getTimezone() {

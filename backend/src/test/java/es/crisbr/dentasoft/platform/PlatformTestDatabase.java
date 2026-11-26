@@ -1,6 +1,7 @@
 package es.crisbr.dentasoft.platform;
 
 import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsOwner;
+import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsPlatform;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -30,6 +31,35 @@ public final class PlatformTestDatabase {
             }
         }
     }
+
+    /** How many clinics exist, in every clinic. */
+    public static long clinicCount() throws SQLException {
+        try (Connection connection = connectAsPlatform();
+                PreparedStatement statement = connection.prepareStatement("SELECT count(*) FROM clinic");
+                ResultSet result = statement.executeQuery()) {
+            result.next();
+            return result.getLong(1);
+        }
+    }
+
+    /** The clinic's {@code legal_name} and {@code tax_id}, if the clinic exists. */
+    public static Optional<FiscalData> fiscalData(UUID clinic) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSessionClinic(connection, clinic);
+            try (PreparedStatement statement =
+                    connection.prepareStatement("SELECT legal_name, tax_id FROM clinic WHERE id = ?")) {
+                statement.setObject(1, clinic);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next()
+                            ? Optional.of(new FiscalData(result.getString(1), result.getString(2)))
+                            : Optional.empty();
+                }
+            }
+        }
+    }
+
+    /** What {@link #fiscalData(UUID)} reads. */
+    public record FiscalData(String legalName, String taxId) {}
 
     /** The default appointment length in the clinic's settings, if the clinic has settings. */
     public static Optional<Integer> defaultAppointmentMinutes(UUID clinic) throws SQLException {

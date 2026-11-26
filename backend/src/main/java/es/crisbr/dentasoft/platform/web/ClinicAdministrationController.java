@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -55,5 +56,11 @@ class ClinicAdministrationController {
     @PostMapping("/{id}/reactivation")
     ClinicDetails reactivate(@PathVariable UUID id) {
         return administration.reactivate(id);
+    }
+
+    /** The clinic's legal name and tax identifier, which only the platform corrects (M01-T11). */
+    @PutMapping("/{id}/fiscal-data")
+    ClinicDetails correctFiscalData(@PathVariable UUID id, @Valid @RequestBody CorrectFiscalDataRequest body) {
+        return administration.correctFiscalData(id, body.toCorrection());
     }
 }
