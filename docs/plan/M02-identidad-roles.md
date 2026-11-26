@@ -66,12 +66,12 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T03 · Usuarios y membresías
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T02, M01-T02
 - **Descripción**: `user_account` creado en el primer acceso a partir del token, `clinic_membership` con rol por clínica y endpoint `/api/v1/me` con las clínicas y roles del usuario.
 - **Criterios de aceptación**:
-  - [ ] Un usuario puede pertenecer a varias clínicas con roles distintos
-  - [ ] Un usuario sin membresías activas no puede operar
+  - [x] Un usuario puede pertenecer a varias clínicas con roles distintos
+  - [x] Un usuario sin membresías activas no puede operar: `/me` no le devuelve ninguna clínica y RLS no le deja leer clínicas ni membresías; el 403 al elegir una clínica es de M02-T04
 - **Decisiones** (ADR 0015):
   - `user_account` solo guarda el `sub` como `id`, el estado y las fechas.
   - Cada transacción con usuario fija `app.user_id`. Las políticas `user_isolation`, `own_memberships` y `member_select` solo dejan ver al usuario lo suyo.
