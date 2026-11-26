@@ -56,7 +56,7 @@ abstract class ClinicUsersTestBase {
 
     @AfterEach
     void deleteData() throws SQLException {
-        TenancyTestDatabase.deleteClinicsAnd(List.of("clinic_membership"));
+        TenancyTestDatabase.deleteClinicsAnd(List.of("practitioner_role", "clinic_membership"));
         List<UUID> all = new ArrayList<>(createdUsers);
         keycloak.users().forEach(user -> all.add(user.id()));
         IdentityTestDatabase.deleteUsers(all);

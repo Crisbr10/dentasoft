@@ -23,6 +23,14 @@ public interface ClinicMembershipRepository extends JpaRepository<ClinicMembersh
     Optional<ClinicMembership> findByUserId(UUID userId);
 
     /**
+     * The same membership, locked for sharing ({@code SELECT … FOR SHARE}) until the transaction ends: it cannot be
+     * changed or deactivated meanwhile, as while checking that its user may have a practitioner record (M02-T06).
+     */
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("SELECT m FROM ClinicMembership m WHERE m.userId = :userId")
+    Optional<ClinicMembership> lockSharedByUserId(UUID userId);
+
+    /**
      * The active clinic's active and accepted memberships with {@code role}, locked ({@code SELECT … FOR UPDATE}) until the
      * transaction ends: two changes that each check how many administrators remain run one after the other.
      */
