@@ -170,12 +170,22 @@ class UserRowLevelSecurityTests {
     }
 
     @Test
-    void anInvitedUsersAccountIsOnlyCreatedActiveInsideAClinicAndInTheNameOfTheRequestingUser() throws SQLException {
+    void anInvitedUsersAccountIsOnlyCreatedActiveByAnAdministratorOfTheClinicInTheirName() throws SQLException {
         UUID invited = UUID.fromString("5f0c2b1e-0000-4000-8000-0000000000e6");
+        String updatedByAnother =
+                invite(invited, "ACTIVE", USER_B).replace("now(), '" + USER_B + "')", "now(), '" + USER_A + "')");
 
         assertRejected(USER_B, CLINIC_B, invite(invited, "DISABLED", USER_B));
         assertRejected(USER_B, null, invite(invited, "ACTIVE", USER_B));
         assertRejected(USER_B, CLINIC_B, invite(invited, "ACTIVE", USER_A));
+        assertRejected(USER_B, CLINIC_B, updatedByAnother);
+        // USER_A is a receptionist in clinic B, and USER_C belongs to no clinic: neither is an administrator there.
+        assertRejected(USER_A, CLINIC_B, invite(invited, "ACTIVE", USER_A));
+        assertRejected(USER_C, CLINIC_B, invite(invited, "ACTIVE", USER_C));
+        // An administrator of clinic B acting as clinic A, where they are not one.
+        assertRejected(USER_B, CLINIC_A, invite(invited, "ACTIVE", USER_B));
+        IdentityTestDatabase.setMembershipActive(CLINIC_B, USER_B, false);
+        assertRejected(USER_B, CLINIC_B, invite(invited, "ACTIVE", USER_B));
         assertThat(IdentityTestDatabase.userStatus(invited)).isEmpty();
     }
 

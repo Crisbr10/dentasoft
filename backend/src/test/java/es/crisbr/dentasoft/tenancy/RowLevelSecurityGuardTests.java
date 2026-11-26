@@ -38,6 +38,9 @@ class RowLevelSecurityGuardTests {
     /** {@code app.user_id} as PostgreSQL prints it in a policy expression. */
     private static final String CURRENT_USER = "(NULLIF(current_setting('app.user_id'::text, true), ''::text))::uuid";
 
+    private static final String CURRENT_CLINIC =
+            "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid";
+
     /**
      * Tables whose policy compares a column other than {@code tenant_id}. Every entry needs a reason: {@code clinic} is
      * the tenant itself, so its rows are isolated by {@code id}.
@@ -87,13 +90,15 @@ class RowLevelSecurityGuardTests {
     /**
      * {@code INSERT} policies of the application role allowed next to the isolation policy. Every entry needs a reason:
      * an administrator inviting someone creates that person's account, which {@code user_isolation} would refuse, but
-     * only an active one, inside an active clinic and in the name of the requesting user (V008, ADR 0016).
+     * only an active one, by an active administrator of the active clinic and in their name (V008, ADR 0016).
      */
     private static final Set<ApplicationInsertPolicy> APPLICATION_INSERT_POLICIES = Set.of(new ApplicationInsertPolicy(
             "user_account",
             "invited_insert",
-            "(((status)::text = 'ACTIVE'::text) AND (NULLIF(current_setting('app.tenant_id'::text, true), ''::text)"
-                    + " IS NOT NULL) AND (created_by = " + CURRENT_USER + "))"));
+            "(((status)::text = 'ACTIVE'::text) AND (created_by = " + CURRENT_USER + ") AND (updated_by = created_by)"
+                    + " AND (EXISTS ( SELECT 1\n   FROM clinic_membership m\n  WHERE ((m.tenant_id = " + CURRENT_CLINIC
+                    + ") AND (m.user_id = " + CURRENT_USER + ") AND m.active"
+                    + " AND ((m.role)::text = 'ADMIN_CLINICA'::text)))))"));
 
     /**
      * Schemas other than {@code public}, which hold no clinic data and so have no Row Level Security. Every entry needs a

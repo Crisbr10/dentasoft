@@ -51,7 +51,7 @@ Con M02-T05, `ADMIN_CLINICA` invita a personas a su clínica, les cambia el rol 
 - **Respuesta idéntica**: `202` sin cuerpo, tanto si la persona ya existía en Keycloak como si no.
   - Si el email es de un usuario que la cuenta de servicio no ve (un administrador de plataforma), crearlo da 409 y no se hace nada, con la misma respuesta. Un administrador de plataforma usa otra cuenta para trabajar en una clínica.
   - A quien ya tenía la cuenta configurada no le llega ningún email de Keycloak. El aviso de «te han añadido a la clínica» queda para M07 (#141).
-- **`user_account` del invitado**: se mantiene la FK. V008 añade la política `invited_insert`, solo `INSERT` para `dentasoft_app`, que exige tres cosas: `status = 'ACTIVE'`, una clínica activa (`app.tenant_id`) y `created_by = app.user_id`.
+- **`user_account` del invitado**: se mantiene la FK. V008 añade la política `invited_insert`, solo `INSERT` para `dentasoft_app`, que exige tres cosas: `status = 'ACTIVE'`; `created_by` y `updated_by` iguales a `app.user_id`; y que ese usuario sea `ADMIN_CLINICA` activo de la clínica activa (`app.tenant_id`). La base de datos lo comprueba aunque la aplicación falle.
   - Leer, cambiar o borrar cuentas ajenas sigue siendo imposible.
   - La aplicación crea la cuenta con la función `create_invited_user_account` (`SECURITY INVOKER`, sujeta a la política). La función inserta y, si la fila ya existe, ignora el `unique_violation` dentro de un subbloque. No vale `INSERT … ON CONFLICT DO NOTHING`: si la fila existente no es visible (la cuenta de quien ya trabaja en otra clínica, el caso habitual), PostgreSQL rechaza la inserción en lugar de saltarla.
   - La función no devuelve nada, así que no revela si la cuenta existía.
@@ -76,6 +76,7 @@ Con M02-T05, `ADMIN_CLINICA` invita a personas a su clínica, les cambia el rol 
   - No se revela qué personas trabajan en otras clínicas.
 - **Riesgo residual**: con el secreto, se podría resetear la contraseña, borrar el OTP o cambiar el email de **cualquier usuario de clínica**, de todas las clínicas. Es inevitable, porque crear usuarios y enviarles las acciones exige `manage-members` sobre el grupo. Mitigaciones:
   - el secreto solo vive en variables de entorno;
+  - `manage-organizations` vale para todo el realm: con el secreto se podrían crear o borrar organizaciones. Son un espejo, y manda la base de datos (ADR 0015). Añadir a una organización a un usuario que la cuenta no ve (un administrador de plataforma) da 403;
   - los eventos de administración de Keycloak se guardan 90 días;
   - queda pendiente alertar sobre los cambios de credenciales hechos por la cuenta de servicio (M13, #142).
 - **Lo que cuesta**:
