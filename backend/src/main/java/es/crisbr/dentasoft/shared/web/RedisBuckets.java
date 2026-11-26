@@ -2,7 +2,6 @@ package es.crisbr.dentasoft.shared.web;
 
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
-import io.github.bucket4j.EstimationProbe;
 import io.github.bucket4j.distributed.ExpirationAfterWriteStrategy;
 import io.github.bucket4j.redis.lettuce.Bucket4jLettuce;
 import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
@@ -47,8 +46,8 @@ class RedisBuckets implements RateLimiter.DistributedBuckets, DisposableBean {
     }
 
     @Override
-    public EstimationProbe estimate(String key, BucketConfiguration configuration) {
-        return proxyManager().getProxy(key, () -> configuration).estimateAbilityToConsume(1);
+    public void refund(String key, BucketConfiguration configuration) {
+        proxyManager().getProxy(key, () -> configuration).addTokens(1);
     }
 
     private LettuceBasedProxyManager<String> proxyManager() {

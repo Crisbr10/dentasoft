@@ -1,7 +1,6 @@
 package es.crisbr.dentasoft.shared.web;
 
 import io.github.bucket4j.ConsumptionProbe;
-import io.github.bucket4j.EstimationProbe;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,11 +30,12 @@ import org.springframework.web.servlet.ModelAndView;
  * side of Spring Security's filter chain (order -100):
  *
  * <ul>
- *   <li>{@link Stage#CLIENT_IP}, before it ({@value #CLIENT_IP_ORDER}): the anonymous limit of the client IP. It
- *       counts every request that ends without a user, also those Spring Security answers with 401, so a flood of
- *       forged tokens is refused before their signatures are checked. Requests of a signed-in user do not count, so
- *       the users of a clinic behind one address keep their own limits; but once that address is over its limit, they
- *       are refused too until it refills, because nothing tells them apart before the token is checked.
+ *   <li>{@link Stage#CLIENT_IP}, before it ({@value #CLIENT_IP_ORDER}): the anonymous limit of the client IP. Every
+ *       request is counted up front, so a flood of forged tokens, sequential or concurrent, is refused before their
+ *       signatures are checked; also those Spring Security answers with 401 stay counted. A request whose user signed
+ *       in is given back once done, so the users of a clinic behind one address keep their own limits, using at most
+ *       the address's limit while in flight. Once that address is over its limit, they are refused too until it
+ *       refills, because nothing tells them apart before the token is checked.
  *   <li>{@link Stage#USER}, after it ({@value #USER_ORDER}), once the user is known: the limit of each user.
  * </ul>
  *
@@ -53,7 +53,7 @@ class RateLimitFilter extends OncePerRequestFilter {
     static final int USER_ORDER = -90;
     static final String KEY_PREFIX = "dentasoft:rate-limit:";
 
-    /** Set by the user stage on requests of a signed-in user, which the client IP stage then does not count. */
+    /** Set by the user stage on requests of a signed-in user, which the client IP stage then gives back. */
     static final String SIGNED_IN_ATTRIBUTE = RateLimitFilter.class.getName() + ".signedIn";
 
     /** Kubernetes probes must never be throttled. */
@@ -96,20 +96,23 @@ class RateLimitFilter extends OncePerRequestFilter {
         }
     }
 
-    /** Refused before anything else runs; counted once done, only if no user signed in. */
+    /**
+     * Counted before anything else runs, so concurrent requests cannot all pass before any is counted; given back
+     * once done if a user signed in.
+     */
     private void limitClientIp(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String key = KEY_PREFIX + "ip:" + hmac(clientBytes(clientIpResolver.resolve(request)));
-        EstimationProbe probe = limiter.check(key, RateLimiter.Scope.ANONYMOUS);
-        if (!probe.canBeConsumed()) {
+        ConsumptionProbe probe = limiter.tryConsume(key, RateLimiter.Scope.ANONYMOUS);
+        if (!probe.isConsumed()) {
             reject(request, response, probe.getNanosToWaitForRefill());
             return;
         }
         try {
             chain.doFilter(request, response);
         } finally {
-            if (request.getAttribute(SIGNED_IN_ATTRIBUTE) == null) {
-                limiter.tryConsume(key, RateLimiter.Scope.ANONYMOUS);
+            if (request.getAttribute(SIGNED_IN_ATTRIBUTE) != null) {
+                limiter.refund(key, RateLimiter.Scope.ANONYMOUS);
             }
         }
     }

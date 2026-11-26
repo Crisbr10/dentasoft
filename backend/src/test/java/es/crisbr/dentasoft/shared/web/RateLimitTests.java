@@ -10,8 +10,15 @@ import es.crisbr.dentasoft.TestJwks;
 import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,6 +86,33 @@ class RateLimitTests {
                 .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .containsHeader(HttpHeaders.RETRY_AFTER);
+        verify(decoder, times(ANONYMOUS_LIMIT)).decode(anyString());
+    }
+
+    /** Concurrent forged tokens are counted as they arrive, so they cannot all slip through before any is counted. */
+    @Test
+    void concurrentForgedTokensCannotSlipThroughTheLimit() throws Exception {
+        String forged = "Bearer " + TestTokens.token().signWith(TestJwks.otherKey("forged"));
+        int requests = ANONYMOUS_LIMIT * 4;
+        clearInvocations(decoder);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Integer>> statuses = new ArrayList<>();
+        try (ExecutorService clients = Executors.newFixedThreadPool(requests)) {
+            for (int i = 0; i < requests; i++) {
+                statuses.add(clients.submit(() -> {
+                    start.await();
+                    return withToken(forged, "203.0.113.23").getResponse().getStatus();
+                }));
+            }
+            start.countDown();
+            List<Integer> answered = new ArrayList<>();
+            for (Future<Integer> status : statuses) {
+                answered.add(status.get(30, TimeUnit.SECONDS));
+            }
+
+            assertThat(answered).filteredOn(status -> status == 401).hasSize(ANONYMOUS_LIMIT);
+            assertThat(answered).filteredOn(status -> status == 429).hasSize(requests - ANONYMOUS_LIMIT);
+        }
         verify(decoder, times(ANONYMOUS_LIMIT)).decode(anyString());
     }
 

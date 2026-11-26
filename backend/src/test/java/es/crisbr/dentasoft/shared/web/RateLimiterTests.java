@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
-import io.github.bucket4j.EstimationProbe;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,34 +39,36 @@ class RateLimiterTests {
     }
 
     @Test
-    void checkingAsksRedisWithoutCounting() {
-        assertThat(limiter.check("a", RateLimiter.Scope.ANONYMOUS).canBeConsumed())
-                .isTrue();
+    void refundsGoToRedisWhileItAnswers() {
+        limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS);
+        limiter.refund("a", RateLimiter.Scope.ANONYMOUS);
 
-        assertThat(redis.calls).isEqualTo(1);
+        assertThat(redis.calls).isEqualTo(2);
         assertThat(registry.counter(RateLimiter.FALLBACK_METRIC).count()).isZero();
     }
 
-    /** A check never uses up the limit; only counting does, and a check then refuses what no longer fits. */
+    /** A refunded request leaves room for another; refunds never raise the limit above its capacity. */
     @Test
-    void whenRedisFailsChecksUseTheLocalLimitWithoutCounting() {
+    void whenRedisFailsRefundsGiveBackRoomInTheLocalLimit() {
         redis.down = true;
 
         for (int i = 0; i < 10; i++) {
-            assertThat(limiter.check("a", RateLimiter.Scope.ANONYMOUS).canBeConsumed())
-                    .isTrue();
+            limiter.refund("a", RateLimiter.Scope.ANONYMOUS);
         }
         for (int i = 0; i < 3; i++) {
             assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
                     .isTrue();
         }
-        EstimationProbe refused = limiter.check("a", RateLimiter.Scope.ANONYMOUS);
+        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .as("ten refunds before did not raise the capacity")
+                .isFalse();
 
-        assertThat(refused.canBeConsumed()).isFalse();
-        assertThat(refused.getNanosToWaitForRefill()).isPositive();
-        assertThat(registry.counter(RateLimiter.REJECTED_METRIC, "scope", "anonymous")
-                        .count())
-                .isEqualTo(1);
+        limiter.refund("a", RateLimiter.Scope.ANONYMOUS);
+
+        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .isTrue();
+        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .isFalse();
     }
 
     @Test
@@ -226,12 +227,11 @@ class RateLimiterTests {
         }
 
         @Override
-        public synchronized EstimationProbe estimate(String key, BucketConfiguration configuration) {
+        public synchronized void refund(String key, BucketConfiguration configuration) {
             calls++;
             if (down) {
                 throw new IllegalStateException(ERROR_MESSAGE);
             }
-            return EstimationProbe.canBeConsumed(1);
         }
     }
 

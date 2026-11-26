@@ -4,7 +4,6 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
-import io.github.bucket4j.EstimationProbe;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -42,8 +41,8 @@ class RateLimiter {
     interface DistributedBuckets {
         ConsumptionProbe tryConsume(String key, BucketConfiguration configuration);
 
-        /** Whether one request would fit, without counting it. */
-        EstimationProbe estimate(String key, BucketConfiguration configuration);
+        /** Gives back one request counted by {@link #tryConsume}, never above the capacity. */
+        void refund(String key, BucketConfiguration configuration);
     }
 
     static final String REDIS_AVAILABLE_METRIC = "dentasoft.rate.limit.redis.available";
@@ -101,18 +100,21 @@ class RateLimiter {
     }
 
     /**
-     * Whether one more request of {@code key} fits, without counting it: for limits that only count some requests
-     * once they are done (the client IP limit counts the requests that end without a user), but must refuse before.
+     * Gives back one request of {@code key} counted by {@link #tryConsume}: for limits that count every request up
+     * front, so concurrent requests cannot slip through, but only keep some once they are done (the client IP limit
+     * keeps the requests that end without a user).
      */
-    EstimationProbe check(String key, Scope scope) {
+    void refund(String key, Scope scope) {
         BucketConfiguration configuration = configurations.get(scope);
-        EstimationProbe probe = distributedOrLocal(
-                buckets -> buckets.estimate(key, configuration),
-                local -> local.get(key, configuration).estimateAbilityToConsume(1));
-        if (!probe.canBeConsumed()) {
-            rejections.get(scope).increment();
-        }
-        return probe;
+        distributedOrLocal(
+                buckets -> {
+                    buckets.refund(key, configuration);
+                    return null;
+                },
+                local -> {
+                    local.get(key, configuration).addTokens(1);
+                    return null;
+                });
     }
 
     private ConsumptionProbe distributedOrLocal(String key, BucketConfiguration configuration) {
