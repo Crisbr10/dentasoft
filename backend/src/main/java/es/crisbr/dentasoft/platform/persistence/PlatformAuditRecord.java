@@ -5,6 +5,7 @@ import es.crisbr.dentasoft.audit.AuditActorType;
 import es.crisbr.dentasoft.audit.AuditDetails;
 import es.crisbr.dentasoft.audit.AuditEntityType;
 import es.crisbr.dentasoft.audit.AuditOutcome;
+import es.crisbr.dentasoft.shared.CurrentUser;
 import es.crisbr.dentasoft.shared.RequestId;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -44,7 +45,7 @@ public class PlatformAuditRecord {
     @Column(name = "actor_type", nullable = false, updatable = false)
     private AuditActorType actorType = AuditActorType.PLATFORM;
 
-    /** The Keycloak {@code sub} of the platform administrator: empty until M02. */
+    /** The Keycloak {@code sub} of the platform administrator who made the change. */
     @Column(name = "actor_id", updatable = false)
     private @Nullable UUID actorId;
 
@@ -82,6 +83,7 @@ public class PlatformAuditRecord {
         this.clinicId = clinicId;
         this.action = action;
         this.entityId = clinicId;
+        this.actorId = CurrentUser.id().orElse(null);
         this.requestId = RequestId.serverGenerated().orElse(null);
         this.details = details == null ? null : details.toJson();
     }

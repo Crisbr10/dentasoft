@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.TestData;
+import es.crisbr.dentasoft.WithJwtUser;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
 import es.crisbr.dentasoft.tenancy.TenantContext;
 import es.crisbr.dentasoft.tenancy.internal.ClinicConfiguration.ClinicChanges;
@@ -26,7 +27,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
-import org.springframework.security.test.context.support.WithMockUser;
 
 /**
  * Only {@code ADMIN_CLINICA} configures its clinic: every other caller is refused before anything is read or written,
@@ -74,7 +74,7 @@ class ClinicConfigurationAuthorizationTests {
 
     @ParameterizedTest
     @MethodSource("operationNames")
-    @WithMockUser(roles = {"PLATFORM_ADMIN", "ODONTOLOGO", "HIGIENISTA", "RECEPCION", "FACTURACION"})
+    @WithJwtUser(roles = {"PLATFORM_ADMIN", "ODONTOLOGO", "HIGIENISTA", "RECEPCION", "FACTURACION"})
     void refusesEveryOtherRole(String operation) throws SQLException {
         assertThatThrownBy(() -> TenantContext.runAs(CLINIC_A, operation(operation)))
                 .isInstanceOf(AccessDeniedException.class);
@@ -85,7 +85,7 @@ class ClinicConfigurationAuthorizationTests {
     /** {@code hasRole} expects the {@code ROLE_} prefix: a bare authority with the same name is not the role. */
     @ParameterizedTest
     @MethodSource("operationNames")
-    @WithMockUser(authorities = "ADMIN_CLINICA")
+    @WithJwtUser(authorities = "ADMIN_CLINICA")
     void refusesAnAuthorityThatIsNotTheRole(String operation) throws SQLException {
         assertThatThrownBy(() -> TenantContext.runAs(CLINIC_A, operation(operation)))
                 .isInstanceOf(AccessDeniedException.class);

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.WithJwtUser;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.FiscalDataCorrection;
 import es.crisbr.dentasoft.platform.internal.ClinicAdministration.NewClinic;
 import java.sql.Connection;
@@ -21,7 +22,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 
@@ -54,7 +54,7 @@ class ClinicAdministrationAuthorizationTests {
 
     @ParameterizedTest
     @MethodSource("es.crisbr.dentasoft.platform.internal.ClinicAdministrationAuthorizationTests#operationNames")
-    @WithMockUser(roles = {"ADMIN_CLINICA", "ODONTOLOGO", "RECEPCION"})
+    @WithJwtUser(roles = {"ADMIN_CLINICA", "ODONTOLOGO", "RECEPCION"})
     void refusesClinicRoles(String operation) throws SQLException {
         assertThatThrownBy(() -> operation(operation).run()).isInstanceOf(AccessDeniedException.class);
 
@@ -64,7 +64,7 @@ class ClinicAdministrationAuthorizationTests {
     /** {@code hasRole} expects the {@code ROLE_} prefix: a bare authority with the same name is not the role. */
     @ParameterizedTest
     @MethodSource("es.crisbr.dentasoft.platform.internal.ClinicAdministrationAuthorizationTests#operationNames")
-    @WithMockUser(authorities = "PLATFORM_ADMIN")
+    @WithJwtUser(authorities = "PLATFORM_ADMIN")
     void refusesAnAuthorityThatIsNotTheRole(String operation) throws SQLException {
         assertThatThrownBy(() -> operation(operation).run()).isInstanceOf(AccessDeniedException.class);
 
@@ -110,7 +110,7 @@ class ClinicAdministrationAuthorizationTests {
     }
 
     @Test
-    @WithMockUser(roles = "PLATFORM_ADMIN")
+    @WithJwtUser(roles = "PLATFORM_ADMIN")
     void letsThePlatformAdministratorList() {
         assertThat(administration.list(PageRequest.of(0, 1))).isNotNull();
     }

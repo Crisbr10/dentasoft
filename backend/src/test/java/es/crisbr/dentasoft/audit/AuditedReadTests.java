@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.TestSecurityContext;
+import es.crisbr.dentasoft.WithJwtUser;
 import es.crisbr.dentasoft.audit.AuditLogDatabase.StoredEntry;
 import es.crisbr.dentasoft.tenancy.TenantContext;
 import java.sql.SQLException;
@@ -24,10 +26,9 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -43,7 +44,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>No clinic rows are needed: the log has no foreign key to {@code clinic}, and Row Level Security only compares ids.
  */
 @IntegrationTest
-@WithMockUser(roles = "ADMIN_CLINICA")
+@WithJwtUser(roles = "ADMIN_CLINICA")
 class AuditedReadTests {
 
     @Autowired
@@ -66,12 +67,13 @@ class AuditedReadTests {
             assertThat(entry.action()).isEqualTo("READ");
             assertThat(entry.entityType()).isEqualTo("CLINIC");
             assertThat(entry.outcome()).isEqualTo("SUCCESS");
-            assertThat(entry.actorType()).isEqualTo("SYSTEM");
+            assertThat(entry.actorType()).isEqualTo("USER");
+            assertThat(entry.actorId()).isEqualTo(UUID.fromString(WithJwtUser.DEFAULT_SUB));
         });
     }
 
     @Test
-    @WithMockUser(roles = "RECEPCION")
+    @WithJwtUser(roles = "RECEPCION")
     void aDeniedReadIsRecordedAsDenied() throws SQLException {
         UUID patient = UUID.randomUUID();
 
@@ -141,7 +143,9 @@ class AuditedReadTests {
                 patients.add(patient);
                 results.add(executor.submit(() -> {
                     SecurityContextHolder.getContext()
-                            .setAuthentication(new TestingAuthenticationToken("admin", null, "ROLE_ADMIN_CLINICA"));
+                            .setAuthentication(TestSecurityContext.authentication(
+                                    UUID.fromString(WithJwtUser.DEFAULT_SUB),
+                                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN_CLINICA"))));
                     try {
                         for (int i = 0; i < readsPerThread; i++) {
                             TenantContext.callAs(clinic, () -> reader.slowRead(patient));

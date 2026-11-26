@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.tenancy.internal;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.TestData;
+import es.crisbr.dentasoft.WithJwtUser;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
 import es.crisbr.dentasoft.tenancy.TenantContext;
 import es.crisbr.dentasoft.tenancy.persistence.ClinicSettings;
@@ -12,7 +13,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -20,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * the services. Every call goes through the real path: {@link TenantContext#callAs} and the service's own transaction.
  */
 @IntegrationTest
-@WithMockUser(roles = "ADMIN_CLINICA")
+@WithJwtUser(roles = "ADMIN_CLINICA")
 public abstract class ClinicConfigurationTestBase {
 
     public static final UUID CLINIC_A = TestData.CLINIC_A.id();

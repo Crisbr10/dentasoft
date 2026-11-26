@@ -7,9 +7,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads and deletes, as the owner, the clinics the platform tests create. Row Level Security is forced on the owner
@@ -33,6 +36,23 @@ public final class PlatformTestDatabase {
     }
 
     /** How many clinics exist, in every clinic. */
+    /** {@code created_by} and {@code updated_by} of the clinic, in that order; empty if it does not exist. */
+    public static Optional<List<@Nullable UUID>> auditUsers(UUID clinic) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSessionClinic(connection, clinic);
+            try (PreparedStatement statement =
+                    connection.prepareStatement("SELECT created_by, updated_by FROM clinic WHERE id = ?")) {
+                statement.setObject(1, clinic);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next()
+                            ? Optional.of(
+                                    Arrays.asList(result.getObject(1, UUID.class), result.getObject(2, UUID.class)))
+                            : Optional.empty();
+                }
+            }
+        }
+    }
+
     public static long clinicCount() throws SQLException {
         try (Connection connection = connectAsPlatform();
                 PreparedStatement statement = connection.prepareStatement("SELECT count(*) FROM clinic");

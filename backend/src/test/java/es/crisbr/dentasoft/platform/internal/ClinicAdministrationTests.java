@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.within;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.WithJwtUser;
 import es.crisbr.dentasoft.audit.AuditLogDatabase;
 import es.crisbr.dentasoft.audit.AuditLogDatabase.StoredEntry;
 import es.crisbr.dentasoft.platform.ClinicCreated;
@@ -38,7 +39,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -46,7 +46,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** What {@code PLATFORM_ADMIN} can do with clinics (M01-T05), through the service and against the database. */
 @IntegrationTest
 @RecordApplicationEvents
-@WithMockUser(roles = "PLATFORM_ADMIN")
+@WithJwtUser(roles = "PLATFORM_ADMIN")
 class ClinicAdministrationTests {
 
     /** Names unique to this run, so the assertions only look at the clinics this class creates. */
@@ -95,6 +95,8 @@ class ClinicAdministrationTests {
         assertThat(clinic.status()).isEqualTo(ClinicStatus.ACTIVE);
         assertThat(clinic.createdAt()).isNotNull();
         assertThat(PlatformTestDatabase.status(clinic.id())).contains("ACTIVE");
+        UUID administrator = UUID.fromString(WithJwtUser.DEFAULT_SUB);
+        assertThat(PlatformTestDatabase.auditUsers(clinic.id())).contains(List.of(administrator, administrator));
         assertThat(PlatformTestDatabase.defaultAppointmentMinutes(clinic.id()))
                 .contains(ClinicSettings.DEFAULT_APPOINTMENT_MINUTES);
     }
@@ -249,8 +251,8 @@ class ClinicAdministrationTests {
         assertThat(entries).allSatisfy(entry -> {
             assertThat(entry.tenantId()).isEqualTo(clinic.id());
             assertThat(entry.actorType()).isEqualTo("PLATFORM");
-            // The platform administrator's sub arrives with M02.
-            assertThat(entry.actorId()).isNull();
+            // The platform administrator who made the change, by the token's sub.
+            assertThat(entry.actorId()).isEqualTo(UUID.fromString(WithJwtUser.DEFAULT_SUB));
             assertThat(entry.entityType()).isEqualTo("CLINIC");
             assertThat(entry.outcome()).isEqualTo("SUCCESS");
         });
@@ -303,6 +305,7 @@ class ClinicAdministrationTests {
         assertThat(correction.details()).isEqualTo("{\"subtype\": \"CLINIC_FISCAL_DATA_CORRECTED\"}");
         assertThat(correction.tenantId()).isEqualTo(clinic.id());
         assertThat(correction.actorType()).isEqualTo("PLATFORM");
+        assertThat(correction.actorId()).isEqualTo(UUID.fromString(WithJwtUser.DEFAULT_SUB));
         assertThat(correction.entityType()).isEqualTo("CLINIC");
         assertThat(correction.outcome()).isEqualTo("SUCCESS");
         assertThat(correction.toString()).doesNotContain("Auditada", "Q1234567D", "B12345674");
