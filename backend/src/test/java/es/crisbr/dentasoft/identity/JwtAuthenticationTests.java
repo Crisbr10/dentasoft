@@ -112,6 +112,15 @@ class JwtAuthenticationTests {
                         bearer(TestTokens.token().subject("1-1-1-1-1").sign())),
                 Arguments.of(
                         "without a sub", bearer(TestTokens.token().subject(null).sign())),
+                Arguments.of(
+                        "an ID token (typ: ID)",
+                        bearer(TestTokens.token().claim("typ", "ID").sign())),
+                Arguments.of(
+                        "a refresh token (typ: Refresh)",
+                        bearer(TestTokens.token().claim("typ", "Refresh").sign())),
+                Arguments.of(
+                        "without a typ",
+                        bearer(TestTokens.token().claim("typ", null).sign())),
                 Arguments.of("that is not a JWT", bearer("not-a-token")),
                 Arguments.of("in another scheme", "Basic " + TestTokens.token().sign()));
     }

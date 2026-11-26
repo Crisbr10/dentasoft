@@ -42,7 +42,8 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  *       token with an unknown key ID cannot make every request call Keycloak.
  *   <li>Claims: {@code exp} is required, with {@value #CLOCK_SKEW_SECONDS} seconds of clock skew; the issuer must be
  *       {@code {dentasoft.urls.auth}/realms/{realm}}; the audience must include {@value #AUDIENCE}; {@code sub} must be
- *       a UUID, because it is stored in the {@code uuid} audit columns.
+ *       a UUID, because it is stored in the {@code uuid} audit columns; {@code typ} must be {@value #ACCESS_TOKEN}, so an
+ *       ID or refresh token is never taken for an access token, whatever audience the realm gives it.
  *   <li>Authorities: the realm roles Dentasoft knows ({@link RealmRoles}). The user's name is {@code sub}.
  * </ul>
  */
@@ -52,6 +53,11 @@ class JwtConfiguration {
 
     static final String AUDIENCE = "dentasoft-api";
     static final long CLOCK_SKEW_SECONDS = 30;
+
+    /** Keycloak's claim for the kind of token: {@value #ACCESS_TOKEN} in access tokens, {@code ID} in ID tokens. */
+    static final String TOKEN_TYPE = "typ";
+
+    static final String ACCESS_TOKEN = "Bearer";
 
     @Bean
     JwtDecoder jwtDecoder(DentasoftUrls urls, AuthProperties properties) throws MalformedURLException {
@@ -97,7 +103,8 @@ class JwtConfiguration {
                 timestamps,
                 new JwtIssuerValidator(issuer),
                 new JwtAudienceValidator(AUDIENCE),
-                new JwtClaimValidator<@Nullable Object>(JwtClaimNames.SUB, JwtConfiguration::isUuid)));
+                new JwtClaimValidator<@Nullable Object>(JwtClaimNames.SUB, JwtConfiguration::isUuid),
+                new JwtClaimValidator<@Nullable Object>(TOKEN_TYPE, ACCESS_TOKEN::equals)));
     }
 
     /** Only the canonical form, as Keycloak writes it: {@code UUID.fromString} also accepts {@code 1-1-1-1-1}. */
