@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.time.Duration;
 import org.hibernate.validator.constraints.URL;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -23,5 +24,6 @@ import org.springframework.validation.annotation.Validated;
 record AuthProperties(
         @NotBlank @Pattern(regexp = "[A-Za-z0-9_-]+") String realm,
         @NotBlank @URL String jwkSetUri,
-        @NotNull Duration jwksConnectTimeout,
-        @NotNull Duration jwksReadTimeout) {}
+        // Zero would mean no timeout at all.
+        @NotNull @DurationMin(millis = 1) Duration jwksConnectTimeout,
+        @NotNull @DurationMin(millis = 1) Duration jwksReadTimeout) {}

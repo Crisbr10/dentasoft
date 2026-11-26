@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.shared;
 
+import com.nimbusds.jose.jwk.source.RateLimitReachedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -88,7 +89,7 @@ public final class ApiSecurity {
             HttpServletResponse response,
             AuthenticationException failure)
             throws IOException {
-        if (failure instanceof AuthenticationServiceException) {
+        if (failure instanceof AuthenticationServiceException && !keysNotAskedAgainYet(failure)) {
             log.warn("Access token could not be checked: {}", failure.getClass().getName(), Logging.redacted(failure));
         }
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
@@ -96,6 +97,20 @@ public final class ApiSecurity {
         if (exceptionResolver.resolveException(request, response, null, generic) == null) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
         }
+    }
+
+    /**
+     * The keys were not asked for because they were asked too recently ({@code identity}'s JWK source asks at most
+     * twice every 30 seconds). Not logged: anyone can send tokens with an unknown key ID, and each would add a line.
+     * The attempts that did ask Keycloak and failed are logged.
+     */
+    static boolean keysNotAskedAgainYet(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof RateLimitReachedException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** A 403 {@code ProblemDetail}; a bare 403 if no MVC resolver handles it, never an empty 200. */
