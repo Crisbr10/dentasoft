@@ -159,6 +159,12 @@ Sin token válido, la respuesta es un 401 con `ProblemDetail` y `WWW-Authenticat
 > **Importante**: `--import-realm` solo importa realms que **no existen**. Si cambias `realm-dentasoft.json` o las variables de `.env` después del primer arranque, el realm que ya está en la base de datos **no cambia**.
 
 - **En local**, para reimportarlo de cero, borra el realm desde la consola de administración (<http://localhost:8180>, realm `dentasoft` → *Realm settings* → *Action* → *Delete*) y reinicia Keycloak: `docker compose -f compose.yml -f compose.local.yml restart keycloak`. Se pierden los usuarios, las sesiones y el OTP configurado de ese realm, pero no el resto de la base de datos.
+  - Ojo: los usuarios de prueba no tienen un id fijo. Al reimportar cambian de `sub`, y sus membresías en la base de datos dejan de corresponderles.
+- **En local, para un realm importado antes de M02-T05**, sin borrar nada: `bash infra/keycloak/local/apply-m02-t05.sh`, desde la raíz del repositorio. Aplica el cliente `dentasoft-backend`, el grupo `clinic-users` y los permisos finos (ADR 0016), y comprueba al final que la cuenta de servicio no puede tocar al administrador de plataforma. Antes:
+  1. Añade `DENTASOFT_KC_BACKEND_CLIENT_SECRET` a `.env`.
+  2. Recrea Keycloak para que la reciba: `docker compose -f compose.yml -f compose.local.yml up -d keycloak`. No borra volúmenes y no reimporta el realm.
+
+  Se puede ejecutar más de una vez.
 - **En pruebas y producción** no se borra el realm: los cambios se aplican en la consola de administración (o con `kcadm.sh`) y también en el JSON, para que un entorno nuevo nazca igual. Ver la nota de M03-T02 y [cambio de dominio](../docs/operaciones/cambio-de-dominio.md).
 
 ### Usuarios de prueba (solo local)
