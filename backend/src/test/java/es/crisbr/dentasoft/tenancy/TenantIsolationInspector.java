@@ -16,6 +16,9 @@ import org.jspecify.annotations.Nullable;
  * Level Security enabled and forced, exactly the {@code tenant_isolation} policy with the fail-closed expression of
  * {@code enable_tenant_isolation}, and a tenant column that is {@code uuid NOT NULL} and leads an index.
  *
+ * <p>Tables whose rows belong to a user instead of a clinic ({@code user_account}, V007) are declared apart and checked
+ * the same way against the {@code user_isolation} policy of {@code enable_user_isolation}, on {@code app.user_id}.
+ *
  * <p>Used by {@link RowLevelSecurityGuardTests} on the migrated schema and by {@link TenantIsolationInspectorTests},
  * which proves on deliberately broken tables that each check fails.
  */
@@ -28,6 +31,8 @@ final class TenantIsolationInspector {
     private final Map<String, String> tenantColumnExceptions;
     private final Set<String> excludedTables;
     private final Set<AllowedPolicy> allowedPolicies;
+    private final Set<ApplicationReadPolicy> applicationReadPolicies;
+    private final Map<String, String> userIsolatedTables;
 
     /**
      * A policy allowed next to {@code tenant_isolation}, compared in full. It must name a single role that is neither
@@ -53,6 +58,15 @@ final class TenantIsolationInspector {
     }
 
     /**
+     * A policy that widens what the application role reads, compared in full: PostgreSQL ORs it with the isolation
+     * policy, so each one must be declared with its reason. Only {@code SELECT}: a policy that widened inserts or
+     * updates would let the application write another clinic's or another user's rows.
+     *
+     * @param using the {@code USING} expression as PostgreSQL prints it
+     */
+    record ApplicationReadPolicy(String table, String name, String using) {}
+
+    /**
      * @param tenantColumnExceptions tables whose policy compares a column other than {@code tenant_id}
      * @param excludedTables tables that are not checked at all
      */
@@ -71,16 +85,43 @@ final class TenantIsolationInspector {
             Map<String, String> tenantColumnExceptions,
             Set<String> excludedTables,
             Set<AllowedPolicy> allowedPolicies) {
+        this(connection, schema, tenantColumnExceptions, excludedTables, allowedPolicies, Set.of(), Map.of());
+    }
+
+    /**
+     * @param applicationReadPolicies {@code SELECT} policies of the application role allowed next to the isolation
+     *     policy, each exactly as declared
+     * @param userIsolatedTables tables isolated by user instead of by clinic, with the column their policy compares
+     */
+    TenantIsolationInspector(
+            Connection connection,
+            String schema,
+            Map<String, String> tenantColumnExceptions,
+            Set<String> excludedTables,
+            Set<AllowedPolicy> allowedPolicies,
+            Set<ApplicationReadPolicy> applicationReadPolicies,
+            Map<String, String> userIsolatedTables) {
         this.connection = connection;
         this.schema = schema;
         this.tenantColumnExceptions = tenantColumnExceptions;
         this.excludedTables = excludedTables;
         this.allowedPolicies = allowedPolicies;
+        this.applicationReadPolicies = applicationReadPolicies;
+        this.userIsolatedTables = userIsolatedTables;
     }
 
     /** The policy expression {@code enable_tenant_isolation} creates for {@code column}, as PostgreSQL prints it. */
     static String expectedExpression(String column) {
-        return "(%s = (NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid)".formatted(column);
+        return isolationExpression(column, "app.tenant_id");
+    }
+
+    /** The policy expression {@code enable_user_isolation} creates for {@code column}, as PostgreSQL prints it. */
+    static String expectedUserExpression(String column) {
+        return isolationExpression(column, "app.user_id");
+    }
+
+    private static String isolationExpression(String column, String setting) {
+        return "(%s = (NULLIF(current_setting('%s'::text, true), ''::text))::uuid)".formatted(column, setting);
     }
 
     /** Ordinary and partitioned tables of the schema, without the excluded ones. */
@@ -105,9 +146,15 @@ final class TenantIsolationInspector {
     List<String> problems() throws SQLException {
         List<String> problems = new ArrayList<>(unprotectedRelations());
         for (String table : tables()) {
-            String column = tenantColumnExceptions.getOrDefault(table, TENANT_COLUMN);
+            boolean byUser = userIsolatedTables.containsKey(table);
+            String column =
+                    byUser ? userIsolatedTables.get(table) : tenantColumnExceptions.getOrDefault(table, TENANT_COLUMN);
             checkRowLevelSecurity(table, problems);
-            checkPolicy(table, column, problems);
+            checkPolicy(
+                    table,
+                    byUser ? "user_isolation" : "tenant_isolation",
+                    byUser ? expectedUserExpression(column) : expectedExpression(column),
+                    problems);
             checkTenantColumn(table, column, problems);
             checkLeadingIndex(table, column, problems);
         }
@@ -156,13 +203,14 @@ final class TenantIsolationInspector {
     }
 
     /**
-     * The policy {@code enable_tenant_isolation} creates, and no other except the allowed ones. Comparing the whole
-     * expression (and not only the name) rejects {@code USING (true)} or an added {@code OR}; rejecting any other
-     * policy rejects a second permissive policy, which PostgreSQL would OR with this one. An allowed policy must match
-     * its declaration in full, role included, so it can never reach the application role.
+     * The policy {@code enable_tenant_isolation} (or {@code enable_user_isolation}) creates, and no other except the
+     * allowed ones. Comparing the whole expression (and not only the name) rejects {@code USING (true)} or an added
+     * {@code OR}; rejecting any other policy rejects a second permissive policy, which PostgreSQL would OR with this
+     * one. An allowed policy must match its declaration in full, role included; the only ones that reach the
+     * application role are declared {@code SELECT} policies.
      */
-    private void checkPolicy(String table, String column, List<String> problems) throws SQLException {
-        String expected = expectedExpression(column);
+    private void checkPolicy(String table, String isolation, String expected, List<String> problems)
+            throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(
                 "SELECT policyname, permissive, roles::text[] AS roles, cmd, qual, with_check FROM pg_policies"
                         + " WHERE schemaname = ? AND tablename = ? ORDER BY policyname")) {
@@ -174,7 +222,7 @@ final class TenantIsolationInspector {
                     String name = result.getString("policyname");
                     List<Object> roles =
                             List.of((Object[]) result.getArray("roles").getArray());
-                    if (!"tenant_isolation".equals(name)) {
+                    if (!isolation.equals(name)) {
                         if (!isAllowed(table, name, roles, result)) {
                             problems.add(table + ": unexpected policy " + name);
                         }
@@ -184,19 +232,19 @@ final class TenantIsolationInspector {
                     if (!"PERMISSIVE".equals(result.getString("permissive"))
                             || !"ALL".equals(result.getString("cmd"))
                             || !roles.equals(List.of("public"))) {
-                        problems.add(table + ": tenant_isolation must be a permissive policy FOR ALL TO PUBLIC");
+                        problems.add(table + ": " + isolation + " must be a permissive policy FOR ALL TO PUBLIC");
                     }
                     if (!expected.equals(result.getString("qual"))) {
-                        problems.add(table + ": tenant_isolation USING is " + result.getString("qual") + ", expected "
+                        problems.add(table + ": " + isolation + " USING is " + result.getString("qual") + ", expected "
                                 + expected);
                     }
                     if (!expected.equals(result.getString("with_check"))) {
-                        problems.add(table + ": tenant_isolation WITH CHECK is " + result.getString("with_check")
+                        problems.add(table + ": " + isolation + " WITH CHECK is " + result.getString("with_check")
                                 + ", expected " + expected);
                     }
                 }
                 if (!found) {
-                    problems.add(table + ": no tenant_isolation policy");
+                    problems.add(table + ": no " + isolation + " policy");
                 }
             }
         }
@@ -207,7 +255,13 @@ final class TenantIsolationInspector {
             return false;
         }
         String role = (String) roles.getFirst();
-        if (role.equals("public") || role.equals(TestPostgresConfiguration.APP_USER)) {
+        if (role.equals(TestPostgresConfiguration.APP_USER)) {
+            return "SELECT".equals(policy.getString("cmd"))
+                    && policy.getString("with_check") == null
+                    && applicationReadPolicies.contains(
+                            new ApplicationReadPolicy(table, name, policy.getString("qual")));
+        }
+        if (role.equals("public")) {
             return false;
         }
         AllowedPolicy found = new AllowedPolicy(

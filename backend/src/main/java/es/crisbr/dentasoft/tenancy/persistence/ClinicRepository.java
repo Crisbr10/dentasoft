@@ -8,8 +8,9 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 /**
- * The active clinic. Row Level Security only ever shows its own row; Hibernate adds no filter (see {@link Clinic}), so
- * the services always look it up by the id of {@code TenantContext}.
+ * The active clinic. Hibernate adds no filter (see {@link Clinic}), and Row Level Security shows the active clinic plus,
+ * to a signed-in user, the clinics where they have an active membership ({@code member_select}, V007). So the services
+ * always look it up by the id of {@code TenantContext}, never with {@code findAll()}.
  */
 public interface ClinicRepository extends JpaRepository<Clinic, UUID> {
 

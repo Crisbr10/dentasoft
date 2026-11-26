@@ -66,12 +66,18 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T03 · Usuarios y membresías
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T02, M01-T02
 - **Descripción**: `user_account` creado en el primer acceso a partir del token, `clinic_membership` con rol por clínica y endpoint `/api/v1/me` con las clínicas y roles del usuario.
 - **Criterios de aceptación**:
-  - [ ] Un usuario puede pertenecer a varias clínicas con roles distintos
-  - [ ] Un usuario sin membresías activas no puede operar
+  - [x] Un usuario puede pertenecer a varias clínicas con roles distintos
+  - [x] Un usuario sin membresías activas no puede operar: `/me` no le devuelve ninguna clínica y RLS no le deja leer clínicas ni membresías; el 403 al elegir una clínica es de M02-T04
+- **Decisiones** (ADR 0015):
+  - `user_account` solo guarda el `sub` como `id`, el estado y las fechas.
+  - Cada transacción con usuario fija `app.user_id`. Las políticas `user_isolation`, `own_memberships` y `member_select` solo dejan ver al usuario lo suyo.
+  - Un enumerado `ClinicRole` cerrado, con un rol por clínica. No hay endpoint de alta de membresías.
+  - `GET /api/v1/me` devuelve las membresías activas del usuario, con el rol y si la clínica está suspendida.
+  - Un lote lanzado desde una petición se audita como el usuario que lo lanzó.
 - **Nota**: desde M02-T02 el registro de auditoría guarda `USER` con el `sub` del token, y los procesos sin usuario (`ClinicBatch`, listeners con `ClinicTransactions`, M01-T08) siguen registrándose como `SYSTEM`: sin usuario autenticado, `SYSTEM`. Una autenticación que no sea de token se rechaza en lugar de registrarse como `SYSTEM` (`shared.CurrentUser`). Si se permite lanzar un lote desde una petición con usuario (por ejemplo, un `PLATFORM_ADMIN`), aquí se decide si se audita como ese usuario o como `SYSTEM`; en el segundo caso, `ClinicTransactions` tendrá que fijar el actor o limpiar el `SecurityContext`.
 
 ### M02-T04 · Filtro de clínica activa
@@ -94,6 +100,8 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
   - [ ] Credenciales de la Admin API solo por variables de entorno y con permisos mínimos
   - [ ] Desactivar una membresía impide el acceso a esa clínica de inmediato
   - [ ] Cada cambio queda en `audit_log`
+- **Nota**: la FK `clinic_membership.user_id → user_account` (V007) exige que el invitado tenga cuenta, pero con `user_isolation` (ADR 0015) la aplicación solo puede crear la del usuario que hace la petición. Aquí se decide entre una política de solo `INSERT` en `user_account` (con `status = 'ACTIVE'`) y quitar la FK.
+- **Nota**: dentro de la clínica activa, la base de datos deja cambiar el rol y el estado de cualquier membresía de esa clínica, también la propia. Que solo `ADMIN_CLINICA` lo haga, y que nadie se ascienda ni se reactive a sí mismo, lo garantiza la autorización de esta tarea. M02-T04 rechaza las membresías inactivas. Una cuenta `DISABLED` todavía lee sus clínicas por SQL (`member_select` no mira `user_account.status`): se decide cuando exista la forma de desactivar cuentas.
 
 ### M02-T06 · Profesionales
 

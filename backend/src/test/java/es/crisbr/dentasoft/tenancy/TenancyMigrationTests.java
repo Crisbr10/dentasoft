@@ -342,6 +342,7 @@ class TenancyMigrationTests {
     void applicationCannotCallThePolicyFunction() throws SQLException {
         try (Connection connection = connectAsApplication()) {
             assertInsufficientPrivilege(connection, "SELECT enable_tenant_isolation('clinic', 'id')");
+            assertInsufficientPrivilege(connection, "SELECT enable_user_isolation('user_account', 'id')");
         }
     }
 

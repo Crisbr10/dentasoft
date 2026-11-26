@@ -21,7 +21,7 @@ Los recordatorios de citas, las caducidades o los reintentos de envío son proce
   - Se captura `RuntimeException` y se registra el job, el id de la clínica y la clase de la excepción, nunca su mensaje, que puede llevar datos personales. Después se sigue con la siguiente clínica.
   - Al final hay un resumen con las clínicas que fallaron. `ClinicBatch.Result` las devuelve.
   - Un `Error` (`OutOfMemoryError`…) no se captura y detiene el proceso. Si llega envuelto en una `RuntimeException`, como causa o como la excepción original de una `TransactionSystemException`, también.
-- **Actor de auditoría**: `SYSTEM`, porque no hay usuario. Hasta M02 todo se registra como `SYSTEM`; M02-T03 tiene anotado que los procesos sin usuario deben seguir así cuando aparezca `USER`.
+- **Actor de auditoría**: `SYSTEM`, porque no hay usuario. Desde M02-T02 se registra `USER` cuando lo hay. Un lote que se lance desde una petición se audita como el usuario que lo lanzó (ADR 0015).
 - **Listeners que trabajan con datos de una clínica**:
   - Se declaran con `@Async` y `@TransactionalEventListener`, sin `@Transactional`.
   - El evento lleva el `clinicId`, y el listener llama a `ClinicTransactions.run(event.clinicId(), …)`.
