@@ -54,6 +54,20 @@ public final class IdentityTestDatabase {
         }
     }
 
+    /** Who created {@code user}'s account, empty when it does not exist or has no creator. */
+    public static Optional<UUID> userCreatedBy(UUID user) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSession(connection, "app.user_id", user);
+            try (PreparedStatement statement =
+                    connection.prepareStatement("SELECT created_by FROM user_account WHERE id = ?")) {
+                statement.setObject(1, user);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? Optional.ofNullable(result.getObject(1, UUID.class)) : Optional.empty();
+                }
+            }
+        }
+    }
+
     /** How many accounts {@code user} has: 0 or 1. */
     public static int userCount(UUID user) throws SQLException {
         return userStatus(user).isPresent() ? 1 : 0;
@@ -90,6 +104,21 @@ public final class IdentityTestDatabase {
             }
         }
         return id;
+    }
+
+    /** {@code user}'s membership of {@code clinic} as {@code ROLE/active}, empty if there is none. */
+    public static Optional<String> membership(UUID clinic, UUID user) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSession(connection, "app.tenant_id", clinic);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT role || '/' || active FROM clinic_membership WHERE tenant_id = ? AND user_id = ?")) {
+                statement.setObject(1, clinic);
+                statement.setObject(2, user);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? Optional.of(result.getString(1)) : Optional.empty();
+                }
+            }
+        }
     }
 
     /** Makes {@code user}'s membership of {@code clinic} active or inactive. */

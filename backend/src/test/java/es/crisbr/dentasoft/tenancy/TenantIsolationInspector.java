@@ -32,6 +32,7 @@ final class TenantIsolationInspector {
     private final Set<String> excludedTables;
     private final Set<AllowedPolicy> allowedPolicies;
     private final Set<ApplicationReadPolicy> applicationReadPolicies;
+    private final Set<ApplicationInsertPolicy> applicationInsertPolicies;
     private final Map<String, String> userIsolatedTables;
 
     /**
@@ -65,6 +66,15 @@ final class TenantIsolationInspector {
      * @param using the {@code USING} expression as PostgreSQL prints it
      */
     record ApplicationReadPolicy(String table, String name, String using) {}
+
+    /**
+     * A policy that widens what the application role may insert, compared in full: PostgreSQL ORs it with the isolation
+     * policy's {@code WITH CHECK}, so each one must be declared with its reason. Only {@code INSERT}: it never lets the
+     * application read, change or delete a row it could not before.
+     *
+     * @param withCheck the {@code WITH CHECK} expression as PostgreSQL prints it
+     */
+    record ApplicationInsertPolicy(String table, String name, String withCheck) {}
 
     /**
      * @param tenantColumnExceptions tables whose policy compares a column other than {@code tenant_id}
@@ -101,6 +111,31 @@ final class TenantIsolationInspector {
             Set<AllowedPolicy> allowedPolicies,
             Set<ApplicationReadPolicy> applicationReadPolicies,
             Map<String, String> userIsolatedTables) {
+        this(
+                connection,
+                schema,
+                tenantColumnExceptions,
+                excludedTables,
+                allowedPolicies,
+                applicationReadPolicies,
+                Set.of(),
+                userIsolatedTables);
+    }
+
+    /**
+     * @param applicationInsertPolicies {@code INSERT} policies of the application role allowed next to the isolation
+     *     policy, each exactly as declared
+     */
+    TenantIsolationInspector(
+            Connection connection,
+            String schema,
+            Map<String, String> tenantColumnExceptions,
+            Set<String> excludedTables,
+            Set<AllowedPolicy> allowedPolicies,
+            Set<ApplicationReadPolicy> applicationReadPolicies,
+            Set<ApplicationInsertPolicy> applicationInsertPolicies,
+            Map<String, String> userIsolatedTables) {
+        this.applicationInsertPolicies = applicationInsertPolicies;
         this.connection = connection;
         this.schema = schema;
         this.tenantColumnExceptions = tenantColumnExceptions;
@@ -207,7 +242,7 @@ final class TenantIsolationInspector {
      * allowed ones. Comparing the whole expression (and not only the name) rejects {@code USING (true)} or an added
      * {@code OR}; rejecting any other policy rejects a second permissive policy, which PostgreSQL would OR with this
      * one. An allowed policy must match its declaration in full, role included; the only ones that reach the
-     * application role are declared {@code SELECT} policies.
+     * application role are declared {@code SELECT} and {@code INSERT} policies.
      */
     private void checkPolicy(String table, String isolation, String expected, List<String> problems)
             throws SQLException {
@@ -256,10 +291,17 @@ final class TenantIsolationInspector {
         }
         String role = (String) roles.getFirst();
         if (role.equals(TestPostgresConfiguration.APP_USER)) {
-            return "SELECT".equals(policy.getString("cmd"))
-                    && policy.getString("with_check") == null
-                    && applicationReadPolicies.contains(
-                            new ApplicationReadPolicy(table, name, policy.getString("qual")));
+            return switch (policy.getString("cmd")) {
+                case "SELECT" ->
+                    policy.getString("with_check") == null
+                            && applicationReadPolicies.contains(
+                                    new ApplicationReadPolicy(table, name, policy.getString("qual")));
+                case "INSERT" ->
+                    policy.getString("qual") == null
+                            && applicationInsertPolicies.contains(
+                                    new ApplicationInsertPolicy(table, name, policy.getString("with_check")));
+                default -> false;
+            };
         }
         if (role.equals("public")) {
             return false;
