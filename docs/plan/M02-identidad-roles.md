@@ -100,13 +100,13 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T05 · Gestión de usuarios de la clínica
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T04
 - **Descripción**: `ADMIN_CLINICA` invita usuarios (creación en Keycloak con la Admin API, alta en la organización y email de bienvenida), cambia roles y desactiva membresías.
 - **Criterios de aceptación**:
-  - [ ] Credenciales de la Admin API solo por variables de entorno y con permisos mínimos
-  - [ ] Desactivar una membresía impide el acceso a esa clínica de inmediato
-  - [ ] Cada cambio queda en `audit_log`
+  - [x] Credenciales de la Admin API solo por variables de entorno y con permisos mínimos
+  - [x] Desactivar una membresía impide el acceso a esa clínica de inmediato
+  - [x] Cada cambio queda en `audit_log`
 - **Notas** (decisiones en el ADR 0016):
   - **Endpoints**, todos bajo `/api/v1/clinic/users` y solo para `ADMIN_CLINICA`:
     - `GET` lista, con un máximo de 50 por página;
