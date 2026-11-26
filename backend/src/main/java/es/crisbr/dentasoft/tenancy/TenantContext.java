@@ -32,7 +32,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>Only Spring transactions are detected. A session opened in another way keeps its clinic: that is why
  * {@code spring.jpa.open-in-view} stays {@code false}, and why the write guard checks the session's clinic.
  *
- * <p>Until membership validation exists (M02), the clinic is never taken from a header, a path or a request body.
+ * <p>A request never takes its clinic from a header, a path or a request body by itself: only the {@code identity}
+ * module's active clinic filter binds one, for the clinic API, after checking the user's membership (M02-T04).
  */
 public final class TenantContext {
 

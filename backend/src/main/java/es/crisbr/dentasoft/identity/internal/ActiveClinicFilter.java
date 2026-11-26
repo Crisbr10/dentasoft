@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.identity.internal;
 
 import es.crisbr.dentasoft.identity.ClinicRole;
 import es.crisbr.dentasoft.shared.ApiSecurity;
+import es.crisbr.dentasoft.shared.CurrentUser;
 import es.crisbr.dentasoft.tenancy.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -105,7 +106,8 @@ final class ActiveClinicFilter extends OncePerRequestFilter {
         }
         Optional<ClinicRole> role = access.getObject().roleIn(clinic.get());
         if (role.isEmpty()) {
-            log.warn("Active clinic refused: user {} asked for clinic {}", token.getName(), clinic.get());
+            UUID user = CurrentUser.id().orElseThrow();
+            log.warn("Active clinic refused: user {} asked for clinic {}", user, clinic.get());
             refuse(request, response, new AccessDeniedException("Clinic refused"), HttpServletResponse.SC_FORBIDDEN);
             return;
         }

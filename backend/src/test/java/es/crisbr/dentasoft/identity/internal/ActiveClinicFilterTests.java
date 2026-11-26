@@ -3,7 +3,10 @@ package es.crisbr.dentasoft.identity.internal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -116,6 +119,7 @@ class ActiveClinicFilterTests {
 
     @ParameterizedTest
     @ValueSource(strings = {"/api/v1/clinic", "/api/v1/clinic/", "/api/v1/clinic/locations", "/api/v1/clinic/a/b"})
+    /** A signed-in user without the header gets the 400, on every path of the clinic API. */
     void everyPathOfTheClinicApiNeedsTheHeader(String path) throws Exception {
         AtomicReference<Boolean> reached = new AtomicReference<>(false);
 
@@ -125,6 +129,7 @@ class ActiveClinicFilterTests {
                 (req, res) -> reached.set(true));
 
         assertThat(reached.get()).isFalse();
+        verify(resolver).resolveException(any(), any(), isNull(), isA(InvalidClinicHeaderException.class));
         verifyNoInteractions(access);
     }
 
