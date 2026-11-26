@@ -9,6 +9,7 @@ import es.crisbr.dentasoft.identity.IdentityTestDatabase;
 import es.crisbr.dentasoft.identity.PractitionerSpecialty;
 import es.crisbr.dentasoft.identity.internal.PractitionerConflictException.Reason;
 import es.crisbr.dentasoft.identity.internal.PractitionerRoles.PractitionerData;
+import es.crisbr.dentasoft.identity.persistence.PractitionerRoleStatus;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -73,6 +74,54 @@ class PractitionerMembershipRaceTests extends ClinicUsersTestBase {
                 .isEmpty();
     }
 
+    /**
+     * The other order: the creation has checked and locked the membership and written the record, but not committed,
+     * when an administrator deactivates the membership. The deactivation waits for the creation and then deactivates
+     * the record it can now see, instead of looking for it before waiting and missing it.
+     */
+    @Test
+    void aMembershipDeactivatedWhileItsRecordIsBeingCreatedDeactivatesTheRecord() throws Exception {
+        UUID dentist = member(CLINIC_A, ClinicRole.ODONTOLOGO);
+        ClinicUserDetails membership = detailsOf(dentist);
+        UUID record = UUID.randomUUID();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try (Connection creation = connectAsOwner()) {
+            creation.setAutoCommit(false);
+            setClinic(creation);
+            try (PreparedStatement lock =
+                    creation.prepareStatement("SELECT id FROM clinic_membership WHERE user_id = ? FOR SHARE")) {
+                lock.setObject(1, dentist);
+                lock.executeQuery().close();
+            }
+            try (PreparedStatement insert = creation.prepareStatement(
+                    "INSERT INTO practitioner_role (id, tenant_id, user_id, display_name, specialty, license_province,"
+                            + " license_number, agenda_color, created_at, updated_at)"
+                            + " VALUES (?, ?, ?, 'Dr. Pruebas', 'ORTHODONTICS', '28', '1234', '#1E88E5', now(), now())")) {
+                insert.setObject(1, record);
+                insert.setObject(2, CLINIC_A);
+                insert.setObject(3, dentist);
+                assertThat(insert.executeUpdate()).isOne();
+            }
+
+            Future<Throwable> deactivation = executor.submit(() -> {
+                try {
+                    asAdmin(() -> users.deactivate(membership.id(), membership.version()));
+                    return null;
+                } catch (RuntimeException failed) {
+                    return failed;
+                }
+            });
+            awaitAWaitingTransaction(deactivation);
+            creation.commit();
+
+            assertThat(deactivation.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)).isNull();
+        } finally {
+            executor.shutdownNow();
+        }
+        assertThat(IdentityTestDatabase.membership(CLINIC_A, dentist)).contains("ODONTOLOGO/false");
+        assertThat(asAdmin(() -> practitioners.get(record)).status()).isEqualTo(PractitionerRoleStatus.INACTIVE);
+    }
+
     private static void setClinic(Connection connection) throws SQLException {
         try (PreparedStatement statement =
                 connection.prepareStatement("SELECT set_config('app.tenant_id', ?, false)")) {
@@ -85,7 +134,7 @@ class PractitionerMembershipRaceTests extends ClinicUsersTestBase {
      * Waits until the creation waits for the row the deactivation holds: in {@code pg_locks}, a row lock not granted.
      * Fails if the creation finishes first, which is what happens without the lock.
      */
-    private static void awaitAWaitingTransaction(Future<Throwable> creation)
+    private static void awaitAWaitingTransaction(Future<Throwable> other)
             throws SQLException, InterruptedException, ExecutionException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
         try (Connection observer = connectAsOwner();
@@ -98,11 +147,11 @@ class PractitionerMembershipRaceTests extends ClinicUsersTestBase {
                         return;
                     }
                 }
-                if (creation.isDone()) {
-                    throw new AssertionError("The creation did not wait for the membership: " + creation.get());
+                if (other.isDone()) {
+                    throw new AssertionError("The other transaction did not wait for the lock: " + other.get());
                 }
                 if (System.nanoTime() > deadline) {
-                    throw new AssertionError("The creation never waited for the membership");
+                    throw new AssertionError("The other transaction never waited for the lock");
                 }
                 Thread.sleep(10);
             }

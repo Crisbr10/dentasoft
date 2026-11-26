@@ -11,4 +11,11 @@ import java.util.UUID;
  * @param active whether new appointments may be given with this practitioner
  */
 public record PractitionerSummary(
-        UUID id, String displayName, PractitionerSpecialty specialty, String agendaColor, boolean active) {}
+        UUID id, String displayName, PractitionerSpecialty specialty, String agendaColor, boolean active) {
+
+    /** Never prints the name, should a summary end up in a log. */
+    @Override
+    public String toString() {
+        return "PractitionerSummary[id=" + id + ", specialty=" + specialty + ", active=" + active + "]";
+    }
+}

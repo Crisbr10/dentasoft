@@ -138,6 +138,9 @@ class ClinicMemberships {
             requireAnotherAdmin(admins, membership);
         }
         membership.setRole(role);
+        // The membership first: its row lock waits for a creation or activation of the record that holds it (FOR
+        // SHARE), and only then is the record looked up, so a record committed meanwhile is seen and deactivated.
+        flush();
         PractitionerRoles.followMembership(practitioners, membership);
         flush();
         return membership;
@@ -166,6 +169,9 @@ class ClinicMemberships {
         requireVersion(membership, version);
         requireAnotherAdmin(admins, membership);
         membership.deactivate();
+        // The membership first: its row lock waits for a creation or activation of the record that holds it (FOR
+        // SHARE), and only then is the record looked up, so a record committed meanwhile is seen and deactivated.
+        flush();
         PractitionerRoles.followMembership(practitioners, membership);
         flush();
         return membership;

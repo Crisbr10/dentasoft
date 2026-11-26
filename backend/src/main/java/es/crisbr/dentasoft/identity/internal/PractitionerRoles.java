@@ -344,6 +344,12 @@ public class PractitionerRoles implements ActivePractitioners {
         boolean hasLicense() {
             return licenseProvince != null && licenseNumber != null;
         }
+
+        /** Never prints the name or the licence number, should the data end up in a log. */
+        @Override
+        public String toString() {
+            return "PractitionerData[userId=" + userId + ", specialty=" + specialty + "]";
+        }
     }
 
     /** A practitioner record as the API returns it. */
@@ -369,6 +375,13 @@ public class PractitionerRoles implements ActivePractitioners {
                     practitioner.getAgendaColor(),
                     practitioner.getStatus(),
                     practitioner.getVersion());
+        }
+
+        /** Never prints the name or the licence number, should the details end up in a log. */
+        @Override
+        public String toString() {
+            return "PractitionerDetails[id=" + id + ", specialty=" + specialty + ", status=" + status + ", version="
+                    + version + "]";
         }
     }
 }

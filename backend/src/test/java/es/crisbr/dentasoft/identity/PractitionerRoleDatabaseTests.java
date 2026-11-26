@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.TestData;
+import es.crisbr.dentasoft.identity.persistence.PractitionerRole;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -130,6 +131,28 @@ class PractitionerRoleDatabaseTests {
         assertThat(update("UPDATE practitioner_role SET specialty = 'DENTAL_HYGIENE', license_number = NULL,"
                         + " license_province = NULL"))
                 .isOne();
+    }
+
+    /**
+     * The service tells a race for a licence number or a user by the name of the unique key PostgreSQL reports: a
+     * migration that renamed one would turn those 409s into 500s.
+     */
+    @Test
+    void theUniqueKeysTheServiceRecognisesExist() throws SQLException {
+        try (Connection connection = inClinicA();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT relname FROM pg_class WHERE relkind = 'i' AND relname = ANY(?) ORDER BY relname")) {
+            statement.setArray(1, connection.createArrayOf("text", new String[] {
+                PractitionerRole.ACTIVE_LICENSE_KEY, PractitionerRole.USER_KEY
+            }));
+            List<String> found = new java.util.ArrayList<>();
+            try (var result = statement.executeQuery()) {
+                while (result.next()) {
+                    found.add(result.getString(1));
+                }
+            }
+            assertThat(found).containsExactly(PractitionerRole.ACTIVE_LICENSE_KEY, PractitionerRole.USER_KEY);
+        }
     }
 
     // --- Helpers ---
