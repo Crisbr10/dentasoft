@@ -2,14 +2,17 @@ package es.crisbr.dentasoft.tenancy;
 
 import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsOwner;
 import static es.crisbr.dentasoft.tenancy.TenantIsolationInspector.expectedExpression;
+import static es.crisbr.dentasoft.tenancy.TenantIsolationInspector.expectedUserExpression;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.AllowedPolicy;
+import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.ApplicationReadPolicy;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -164,6 +167,70 @@ class TenantIsolationInspectorTests {
                 .isThrownBy(() -> new AllowedPolicy("clinic", "open", "public", "SELECT", "true", null));
         assertThatIllegalArgumentException()
                 .isThrownBy(() -> new AllowedPolicy("clinic", "open", "dentasoft_app", "SELECT", "true", null));
+    }
+
+    @Test
+    void acceptsADeclaredReadPolicyOfTheApplicationOnlyForSelect() throws SQLException {
+        String own = "(user_id = (NULLIF(current_setting('app.user_id'::text, true), ''::text))::uuid)";
+        for (String table : List.of("read", "write", "all_commands", "other_expression", "undeclared")) {
+            isolatedTable(table);
+            execute("ALTER TABLE guard_probe.%s ADD COLUMN user_id uuid".formatted(table));
+        }
+        String user = "user_id = NULLIF(current_setting('app.user_id', true), '')::uuid";
+        execute("CREATE POLICY own ON guard_probe.read FOR SELECT TO dentasoft_app USING (%s)".formatted(user));
+        execute("CREATE POLICY own ON guard_probe.write FOR UPDATE TO dentasoft_app USING (%s)".formatted(user));
+        execute("CREATE POLICY own ON guard_probe.all_commands TO dentasoft_app USING (%s)".formatted(user));
+        execute("CREATE POLICY own ON guard_probe.other_expression FOR SELECT TO dentasoft_app USING (true)");
+        execute("CREATE POLICY own ON guard_probe.undeclared FOR SELECT TO dentasoft_app USING (%s)".formatted(user));
+        Set<ApplicationReadPolicy> declared = Set.of("read", "write", "all_commands", "other_expression").stream()
+                .map(table -> new ApplicationReadPolicy(table, "own", own))
+                .collect(Collectors.toSet());
+
+        TenantIsolationInspector inspector =
+                new TenantIsolationInspector(connection, SCHEMA, Map.of(), Set.of(), Set.of(), declared, Map.of());
+
+        assertThat(inspector.problems())
+                .containsExactlyInAnyOrder(
+                        "write: unexpected policy own",
+                        "all_commands: unexpected policy own",
+                        "other_expression: unexpected policy own",
+                        "undeclared: unexpected policy own");
+    }
+
+    @Test
+    void checksTablesIsolatedByUserAgainstTheActiveUser() throws SQLException {
+        String user = "id = NULLIF(current_setting('app.user_id', true), '')::uuid";
+        String clinic = POLICY_EXPRESSION.formatted("id");
+        execute("CREATE TABLE guard_probe.by_user (id uuid PRIMARY KEY)");
+        enableAndForce("by_user");
+        execute("CREATE POLICY user_isolation ON guard_probe.by_user USING (%s) WITH CHECK (%s)".formatted(user, user));
+        execute("CREATE TABLE guard_probe.by_clinic_setting (id uuid PRIMARY KEY)");
+        enableAndForce("by_clinic_setting");
+        execute("CREATE POLICY user_isolation ON guard_probe.by_clinic_setting USING (%s) WITH CHECK (%s)"
+                .formatted(clinic, clinic));
+        execute("CREATE TABLE guard_probe.tenant_policy (id uuid PRIMARY KEY)");
+        enableAndForce("tenant_policy");
+        execute("CREATE POLICY tenant_isolation ON guard_probe.tenant_policy USING (%s) WITH CHECK (%s)"
+                .formatted(clinic, clinic));
+        String expected = expectedUserExpression("id");
+
+        TenantIsolationInspector inspector = new TenantIsolationInspector(
+                connection,
+                SCHEMA,
+                Map.of(),
+                Set.of(),
+                Set.of(),
+                Set.of(),
+                Map.of("by_user", "id", "by_clinic_setting", "id", "tenant_policy", "id"));
+
+        assertThat(inspector.problems())
+                .containsExactlyInAnyOrder(
+                        "by_clinic_setting: user_isolation USING is " + expectedExpression("id") + ", expected "
+                                + expected,
+                        "by_clinic_setting: user_isolation WITH CHECK is " + expectedExpression("id") + ", expected "
+                                + expected,
+                        "tenant_policy: unexpected policy tenant_isolation",
+                        "tenant_policy: no user_isolation policy");
     }
 
     @Test

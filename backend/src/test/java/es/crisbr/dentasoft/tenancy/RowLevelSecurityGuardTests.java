@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.AllowedPolicy;
+import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.ApplicationReadPolicy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -24,13 +25,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Guard for the multi-clinic rule of AGENTS.md, run on the schema after all migrations: every table except Flyway's
- * history is isolated by clinic (see {@link TenantIsolationInspector}), and the application role cannot escape Row
- * Level Security. A new table that skips {@code enable_tenant_isolation}, or brings a policy of its own, fails here.
+ * history is isolated by clinic (see {@link TenantIsolationInspector}), or by user when it is listed in
+ * {@link #USER_ISOLATED_TABLES}, and the application role cannot escape Row Level Security. A new table that skips
+ * {@code enable_tenant_isolation}, or brings a policy of its own, fails here.
  */
 @IntegrationTest
 class RowLevelSecurityGuardTests {
 
     private static final String SCHEMA = "public";
+
+    /** {@code app.user_id} as PostgreSQL prints it in a policy expression. */
+    private static final String CURRENT_USER = "(NULLIF(current_setting('app.user_id'::text, true), ''::text))::uuid";
 
     /**
      * Tables whose policy compares a column other than {@code tenant_id}. Every entry needs a reason: {@code clinic} is
@@ -57,6 +62,26 @@ class RowLevelSecurityGuardTests {
                     null,
                     "((actor_type = 'PLATFORM'::text) AND (entity_type = 'CLINIC'::text) AND (entity_id = tenant_id)"
                             + " AND (action = ANY (ARRAY['CREATE'::text, 'UPDATE'::text])))"));
+
+    /**
+     * Tables whose rows belong to a user instead of a clinic, isolated by {@code app.user_id} with
+     * {@code enable_user_isolation} (V007, ADR 0015). Every entry needs a reason: {@code user_account} is the user
+     * itself, in every clinic, so its rows are isolated by {@code id}, the Keycloak user ID.
+     */
+    private static final Map<String, String> USER_ISOLATED_TABLES = Map.of("user_account", "id");
+
+    /**
+     * {@code SELECT} policies of the application role allowed next to the isolation policy. Every entry needs a reason:
+     * before there is an active clinic, a user reads their own memberships in every clinic ({@code GET /api/v1/me},
+     * the check of the active clinic in M02-T04), and the clinics in which one of them is active (V007, ADR 0015).
+     */
+    private static final Set<ApplicationReadPolicy> APPLICATION_READ_POLICIES = Set.of(
+            new ApplicationReadPolicy("clinic_membership", "own_memberships", "(user_id = " + CURRENT_USER + ")"),
+            new ApplicationReadPolicy(
+                    "clinic",
+                    "member_select",
+                    "(EXISTS ( SELECT 1\n   FROM clinic_membership m\n  WHERE ((m.tenant_id = clinic.id)"
+                            + " AND (m.user_id = " + CURRENT_USER + ") AND m.active)))"));
 
     /**
      * Schemas other than {@code public}, which hold no clinic data and so have no Row Level Security. Every entry needs a
@@ -95,9 +120,11 @@ class RowLevelSecurityGuardTests {
                 SCHEMA,
                 TENANT_COLUMN_EXCEPTIONS,
                 Set.of(flyway.getConfiguration().getTable()),
-                ALLOWED_POLICIES);
+                ALLOWED_POLICIES,
+                APPLICATION_READ_POLICIES,
+                USER_ISOLATED_TABLES);
 
-        assertThat(inspector.tables()).as("tables of schema %s", SCHEMA).contains("clinic");
+        assertThat(inspector.tables()).as("tables of schema %s", SCHEMA).contains("clinic", "user_account");
         assertThat(inspector.problems())
                 .as("tables not isolated by clinic; create them as described in docs/plan/M01-clinicas-multitenant.md")
                 .isEmpty();

@@ -12,5 +12,5 @@ import org.springframework.context.annotation.Configuration;
  * to no unit or to both.
  */
 @Configuration(proxyBeanMethods = false)
-@EntityScan(basePackages = {"es.crisbr.dentasoft.tenancy"})
+@EntityScan(basePackages = {"es.crisbr.dentasoft.tenancy", "es.crisbr.dentasoft.identity"})
 class EntityPackagesConfiguration {}

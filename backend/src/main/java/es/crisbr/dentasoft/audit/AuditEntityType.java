@@ -8,5 +8,6 @@ public enum AuditEntityType {
     CLINIC,
     CLINIC_SETTINGS,
     LOCATION,
-    HOURS_OF_OPERATION
+    HOURS_OF_OPERATION,
+    CLINIC_MEMBERSHIP
 }
