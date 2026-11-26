@@ -31,9 +31,10 @@ public record InvitationRequest(
     /**
      * At least one letter, and no format characters (U+200B zero-width space, U+202E right-to-left override…), which
      * {@code @NoControlCharacters} lets through: a name of only Unicode spaces would be blank once stripped, and format
-     * characters can disguise what a name looks like.
+     * characters can disguise what a name looks like. Except the zero-width non-joiner and joiner (U+200C, U+200D),
+     * which Persian and Indic scripts need in real names.
      */
-    static final String PERSON_NAME = "(?=.*\\p{L})[^\\p{Cf}]*";
+    static final String PERSON_NAME = "(?=.*\\p{L})(?:[^\\p{Cf}]|[\\u200C\\u200D])*";
 
     static final String PERSON_NAME_MESSAGE = "{es.crisbr.dentasoft.identity.PersonName.message}";
 

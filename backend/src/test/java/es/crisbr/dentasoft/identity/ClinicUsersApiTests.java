@@ -144,6 +144,15 @@ class ClinicUsersApiTests {
                         .doesNotContain("password"));
     }
 
+    /** The zero-width non-joiner and joiner belong to real names in Persian and Indic scripts. */
+    @Test
+    void namesMayUseTheZeroWidthJoiners() {
+        assertThat(invite("persa@clinica-a.test", "می‌را", "Pruebas", "RECEPCION"))
+                .hasStatus(HttpStatus.ACCEPTED);
+        assertThat(invite("hindi@clinica-a.test", "क्‍ष", "Pruebas", "RECEPCION"))
+                .hasStatus(HttpStatus.ACCEPTED);
+    }
+
     @Test
     void namesHaveAMaximumLength() {
         assertThat(invite("ana@clinica-a.test", "A".repeat(101), "Pruebas", "RECEPCION"))
