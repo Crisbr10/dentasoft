@@ -82,14 +82,21 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T04 · Filtro de clínica activa
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T03, M01-T03
 - **Descripción**: `TenantFilter` que lee `X-Clinic-Id`, comprueba la membresía activa y que la clínica no esté suspendida, fija el `TenantContext` y convierte el rol de clínica en autoridades de Spring.
 - **Criterios de aceptación**:
-  - [ ] Clínica ajena o suspendida → 403
-  - [ ] Una clínica suspendida no puede ser la clínica activa (403 con ProblemDetail) y hay un test que lo comprueba (criterio movido desde M02-T02)
-  - [ ] `@PreAuthorize("hasRole('ODONTOLOGO')")` funciona con el rol de la clínica activa
-  - [ ] Test de que no se puede cambiar de clínica a mitad de petición
+  - [x] Clínica ajena o suspendida → 403
+  - [x] Una clínica suspendida no puede ser la clínica activa (403 con ProblemDetail) y hay un test que lo comprueba (criterio movido desde M02-T02)
+  - [x] `@PreAuthorize("hasRole('ODONTOLOGO')")` funciona con el rol de la clínica activa
+  - [x] Test de que no se puede cambiar de clínica a mitad de petición
+- **Decisiones** (ADR 0015):
+  - El filtro es `identity.internal.ActiveClinicFilter`. Corre después de Spring Security y del alta del usuario, solo en `/api/v1/clinic/**`.
+  - Comprueba en cada petición, sin caché, la membresía activa, la cuenta `ACTIVE` y la clínica no suspendida. Lo hace en una transacción de solo lectura propia, en `dentasoft_app` con `app.user_id`, antes de fijar el `TenantContext`.
+  - Sin `X-Clinic-Id`, con la cabecera repetida o con un valor que no es un UUID: 400.
+  - Clínica inexistente, ajena o suspendida, membresía inactiva, cuenta desactivada o `PLATFORM_ADMIN` sin membresía: el mismo 403, registrado en el log solo con ids. El limitador por usuario cuenta estos intentos.
+  - `ROLE_<rol>` se añade a las autoridades del token solo durante la petición. Los roles de clínica solo valen con `@PreAuthorize`, no en reglas por URL.
+  - Ningún endpoint responde de forma asíncrona (`NoAsyncEndpointsTests`).
 
 ### M02-T05 · Gestión de usuarios de la clínica
 
