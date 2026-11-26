@@ -22,6 +22,8 @@ docker compose -f compose.yml -f compose.local.yml up -d --wait
 
 `--wait` termina cuando todos los servicios están sanos (o falla si alguno no lo consigue). `.env` está en `.gitignore`: nunca lo subas.
 
+Si tu `.env` es de antes de una tarea que añade variables (por ejemplo, las del realm de Keycloak de M02-T01), Compose no arranca ningún servicio y dice cuál falta (`required variable … is missing a value`). Copia las líneas nuevas de `.env.example` a tu `.env` y vuelve a lanzar el comando.
+
 Para parar sin borrar datos:
 
 ```powershell
@@ -120,7 +122,7 @@ El JSON no lleva dominios ni secretos: Keycloak sustituye al importar los `${DEN
 | `DENTASOFT_KC_SMTP_USER` / `_PASSWORD` | Credenciales SMTP (opcionales) | Vacías |
 | `DENTASOFT_KC_LOCAL_USERS_PASSWORD` | Contraseña de los usuarios de prueba (solo `compose.local.yml`) | Cualquiera que cumpla la política |
 
-`KeycloakRealmFileTests` (backend) falla si el JSON tiene un dominio, un comodín en las redirecciones, un secreto fuera de una variable o una variable que Compose no pasa, o si se relaja alguno de los ajustes de la tabla.
+`KeycloakRealmFileTests` (backend) lee los ficheros sin arrancar Keycloak. Falla si el JSON tiene un dominio, un comodín en las redirecciones, un secreto fuera de una variable o una variable que Compose no pasa a Keycloak. También falla si cambia alguno de los valores de la tabla: el cliente, la audiencia, los roles, el flujo de login con OTP, el *password grant*, los tokens, las sesiones, la fuerza bruta, la política de contraseñas, las altas y los eventos. Que Keycloak importe el realm y pida el OTP en el primer login se comprobó a mano con Keycloak 26.8.2. Si cambias el realm o subes la versión de la imagen, repite esa comprobación (`up -d --wait` y un login).
 
 ### Cambios en el realm
 

@@ -15,6 +15,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
+import org.yaml.snakeyaml.Yaml;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -37,10 +38,18 @@ class KeycloakRealmFileTests {
 
     private static final Path USERS_FILE = Path.of("keycloak", "local", "dentasoft-users-0.json");
 
-    /** A value made only of one environment placeholder, such as {@code ${DENTASOFT_KC_SMTP_PASSWORD}}. */
-    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{DENTASOFT_[A-Z0-9_]+}");
+    /**
+     * An environment placeholder, such as {@code ${DENTASOFT_KC_SMTP_PASSWORD}}; group 1 is the variable name. With
+     * {@code matches()} the whole value must be one placeholder; with {@code find()} it finds each one in a value.
+     */
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{(DENTASOFT_[A-Z0-9_]+)}");
 
-    private static final Pattern ANY_PLACEHOLDER = Pattern.compile("\\$\\{(DENTASOFT_[A-Z0-9_]+)}");
+    /** Where Keycloak reads the realm: named {@code <realm>-realm.json} so it pairs the users file with it. */
+    private static final String REALM_MOUNT =
+            "./keycloak/realm-dentasoft.json:/opt/keycloak/data/import/dentasoft-realm.json:ro";
+
+    private static final String USERS_MOUNT =
+            "./keycloak/local/dentasoft-users-0.json:/opt/keycloak/data/import/dentasoft-users-0.json:ro";
 
     /** A URL, or a domain of the project. Placeholders such as {@code ${DENTASOFT_URLS_APP}/} do not match. */
     private static final Pattern FIXED_URL = Pattern.compile("://|crisbr\\.es", Pattern.CASE_INSENSITIVE);
@@ -207,9 +216,12 @@ class KeycloakRealmFileTests {
     @Test
     void bruteForceProtectionAndPasswordPolicyAreOn() {
         assertThat(REALM.path("bruteForceProtected").asBoolean()).isTrue();
-        assertThat(REALM.path("failureFactor").asInt()).isBetween(1, 10);
+        assertThat(REALM.path("permanentLockout").asBoolean(true)).isFalse();
+        assertThat(REALM.path("failureFactor").asInt()).isEqualTo(5);
+        assertThat(REALM.path("waitIncrementSeconds").asInt()).isEqualTo(60);
+        assertThat(REALM.path("maxFailureWaitSeconds").asInt()).isEqualTo(15 * 60);
         assertThat(REALM.path("passwordPolicy").asString())
-                .contains("length(12)", "notUsername", "notEmail", "passwordHistory(5)");
+                .contains("length(12)", "maxLength(128)", "notUsername", "notEmail", "passwordHistory(5)");
     }
 
     @Test
@@ -227,16 +239,26 @@ class KeycloakRealmFileTests {
     }
 
     @Test
-    void composePassesEveryPlaceholderOfTheRealmFiles() {
-        String compose = readString(INFRA.resolve("compose.yml"));
-        String local = readString(INFRA.resolve("compose.local.yml"));
+    void composeImportsTheRealmAndPassesEveryPlaceholderToKeycloak() {
+        Map<String, Object> shared = keycloakService("compose.yml");
+        Map<String, Object> local = keycloakService("compose.local.yml");
 
         assertThat(placeholders(REALM))
                 .isNotEmpty()
-                .allSatisfy(name -> assertThat(compose).contains("      " + name + ": ${" + name));
+                .allSatisfy(name -> assertThat(environment(shared))
+                        .containsKey(name)
+                        .extractingByKey(name)
+                        .asString()
+                        .startsWith("${" + name));
         assertThat(placeholders(USERS))
                 .containsExactly("DENTASOFT_KC_LOCAL_USERS_PASSWORD")
-                .allSatisfy(name -> assertThat(local).contains("      " + name + ": ${" + name));
+                .allSatisfy(name -> assertThat(environment(local))
+                        .containsKey(name)
+                        .extractingByKey(name)
+                        .asString()
+                        .startsWith("${" + name));
+        assertThat(list(shared, "volumes")).contains(REALM_MOUNT);
+        assertThat(list(local, "command")).contains("--import-realm");
     }
 
     @Test
@@ -244,8 +266,26 @@ class KeycloakRealmFileTests {
         assertThat(strings(USERS.path("users"), "email"))
                 .isNotEmpty()
                 .allSatisfy(email -> assertThat(email).endsWith(".test"));
+        assertThat(list(keycloakService("compose.local.yml"), "volumes")).contains(USERS_MOUNT);
         assertThat(readString(INFRA.resolve("compose.yml"))).doesNotContain("keycloak/local");
-        assertThat(readString(INFRA.resolve("compose.local.yml"))).contains("./keycloak/local/dentasoft-users-0.json:");
+    }
+
+    /** The {@code keycloak} service of a Compose file of {@code infra/}. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> keycloakService(String composeFile) {
+        Map<String, Object> compose = new Yaml().load(readString(INFRA.resolve(composeFile)));
+        Map<String, Object> services = (Map<String, Object>) compose.get("services");
+        return (Map<String, Object>) services.get("keycloak");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> environment(Map<String, Object> service) {
+        return (Map<String, Object>) service.getOrDefault("environment", Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> list(Map<String, Object> service, String key) {
+        return (List<Object>) service.getOrDefault(key, List.of());
     }
 
     /** Every string value with a URL or a project domain, as {@code path: value}. */
@@ -304,7 +344,7 @@ class KeycloakRealmFileTests {
         List<String> names = new ArrayList<>();
         walk(root, "", (path, key, value) -> {
             if (value.isString()) {
-                Matcher m = ANY_PLACEHOLDER.matcher(value.asString());
+                Matcher m = PLACEHOLDER.matcher(value.asString());
                 while (m.find()) {
                     if (!names.contains(m.group(1))) {
                         names.add(m.group(1));
