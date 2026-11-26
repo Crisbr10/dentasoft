@@ -235,6 +235,15 @@
         (MapStruct's @Generated has SOURCE retention, so JaCoCo cannot filter it by itself).
       -->
       <plugin>
+        <!-- Without a limit the test JVM may take a quarter of the machine's RAM (#133). @{argLine} keeps the JaCoCo
+             agent that prepare-agent sets. -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <argLine>@{argLine} -Xmx2g -XX:MaxMetaspaceSize=512m</argLine>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>${jacoco.version}</version>
