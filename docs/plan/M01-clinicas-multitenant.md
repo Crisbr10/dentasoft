@@ -292,9 +292,9 @@ Para que una tarea programada se ejecute una sola vez con varias réplicas, se a
 
 ### M01-T11 · Corrección de los datos fiscales por la plataforma
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M01-T05
 - **Descripción**: la clínica no puede cambiar su `legal_name` ni su `tax_id` (M01-T06). Si hay que corregirlos, lo hace `PLATFORM_ADMIN` desde la administración de clínicas, con su propio permiso por columna para `dentasoft_platform` en una migración nueva.
 - **Criterios de aceptación**:
-  - [ ] Solo `PLATFORM_ADMIN` puede cambiar `legal_name` y `tax_id`, y `PlatformRoleTests` comprueba el nuevo permiso
-  - [ ] `dentasoft_app` sigue sin poder cambiarlos (test de permisos)
+  - [x] Solo `PLATFORM_ADMIN` puede cambiar `legal_name` y `tax_id`, y `PlatformRoleTests` comprueba el nuevo permiso
+  - [x] `dentasoft_app` sigue sin poder cambiarlos (test de permisos)
