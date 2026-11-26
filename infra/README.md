@@ -137,9 +137,10 @@ El backend valida los tokens de acceso como Resource Server (M02-T02), sin pedir
 | Audiencia | Debe incluir `dentasoft-api` |
 | Caducidad | `exp` obligatorio, con 30 s de tolerancia de reloj |
 | Usuario | `sub` debe ser un UUID: es el que guardan `created_by`, `updated_by` y el registro de auditoría |
+| Tipo | `typ` debe ser `Bearer`: un ID token o un refresh token no valen como token de acceso |
 | Roles | Solo los roles del realm que el backend conoce (`PLATFORM_ADMIN` → `ROLE_PLATFORM_ADMIN`) |
 
-Sin token válido, la respuesta es un 401 con `ProblemDetail` y `WWW-Authenticate: Bearer`, el mismo sea cual sea el motivo. Si Keycloak no responde, también es un 401, y el backend lo registra en el log. Las únicas rutas públicas son `/actuator/health`, `/actuator/health/liveness` y `/actuator/health/readiness`, además de `/v3/api-docs/**` y `/swagger-ui/**` mientras `springdoc.api-docs.enabled` esté activo (solo en el perfil `local`, para `pnpm api:gen`).
+Sin token válido, la respuesta es un 401 con `ProblemDetail` y `WWW-Authenticate: Bearer`, el mismo sea cual sea el motivo. El límite anónimo por IP (`DENTASOFT_RATE_LIMIT_ANONYMOUS_PER_MINUTE`) se aplica antes de validar el token y cuenta todas las peticiones que acaban sin usuario, también los 401: una avalancha de tokens falsos acaba en 429 sin llegar a comprobar las firmas. Si Keycloak no responde, también es un 401, y el backend lo registra en el log. Las únicas rutas públicas son `/actuator/health`, `/actuator/health/liveness` y `/actuator/health/readiness`, además de `/v3/api-docs/**` y `/swagger-ui/**` mientras `springdoc.api-docs.enabled` esté activo (solo en el perfil `local`, para `pnpm api:gen`).
 
 ### Cambios en el realm
 
