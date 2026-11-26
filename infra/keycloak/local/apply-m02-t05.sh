@@ -128,13 +128,16 @@ $KC config credentials --config "$SACFG" --server http://localhost:8080 --realm 
     --client dentasoft-backend --secret "$DENTASOFT_KC_BACKEND_CLIENT_SECRET" >/dev/null
 PLAT_ROLE=$(k get "roles/PLATFORM_ADMIN" -r "$R" --fields id --format csv --noquotes)
 failed=0
+checked=0
 while read -r username; do
     [ -z "$username" ] && continue
     PLAT=$(id_of users "username=$username")
     if [ -z "$PLAT" ]; then
-        echo "   $username is not in the realm: not checked"
+        # A security check that tested nothing must not pass.
+        echo "   FAIL: $username is not in the realm, so it could not be checked"; failed=1
         continue
     fi
+    checked=$((checked + 1))
     if $KC get "users/$PLAT" -r "$R" --config "$SACFG" >/dev/null 2>&1; then
         echo "   FAIL: the service account can read $username"; failed=1
     fi
@@ -146,6 +149,9 @@ while read -r username; do
 done < "$D/platform-users.txt"
 SEEN=$($KC get users -r "$R" --config "$SACFG" --fields username --format csv --noquotes | sort | tr '\n' ' ')
 echo "   The service account sees: $SEEN"
+if [ "$checked" = 0 ]; then
+    echo "   FAIL: no platform administrator was checked"; failed=1
+fi
 [ "$failed" = 0 ] && echo "   OK: 403 for the platform administrator" || exit 1
 SH
 echo "Done."
