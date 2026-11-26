@@ -61,7 +61,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 
 ### Multi-clínica y acceso a datos
 
-- **Obligatorio**: toda tabla de negocio tiene `tenant_id uuid NOT NULL`, índice que empieza por `tenant_id`, `ENABLE` + `FORCE ROW LEVEL SECURITY` y la política `tenant_isolation`. Las entidades extienden `TenantScopedEntity`. La única excepción es el módulo `platform`: la administración de clínicas de `PLATFORM_ADMIN` usa su propio rol de base de datos y su propia unidad de persistencia, sin datos clínicos (ADR 0011). Ningún otro módulo los usa.
+- **Obligatorio**: toda tabla de negocio tiene `tenant_id uuid NOT NULL`, índice que empieza por `tenant_id`, `ENABLE` + `FORCE ROW LEVEL SECURITY` y la política `tenant_isolation`. Las entidades extienden `TenantScopedEntity`. La única excepción es el módulo `platform`: la administración de clínicas de `PLATFORM_ADMIN` usa su propio rol de base de datos y su propia unidad de persistencia, sin datos clínicos (ADR 0011). Ningún otro módulo los usa. Las tablas de un usuario y no de una clínica (`user_account`) se aíslan por usuario con `enable_user_isolation` (`app.user_id`, ADR 0015).
 - **Obligatorio**: la clínica activa sale del `TenantContext`, nunca de un parámetro, cuerpo de petición o ruta sin validar contra la membresía del usuario.
 - **Obligatorio**: cada módulo con datos tiene un test de aislamiento (la clínica A no lee ni modifica datos de la clínica B) con Testcontainers: una subclase de `TenantIsolationTest<Entidad>` por cada entidad que extiende `TenantScopedEntity` (ver su Javadoc y el ejemplo `TenancyTestRecordIsolationTests`). `TenantIsolationCoverageTests` falla si alguna no la tiene.
 - Los procesos sin usuario (jobs, webhooks) fijan la clínica explícitamente antes de tocar datos.
@@ -86,7 +86,7 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 
 ### Datos
 
-- Identificadores UUID v7 generados en la aplicación.
+- Identificadores UUID v7 generados en la aplicación. Excepción: `user_account.id` es el `sub` de Keycloak (ADR 0015).
 - Fechas con `timestamptz` (`OffsetDateTime`/`Instant` en Java); zona por defecto de la clínica, `Europe/Madrid`. Dos excepciones:
   - Las horas de reloj que se repiten cada semana, como el horario de apertura (`clinic_hours_of_operation`), van en `time` (`LocalTime`), porque son la hora local de la clínica en su zona horaria y no un instante (V003).
   - La tabla de bloqueos de ShedLock (`scheduler.shedlock`) usa `timestamp` en UTC, porque ShedLock escribe la hora de la base de datos sin zona y con `timestamptz` dos réplicas en zonas distintas no coincidirían (V005, ADR 0013).

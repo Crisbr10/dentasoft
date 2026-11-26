@@ -65,6 +65,7 @@ SELECT enable_tenant_isolation('patient');
 - La entidad JPA extiende `TenantScopedEntity` (M01-T02).
 - La primera entidad de un módulo añade el paquete del módulo a `EntityPackagesConfiguration` (`shared.persistence`): la unidad de persistencia principal no escanea toda la aplicación (ADR 0011), y `PersistenceUnitsTests` falla si una entidad no está en ninguna unidad.
 - Cada módulo con datos añade su test de aislamiento (M01-T04).
+- Una tabla cuyas filas son de un usuario y no de una clínica (como `user_account`, V007) usa `enable_user_isolation('tabla', 'columna')`, que filtra por `app.user_id`. Se declara con su motivo en `USER_ISOLATED_TABLES` de `RowLevelSecurityGuardTests`. Una política que amplíe lo que lee `dentasoft_app` solo puede ser `FOR SELECT` y se declara en `APPLICATION_READ_POLICIES` (ADR 0015).
 
 ### Migraciones que tocan datos
 
