@@ -151,6 +151,11 @@ class ClinicUsersApiTests {
                 .hasStatus(HttpStatus.ACCEPTED);
         assertThat(invite("hindi@clinica-a.test", "क्‍ष", "Pruebas", "RECEPCION"))
                 .hasStatus(HttpStatus.ACCEPTED);
+        // Only between letters or marks: never at the start or end, nor next to a space.
+        assertThat(invite("borde@clinica-a.test", "‍Ana", "Pruebas", "RECEPCION"))
+                .hasStatus(HttpStatus.BAD_REQUEST);
+        assertThat(invite("espacio@clinica-a.test", "Ana ‌", "Pruebas", "RECEPCION"))
+                .hasStatus(HttpStatus.BAD_REQUEST);
     }
 
     @Test

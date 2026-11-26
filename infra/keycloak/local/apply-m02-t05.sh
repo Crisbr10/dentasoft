@@ -74,7 +74,8 @@ trap 'rm -rf "$D"' EXIT
 $KC config credentials --config "$CFG" --server http://localhost:8080 --realm master \
     --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null
 k() { $KC "$@" --config "$CFG"; }
-id_of() { k get "$1" -r "$R" -q "$2" --fields id --format csv --noquotes | head -n 1; }
+# exact=true: Keycloak matches users and clients by substring otherwise, and could return the wrong account.
+id_of() { k get "$1" -r "$R" -q "$2" -q exact=true --fields id --format csv --noquotes | head -n 1; }
 
 echo "1. Fine-grained admin permissions"
 k update "realms/$R" -s adminPermissionsEnabled=true
@@ -114,7 +115,11 @@ echo "5. Clinic test users in clinic-users"
 while read -r username; do
     [ -z "$username" ] && continue
     UID_=$(id_of users "username=$username")
-    [ -n "$UID_" ] && k update "users/$UID_/groups/$GID" -r "$R" -s realm=$R -s "userId=$UID_" -s "groupId=$GID" -n
+    if [ -z "$UID_" ]; then
+        echo "   $username is not in the realm: skipped"
+        continue
+    fi
+    k update "users/$UID_/groups/$GID" -r "$R" -s realm=$R -s "userId=$UID_" -s "groupId=$GID" -n
 done < "$D/clinic-users.txt"
 
 echo "6. Check: the service account cannot touch the platform administrator"
@@ -126,6 +131,10 @@ failed=0
 while read -r username; do
     [ -z "$username" ] && continue
     PLAT=$(id_of users "username=$username")
+    if [ -z "$PLAT" ]; then
+        echo "   $username is not in the realm: not checked"
+        continue
+    fi
     if $KC get "users/$PLAT" -r "$R" --config "$SACFG" >/dev/null 2>&1; then
         echo "   FAIL: the service account can read $username"; failed=1
     fi
