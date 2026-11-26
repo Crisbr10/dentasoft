@@ -30,6 +30,7 @@
 - **Estado**: pendiente
 - **Depende de**: M00-T04, M00-T07
 - **Descripción**: `infra/compose.staging.yml` con la imagen de GHCR, Keycloak en modo `start`, reinicio automático y `.env.staging` fuera de Git con secretos aleatorios.
+- **Nota (M02-T01)**: Keycloak arranca con `start --import-realm` y las variables `DENTASOFT_*` del realm (ver `infra/README.md`, «Realm de Keycloak»), y sin montar `keycloak/local/` (usuarios de prueba). `--import-realm` solo crea el realm si no existe: los cambios posteriores del JSON no llegan a pruebas por sí solos. Hay que valorar si conviene usar [keycloak-config-cli](https://github.com/adorsys/keycloak-config-cli) para aplicar los cambios del realm sin borrarlo (revisando sus opciones `import.managed.*` y `import.remote-state.*`, que deciden si borra lo que no está en el fichero, para que nunca toque los usuarios ni las organizaciones que crea la aplicación). Hasta decidirlo, los cambios se aplican a mano en la consola y en el JSON.
 - **Criterios de aceptación**:
   - [ ] El stack arranca desde cero con un solo comando
   - [ ] Secretos generados con `openssl rand` y guardados en el gestor de contraseñas
