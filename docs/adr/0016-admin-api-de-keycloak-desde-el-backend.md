@@ -41,17 +41,19 @@ Con M02-T05, `ADMIN_CLINICA` invita a personas a su clínica, les cambia el rol 
   - `KeycloakRealmFileTests` comprueba esta configuración en el JSON. El trabajo de CI de #136 (comprobación 5) lo comprobará contra un Keycloak real.
 - **Orden de una invitación**: Keycloak nunca va dentro de una transacción.
   1. Buscar el usuario por email o crearlo, sin contraseña.
-  2. Añadirlo a la organización de la clínica, cuyo nombre y alias son el id de la clínica. La organización se crea al usarla por primera vez.
-  3. Una transacción crea su `user_account` si falta (`create_invited_user_account`, V008) y la membresía, o reactiva la inactiva.
-  4. Tras el commit, si la persona aún no ha configurado su cuenta, Keycloak le envía el email con las acciones `VERIFY_EMAIL`, `UPDATE_PASSWORD` y `CONFIGURE_TOTP`. Caduca a las 72 h (`dentasoft.keycloak-admin.invitation-lifespan`).
+  2. Una transacción crea su `user_account` si falta (`create_invited_user_account`, V008) y la membresía, pendiente, o reactiva la inactiva, también pendiente.
+  3. Tras el commit, si la persona aún no ha configurado su cuenta, Keycloak le envía el email con las acciones `VERIFY_EMAIL`, `UPDATE_PASSWORD` y `CONFIGURE_TOTP`. Caduca a las 72 h (`dentasoft.keycloak-admin.invitation-lifespan`).
+
+  Al aceptar, la persona entra en la organización de la clínica, cuyo nombre y alias son el id de la clínica; la organización se crea al usarla por primera vez. Así, las organizaciones reflejan solo las membresías aceptadas, y una invitación pendiente en otra clínica no cuenta como «otra clínica» al desactivar a alguien. Si Keycloak falla en ese paso, la aceptación se mantiene, porque manda la base de datos.
 
   Qué pasa si falla cada paso:
-  - En los pasos 1 a 3, repetir la petición termina el trabajo sin duplicar nada: el usuario se encuentra por email, añadir un miembro dos veces no cambia nada y `UNIQUE (tenant_id, user_id)` evita dos membresías. Un usuario de Keycloak que se quede huérfano (sin membresía) no tiene contraseña ni acceso.
-  - Si falla el paso 4, la membresía queda hecha y `POST /api/v1/clinic/users/{id}/invitation` reenvía el email.
+  - En los pasos 1 y 2, repetir la petición termina el trabajo sin duplicar nada: el usuario se encuentra por email y `UNIQUE (tenant_id, user_id)` evita dos membresías. Un usuario de Keycloak que se quede huérfano (sin membresía) no tiene contraseña ni acceso.
+  - Si falla el paso 3, la membresía queda hecha y `POST /api/v1/clinic/users/{id}/invitation` reenvía el email.
 - **Aceptación explícita** (V009). La revisión de M02-T05 vio que, si no, el listado revelaba quién usaba ya Dentasoft en otra clínica, y que se añadía a una persona a una clínica sin preguntarle.
   - Una invitación crea una membresía activa pero **pendiente** (`accepted_at` nulo), que no da acceso: el filtro de clínica activa y `GET /api/v1/me` solo cuentan las aceptadas.
   - La persona ve sus invitaciones en `GET /api/v1/me` (`invitations`) y acepta con `POST /api/v1/me/invitations/{id}/acceptance`. Desde la petición siguiente, la clínica es suya.
-  - El trigger de V009 impide que la aplicación cree una membresía ya aceptada y que nadie que no sea su usuario la acepte, y solo una vez. Volver a invitar a un antiguo miembro la deja pendiente otra vez.
+  - El trigger de V009, endurecido en V011, impide a todos los roles salvo el propietario crear una membresía ya aceptada, aceptar la de otro, aceptarla dos veces o cambiar el rol o el estado al aceptarla. Volver a invitar a un antiguo miembro la deja pendiente otra vez.
+  - Los nombres deben tener alguna letra y ningún carácter de formato (U+200B, U+202E…), además de no tener caracteres de control.
   - Mientras está pendiente, el listado solo muestra el email que escribió el administrador y `invitationPending: true`, sin el nombre guardado en Keycloak ni si la cuenta ya estaba configurada. El reenvío responde siempre `202`: Keycloak solo envía el email a quien aún no ha configurado su cuenta.
 - **Respuesta idéntica**: `202` sin cuerpo, tanto si la persona ya existía en Keycloak como si no.
   - Si el email es de un usuario que la cuenta de servicio no ve (un administrador de plataforma), crearlo da 409 y no se hace nada, con la misma respuesta. Un administrador de plataforma usa otra cuenta para trabajar en una clínica.
@@ -87,6 +89,7 @@ Con M02-T05, `ADMIN_CLINICA` invita a personas a su clínica, les cambia el rol 
 - **Otros límites conocidos**, avisos de la revisión que se aceptan:
   - Un administrador de clínica puede saber si un email es de una cuenta que la cuenta de servicio no ve (un administrador de plataforma): la respuesta es el mismo `202`, pero no aparece ninguna invitación en el listado. Solo afecta a las cuentas de plataforma, y lo frena el límite de 20 invitaciones al día.
   - Cada intento cuenta para el límite diario, también los que terminan en 503 o en 409. Una caída corta de Keycloak, con reintentos, puede gastar la cuota del día.
+  - Si alguien cambió en Keycloak su email, pero su nombre de usuario sigue siendo el email antiguo, invitar el antiguo se trata como una cuenta que no se ve: la respuesta es el mismo `202`, pero no se crea nada.
 - **Lo que cuesta**:
   - Un cambio del JSON puede romper FGAP sin que se note: por eso lo vigilan el test del fichero y la comprobación 5 de #136.
   - Keycloak no reimporta un realm que ya existe. Los entornos ya creados aplican el cambio a mano, como explica `infra/README.md`.

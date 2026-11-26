@@ -6,6 +6,7 @@ import es.crisbr.dentasoft.shared.NoControlCharacters;
 import es.crisbr.dentasoft.shared.StrictEmail;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.Locale;
 
@@ -18,9 +19,23 @@ import java.util.Locale;
  */
 public record InvitationRequest(
         @NotBlank @StrictEmail String email,
-        @NotBlank @NoControlCharacters @Size(max = 100) String firstName,
-        @NotBlank @NoControlCharacters @Size(max = 100) String lastName,
+
+        @NotBlank @NoControlCharacters @Pattern(regexp = PERSON_NAME, message = PERSON_NAME_MESSAGE) @Size(max = 100)
+        String firstName,
+
+        @NotBlank @NoControlCharacters @Pattern(regexp = PERSON_NAME, message = PERSON_NAME_MESSAGE) @Size(max = 100)
+        String lastName,
+
         @NotNull ClinicRole role) {
+
+    /**
+     * At least one letter, and no format characters (U+200B zero-width space, U+202E right-to-left override…), which
+     * {@code @NoControlCharacters} lets through: a name of only Unicode spaces would be blank once stripped, and format
+     * characters can disguise what a name looks like.
+     */
+    static final String PERSON_NAME = "(?=.*\\p{L})[^\\p{Cf}]*";
+
+    static final String PERSON_NAME_MESSAGE = "{es.crisbr.dentasoft.identity.PersonName.message}";
 
     Invitation toInvitation() {
         return new Invitation(email.toLowerCase(Locale.ROOT), firstName.strip(), lastName.strip(), role);

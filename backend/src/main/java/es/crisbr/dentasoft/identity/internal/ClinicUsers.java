@@ -100,16 +100,16 @@ public class ClinicUsers {
      * <ol>
      *   <li>Their Keycloak user is looked up by email, or created in group {@code clinic-users}, without a password:
      *       they set it themselves. Nothing is written in the database yet.
-     *   <li>They are added to the clinic's Keycloak organization (created on first use).
      *   <li>One transaction creates their account if missing and gives them an active membership, pending until they
      *       accept it ({@code POST /api/v1/me/invitations/{id}/acceptance}): until then it grants nothing.
      *   <li>After it commits, if they have not set up their account yet, Keycloak emails them the link to verify the
      *       address, choose a password and set up the one-time code, which expires.
      * </ol>
      *
-     * A failure in step 1, 2 or 3 is a 503 or 409 and repeating the request finishes the work: the user is found by
-     * email, adding a member twice changes nothing, and the account insert does nothing if it exists. A failure in step
-     * 4 leaves the membership in place; {@link #resendInvitation} sends the email again.
+     * A failure in step 1 or 2 is a 503 or 409 and repeating the request finishes the work: the user is found by
+     * email, and the account insert does nothing if it exists. A failure in step 3 leaves the membership in place;
+     * {@link #resendInvitation} sends the email again. The person joins the clinic's Keycloak organization only when
+     * they accept ({@link MyClinics#accept}): a pending invitation is not one of their clinics.
      *
      * <p>An email that belongs to someone outside {@code clinic-users} (a platform administrator, ADR 0016) is invisible
      * to Dentasoft's Keycloak account: creating the user fails and nothing is done, with the same answer. Platform
@@ -117,7 +117,7 @@ public class ClinicUsers {
      *
      * @throws InvitationLimitExceededException if the clinic has used its invitations for now
      * @throws AlreadyMemberException if the person is already an active user of the clinic
-     * @throws IdentityProviderUnavailableException if Keycloak fails in steps 1 or 2
+     * @throws IdentityProviderUnavailableException if Keycloak fails in step 1
      */
     public void invite(Invitation invitation) {
         UUID clinic = TenantContext.current();
@@ -127,13 +127,7 @@ public class ClinicUsers {
             log.info("Invitation to clinic {} not sent: the email belongs to a user outside the clinic users", clinic);
             return;
         }
-        UUID userId = invitee.get().id();
-        try {
-            keycloak.addOrganizationMember(keycloak.ensureOrganization(clinic), userId);
-        } catch (KeycloakUnavailableException | KeycloakAdminException failure) {
-            throw unavailable(failure);
-        }
-        ClinicMembership membership = memberships.addOrReactivate(userId, invitation.role());
+        ClinicMembership membership = memberships.addOrReactivate(invitee.get().id(), invitation.role());
         if (invitee.get().pendingSetup()) {
             sendActionsEmail(membership);
         }

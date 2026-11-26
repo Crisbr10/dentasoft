@@ -243,6 +243,12 @@ class UserRowLevelSecurityTests {
         String accept = "UPDATE clinic_membership SET accepted_at = now() WHERE user_id = '" + USER_C + "'";
 
         assertRejected(USER_B, CLINIC_B, accept);
+        // Accepting changes nothing else: not the role, not whether it is active (V011).
+        assertRejected(
+                USER_C,
+                CLINIC_B,
+                "UPDATE clinic_membership SET accepted_at = now(), role = 'ADMIN_CLINICA' WHERE user_id = '" + USER_C
+                        + "'");
         int accepted = inTransactionCommitted(USER_C, CLINIC_B, connection -> update(connection, accept));
         assertThat(accepted).isEqualTo(1);
         assertRejected(

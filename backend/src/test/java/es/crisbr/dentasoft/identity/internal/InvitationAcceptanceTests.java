@@ -39,8 +39,14 @@ class InvitationAcceptanceTests extends ClinicUsersTestBase {
                 .extracting(MyInvitation::id, MyInvitation::clinicId, MyInvitation::role)
                 .containsExactly(tuple(membership, CLINIC_A, ClinicRole.ODONTOLOGO));
 
+        assertThat(keycloak.organizations()).isEmpty();
+
         acceptAs(invited, membership);
 
+        assertThat(keycloak.organizationByAlias(CLINIC_A.toString())
+                        .orElseThrow()
+                        .members())
+                .containsExactly(invited);
         assertThat(asUser(invited, myClinics::ofCurrentUser))
                 .extracting(MyClinic::clinicId, MyClinic::role)
                 .containsExactly(tuple(CLINIC_A, ClinicRole.ODONTOLOGO));
@@ -74,6 +80,41 @@ class InvitationAcceptanceTests extends ClinicUsersTestBase {
 
         assertThat(asUser(invited, myClinics::invitationsOfCurrentUser)).isEmpty();
         assertThatThrownBy(() -> acceptAs(invited, details.id())).isInstanceOf(MembershipNotFoundException.class);
+    }
+
+    /** Keycloak failing after the acceptance does not undo it: the database decides (ADR 0015). */
+    @Test
+    void anAcceptanceStandsWhenKeycloakFailsToAddTheOrganizationMember() {
+        asAdmin(() -> users.invite(invitation(EMAIL, ClinicRole.ODONTOLOGO)));
+        UUID invited = keycloak.userByEmail(EMAIL).orElseThrow().id();
+        UUID membership = membershipOf(invited);
+        keycloak.failNext("POST", "/organizations", 503);
+
+        acceptAs(invited, membership);
+
+        assertThat(detailsOf(invited).invitationPending()).isFalse();
+        assertThat(asUser(invited, myClinics::ofCurrentUser)).hasSize(1);
+    }
+
+    /**
+     * A pending invitation in another clinic is not one of the person's clinics: deactivating them where they work
+     * closes their Keycloak sessions.
+     */
+    @Test
+    void aPendingInvitationElsewhereDoesNotKeepTheSessionsOfADeactivatedUser() throws SQLException {
+        UUID member = member(CLINIC_A, ClinicRole.RECEPCION);
+        keycloak.addMember(keycloak.addOrganization(CLINIC_A.toString()), member);
+        IdentityTestDatabase.insertMembership(CLINIC_B, ADMIN, ClinicRole.ADMIN_CLINICA, true);
+        String email = keycloak.user(member).orElseThrow().email();
+        as(ADMIN, List.of("ADMIN_CLINICA"), CLINIC_B, () -> {
+            users.invite(invitation(email, ClinicRole.ODONTOLOGO));
+            return null;
+        });
+        ClinicUserDetails details = detailsOf(member);
+
+        asAdmin(() -> users.deactivate(details.id(), details.version()));
+
+        assertThat(keycloak.logouts()).containsExactly(member);
     }
 
     /** Inviting a former member again needs their acceptance again: being invited once is not a standing yes. */

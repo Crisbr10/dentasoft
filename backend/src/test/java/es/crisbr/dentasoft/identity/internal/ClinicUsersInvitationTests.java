@@ -44,10 +44,8 @@ class ClinicUsersInvitationTests extends ClinicUsersTestBase {
         assertThat(created.emailVerified()).isFalse();
         assertThat(created.requiredActions()).containsExactlyElementsOf(KeycloakAdmin.INVITATION_ACTIONS);
         assertThat(created.firstName()).isEqualTo("Ana");
-        assertThat(keycloak.organizationByAlias(CLINIC_A.toString())
-                        .orElseThrow()
-                        .members())
-                .containsExactly(created.id());
+        // Not in the clinic's organization until they accept: a pending invitation is not one of their clinics.
+        assertThat(keycloak.organizations()).isEmpty();
         assertThat(IdentityTestDatabase.userStatus(created.id())).contains("ACTIVE");
         assertThat(IdentityTestDatabase.userCreatedBy(created.id())).contains(ADMIN);
         assertThat(IdentityTestDatabase.membership(CLINIC_A, created.id())).contains("ODONTOLOGO/true");
@@ -136,17 +134,10 @@ class ClinicUsersInvitationTests extends ClinicUsersTestBase {
                 .isInstanceOf(IdentityProviderUnavailableException.class);
         assertThat(keycloak.users()).isEmpty();
 
-        // This time the user is created, but adding them to the organization fails.
-        keycloak.failNext("POST", "/organizations", 503);
-        assertThatThrownBy(() -> asAdmin(() -> users.invite(invitation(EMAIL, ClinicRole.ODONTOLOGO))))
-                .isInstanceOf(IdentityProviderUnavailableException.class);
-        UUID user = keycloak.userByEmail(EMAIL).orElseThrow().id();
-        assertThat(IdentityTestDatabase.membership(CLINIC_A, user)).isEmpty();
-
         asAdmin(() -> users.invite(invitation(EMAIL, ClinicRole.ODONTOLOGO)));
 
         assertThat(keycloak.users()).hasSize(1);
-        assertThat(keycloak.organizations()).hasSize(1);
+        UUID user = keycloak.userByEmail(EMAIL).orElseThrow().id();
         assertThat(IdentityTestDatabase.membership(CLINIC_A, user)).contains("ODONTOLOGO/true");
         assertThat(keycloak.actionsEmails()).extracting(ActionsEmail::userId).containsExactly(user);
     }

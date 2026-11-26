@@ -114,6 +114,10 @@ class ClinicUsersApiTests {
                 "{\"email\":\"ana@clinica.test\",\"firstName\":\"Ana\\u0000\",\"lastName\":\"Pruebas\",\"role\":\"RECEPCION\"}",
                 "{\"email\":\"ana@clinica.test\",\"firstName\":\"Ana\",\"lastName\":\"Pru\\nebas\",\"role\":\"RECEPCION\"}",
                 "{\"email\":\"ana@clinica.test\",\"firstName\":\" \",\"lastName\":\"Pruebas\",\"role\":\"RECEPCION\"}",
+                "{\"email\":\"ana@clinica.test\",\"firstName\":\"\u2003\u2003\",\"lastName\":\"Pruebas\",\"role\":\"RECEPCION\"}",
+                "{\"email\":\"ana@clinica.test\",\"firstName\":\"Ana\u202Eanilc\",\"lastName\":\"Pruebas\",\"role\":\"RECEPCION\"}",
+                "{\"email\":\"ana@clinica.test\",\"firstName\":\"Ana\",\"lastName\":\"Pru\u200Bebas\",\"role\":\"RECEPCION\"}",
+                "{\"email\":\"ana@clinica.test\",\"firstName\":\"123\",\"lastName\":\"Pruebas\",\"role\":\"RECEPCION\"}",
                 "{\"email\":\"ana@clinica.test\",\"firstName\":\"Ana\",\"lastName\":\"Pruebas\"}",
                 "{\"email\":\"ana@clinica.test\",\"firstName\":\"Ana\",\"lastName\":\"Pruebas\",\"role\":\"PLATFORM_ADMIN\"}"
             })
