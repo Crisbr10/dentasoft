@@ -29,7 +29,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 | --- | --- |
 | `user_account` | `id`, `keycloak_user_id`, `email`, `full_name`, `status` (global, sin `tenant_id`) |
 | `clinic_membership` | `tenant_id`, `user_id`, `role`, `active` |
-| `practitioner` | `tenant_id`, `user_id`, `license_number` (nº de colegiado), `specialty`, `agenda_color` |
+| `practitioner_role` | `tenant_id`, `user_id` (opcional: un colaborador externo no tiene cuenta), `display_name`, `specialty` (área clínica), `license_province` y `license_number` (nº de colegiado), `agenda_color`, `status` (FHIR PractitionerRole, ADR 0017) |
 
 ## Tareas
 
@@ -165,7 +165,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 - **Estado**: pendiente
 - **Depende de**: M02-T09
-- **Descripción**: preferencias de cada usuario (idioma de la interfaz, vista de agenda por defecto, profesional o gabinete por defecto) guardadas en el backend y aplicadas al iniciar sesión.
+- **Descripción**: preferencias de cada usuario (idioma de la interfaz, vista de agenda por defecto, profesional o gabinete por defecto) guardadas en el backend y aplicadas al iniciar sesión. El odontólogo también cambia aquí el color de su propia ficha de profesional en la agenda (de M02-T06 solo la gestiona `ADMIN_CLINICA`).
 - **Criterios de aceptación**:
   - [ ] Las preferencias siguen al usuario en cualquier navegador
   - [ ] Valores por defecto de la clínica cuando el usuario no ha elegido
