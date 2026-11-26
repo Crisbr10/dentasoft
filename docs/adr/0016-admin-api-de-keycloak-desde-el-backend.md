@@ -84,6 +84,9 @@ Con M02-T05, `ADMIN_CLINICA` invita a personas a su clínica, les cambia el rol 
   - `manage-organizations` vale para todo el realm: con el secreto se podrían crear o borrar organizaciones. Son un espejo, y manda la base de datos (ADR 0015). Añadir a una organización a un usuario que la cuenta no ve (un administrador de plataforma) da 403;
   - los eventos de administración de Keycloak se guardan 90 días;
   - queda pendiente alertar sobre los cambios de credenciales hechos por la cuenta de servicio (M13, #142).
+- **Otros límites conocidos**, avisos de la revisión que se aceptan:
+  - Un administrador de clínica puede saber si un email es de una cuenta que la cuenta de servicio no ve (un administrador de plataforma): la respuesta es el mismo `202`, pero no aparece ninguna invitación en el listado. Solo afecta a las cuentas de plataforma, y lo frena el límite de 20 invitaciones al día.
+  - Cada intento cuenta para el límite diario, también los que terminan en 503 o en 409. Una caída corta de Keycloak, con reintentos, puede gastar la cuota del día.
 - **Lo que cuesta**:
   - Un cambio del JSON puede romper FGAP sin que se note: por eso lo vigilan el test del fichero y la comprobación 5 de #136.
   - Keycloak no reimporta un realm que ya existe. Los entornos ya creados aplican el cambio a mano, como explica `infra/README.md`.
