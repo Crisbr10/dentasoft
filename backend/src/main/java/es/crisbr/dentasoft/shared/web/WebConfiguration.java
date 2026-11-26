@@ -123,15 +123,34 @@ class WebConfiguration {
             return new RateLimiter(properties, redisBuckets, registry, InstantSource.system());
         }
 
+        /** The anonymous limit of the client IP, before Spring Security: also counts the requests it rejects. */
         @Bean
-        FilterRegistrationBean<RateLimitFilter> rateLimitFilter(
+        FilterRegistrationBean<RateLimitFilter> clientIpRateLimitFilter(
                 RateLimitProperties properties,
                 RateLimiter rateLimiter,
                 ClientIpResolver clientIpResolver,
                 @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
             return registration(
-                    new RateLimitFilter(rateLimiter, clientIpResolver, exceptionResolver, properties),
-                    RateLimitFilter.ORDER);
+                    new RateLimitFilter(
+                            RateLimitFilter.Stage.CLIENT_IP,
+                            rateLimiter,
+                            clientIpResolver,
+                            exceptionResolver,
+                            properties),
+                    RateLimitFilter.CLIENT_IP_ORDER);
+        }
+
+        /** The limit of each user, after Spring Security, once the user is known. */
+        @Bean
+        FilterRegistrationBean<RateLimitFilter> userRateLimitFilter(
+                RateLimitProperties properties,
+                RateLimiter rateLimiter,
+                ClientIpResolver clientIpResolver,
+                @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
+            return registration(
+                    new RateLimitFilter(
+                            RateLimitFilter.Stage.USER, rateLimiter, clientIpResolver, exceptionResolver, properties),
+                    RateLimitFilter.USER_ORDER);
         }
     }
 }

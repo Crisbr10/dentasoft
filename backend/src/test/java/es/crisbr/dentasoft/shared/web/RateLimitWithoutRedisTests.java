@@ -55,7 +55,8 @@ class RateLimitWithoutRedisTests {
 
         assertThat(registry.get(RateLimiter.REDIS_AVAILABLE_METRIC).gauge().value())
                 .isZero();
-        assertThat(registry.get(RateLimiter.FALLBACK_METRIC).counter().count()).isEqualTo(3);
+        // Each request is checked before it runs and counted once done; the refused one only checked: 2 + 2 + 1.
+        assertThat(registry.get(RateLimiter.FALLBACK_METRIC).counter().count()).isEqualTo(5);
     }
 
     @Test

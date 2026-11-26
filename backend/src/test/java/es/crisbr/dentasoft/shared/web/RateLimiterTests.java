@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.EstimationProbe;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +37,37 @@ class RateLimiterTests {
         assertThat(redis.calls).isEqualTo(1);
         assertThat(gauge()).isEqualTo(1.0);
         assertThat(registry.counter(RateLimiter.FALLBACK_METRIC).count()).isZero();
+    }
+
+    @Test
+    void checkingAsksRedisWithoutCounting() {
+        assertThat(limiter.check("a", RateLimiter.Scope.ANONYMOUS).canBeConsumed())
+                .isTrue();
+
+        assertThat(redis.calls).isEqualTo(1);
+        assertThat(registry.counter(RateLimiter.FALLBACK_METRIC).count()).isZero();
+    }
+
+    /** A check never uses up the limit; only counting does, and a check then refuses what no longer fits. */
+    @Test
+    void whenRedisFailsChecksUseTheLocalLimitWithoutCounting() {
+        redis.down = true;
+
+        for (int i = 0; i < 10; i++) {
+            assertThat(limiter.check("a", RateLimiter.Scope.ANONYMOUS).canBeConsumed())
+                    .isTrue();
+        }
+        for (int i = 0; i < 3; i++) {
+            assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                    .isTrue();
+        }
+        EstimationProbe refused = limiter.check("a", RateLimiter.Scope.ANONYMOUS);
+
+        assertThat(refused.canBeConsumed()).isFalse();
+        assertThat(refused.getNanosToWaitForRefill()).isPositive();
+        assertThat(registry.counter(RateLimiter.REJECTED_METRIC, "scope", "anonymous")
+                        .count())
+                .isEqualTo(1);
     }
 
     @Test
@@ -191,6 +223,15 @@ class RateLimiterTests {
                 throw new IllegalStateException(ERROR_MESSAGE);
             }
             return ConsumptionProbe.consumed(1, 0);
+        }
+
+        @Override
+        public synchronized EstimationProbe estimate(String key, BucketConfiguration configuration) {
+            calls++;
+            if (down) {
+                throw new IllegalStateException(ERROR_MESSAGE);
+            }
+            return EstimationProbe.canBeConsumed(1);
         }
     }
 

@@ -4,6 +4,7 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
+import io.github.bucket4j.EstimationProbe;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +41,9 @@ class RateLimiter {
     /** The shared buckets; any exception means they cannot be used right now. */
     interface DistributedBuckets {
         ConsumptionProbe tryConsume(String key, BucketConfiguration configuration);
+
+        /** Whether one request would fit, without counting it. */
+        EstimationProbe estimate(String key, BucketConfiguration configuration);
     }
 
     static final String REDIS_AVAILABLE_METRIC = "dentasoft.rate.limit.redis.available";
@@ -74,7 +79,7 @@ class RateLimiter {
                 .description("1 while Redis holds the rate limits, 0 while the per-instance fallback is in use")
                 .register(registry);
         fallbacks = Counter.builder(FALLBACK_METRIC)
-                .description("Requests checked against the per-instance fallback because Redis was unavailable")
+                .description("Checks and counts done against the per-instance fallback because Redis was unavailable")
                 .register(registry);
         for (Scope scope : Scope.values()) {
             rejections.put(
@@ -95,11 +100,32 @@ class RateLimiter {
         return probe;
     }
 
+    /**
+     * Whether one more request of {@code key} fits, without counting it: for limits that only count some requests
+     * once they are done (the client IP limit counts the requests that end without a user), but must refuse before.
+     */
+    EstimationProbe check(String key, Scope scope) {
+        BucketConfiguration configuration = configurations.get(scope);
+        EstimationProbe probe = distributedOrLocal(
+                buckets -> buckets.estimate(key, configuration),
+                local -> local.get(key, configuration).estimateAbilityToConsume(1));
+        if (!probe.canBeConsumed()) {
+            rejections.get(scope).increment();
+        }
+        return probe;
+    }
+
     private ConsumptionProbe distributedOrLocal(String key, BucketConfiguration configuration) {
+        return distributedOrLocal(
+                buckets -> buckets.tryConsume(key, configuration),
+                local -> local.get(key, configuration).tryConsumeAndReturnRemaining(1));
+    }
+
+    private <T> T distributedOrLocal(Function<DistributedBuckets, T> distributed, Function<LocalBuckets, T> local) {
         Instant now = clock.instant();
         if (mayUseRedis(now)) {
             try {
-                ConsumptionProbe probe = redis.tryConsume(key, configuration);
+                T probe = distributed.apply(redis);
                 if (redisAvailable.compareAndSet(false, true)) {
                     log.info("Redis is available again for rate limiting");
                 }
@@ -112,7 +138,7 @@ class RateLimiter {
         }
         fallbacks.increment();
         fallbacksSinceWarning.incrementAndGet();
-        return localBuckets.get(key, configuration).tryConsumeAndReturnRemaining(1);
+        return local.apply(localBuckets);
     }
 
     /**

@@ -1,7 +1,12 @@
 package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
+import es.crisbr.dentasoft.TestJwks;
 import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +23,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -39,10 +46,7 @@ class RateLimitTests {
     static final int ANONYMOUS_LIMIT = 3;
     static final int USER_LIMIT = 5;
 
-    /**
-     * A public path, so anonymous requests reach the rate limiter: elsewhere Spring Security answers 401 before it.
-     * Not one of the probe paths, which are never limited.
-     */
+    /** A public path, so anonymous requests get a 200 under the limit. Not one of the probes, never limited. */
     private static final String ANONYMOUS_PATH = "/actuator/health";
 
     /** Needs a signed-in user. */
@@ -53,6 +57,64 @@ class RateLimitTests {
 
     @Autowired
     private StringRedisTemplate redis;
+
+    @MockitoSpyBean
+    private JwtDecoder decoder;
+
+    /**
+     * The client IP limit runs before Spring Security and counts the requests it answers with 401: a flood of forged
+     * tokens from one address ends in 429 without their signatures being checked any more.
+     */
+    @Test
+    void forgedTokensFromOneIpAreRefusedBeforeTheirSignatureIsChecked() {
+        String forged = "Bearer " + TestTokens.token().signWith(TestJwks.otherKey("forged"));
+        clearInvocations(decoder);
+
+        for (int i = 0; i < ANONYMOUS_LIMIT; i++) {
+            assertThat(withToken(forged, "203.0.113.20")).hasStatus(HttpStatus.UNAUTHORIZED);
+        }
+        MvcTestResult refused = withToken(forged, "203.0.113.20");
+
+        assertThat(refused)
+                .hasStatus(HttpStatus.TOO_MANY_REQUESTS)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .containsHeader(HttpHeaders.RETRY_AFTER);
+        verify(decoder, times(ANONYMOUS_LIMIT)).decode(anyString());
+    }
+
+    /**
+     * Signed-in users do not count against the limit of their address, so the users of a clinic behind one address
+     * are only limited each by their own.
+     */
+    @Test
+    void signedInUsersDoNotUseTheLimitOfTheirAddress() {
+        for (int i = 0; i < USER_LIMIT; i++) {
+            assertThat(asUser("behind-a-shared-address", "203.0.113.21")).hasStatusOk();
+        }
+
+        for (int i = 0; i < ANONYMOUS_LIMIT; i++) {
+            assertThat(get(from("203.0.113.21"))).hasStatusOk();
+        }
+        assertThat(get(from("203.0.113.21"))).hasStatus(HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    /** Once an address is over its limit, nothing tells its users apart before the token is checked. */
+    @Test
+    void anAddressOverItsLimitIsRefusedEvenWithAValidToken() {
+        for (int i = 0; i < ANONYMOUS_LIMIT; i++) {
+            get(from("203.0.113.22"));
+        }
+
+        assertThat(asUser("unlucky-neighbour", "203.0.113.22")).hasStatus(HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    private MvcTestResult withToken(String authorization, String ip) {
+        return mvc.get()
+                .uri(PING)
+                .header(HttpHeaders.AUTHORIZATION, authorization)
+                .with(from(ip)::apply)
+                .exchange();
+    }
 
     @Test
     void exceedingTheAnonymousLimitReturns429ProblemDetailWithRetryAfter() {
