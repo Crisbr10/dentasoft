@@ -54,6 +54,12 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
     </dependency>
+    <!-- Client credentials token for the Keycloak Admin REST API (M02-T05): Spring Security's OAuth2 client module
+         alone, without the Boot starter, so no client auto-configuration (login, client registrations) is added. -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-oauth2-client</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.modulith</groupId>
       <artifactId>spring-modulith-starter-core</artifactId>

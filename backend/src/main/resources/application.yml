@@ -97,6 +97,19 @@ dentasoft:
     jwk-set-uri: ${DENTASOFT_AUTH_JWK_SET_URI:${dentasoft.urls.auth:}/realms/${dentasoft.auth.realm}/protocol/openid-connect/certs}
     jwks-connect-timeout: 2s
     jwks-read-timeout: 3s
+  # The Keycloak Admin REST API (M02-T05), with the service account of the confidential client dentasoft-backend and
+  # the client credentials grant; never the admin of the master realm. The base URL is where the backend reaches
+  # Keycloak, the public one unless set apart (inside Docker, for example).
+  keycloak-admin:
+    base-url: ${DENTASOFT_KEYCLOAK_ADMIN_BASE_URL:${dentasoft.urls.auth:}}
+    realm: ${dentasoft.auth.realm}
+    client-id: ${DENTASOFT_KEYCLOAK_ADMIN_CLIENT_ID:dentasoft-backend}
+    # The client's secret. No default: the application does not start without it.
+    client-secret: ${DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET:}
+    connect-timeout: 2s
+    read-timeout: 5s
+    # How long the link of an invitation email stays valid (at most 30 days).
+    invitation-lifespan: 72h
   cors:
     allowed-origins: ${DENTASOFT_CORS_ALLOWED_ORIGINS:${dentasoft.urls.app:}}
   http:
