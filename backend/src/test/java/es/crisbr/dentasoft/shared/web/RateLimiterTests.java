@@ -39,6 +39,39 @@ class RateLimiterTests {
     }
 
     @Test
+    void refundsGoToRedisWhileItAnswers() {
+        limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS);
+        limiter.refund("a", RateLimiter.Scope.ANONYMOUS);
+
+        assertThat(redis.calls).isEqualTo(2);
+        assertThat(registry.counter(RateLimiter.FALLBACK_METRIC).count()).isZero();
+    }
+
+    /** A refunded request leaves room for another; refunds never raise the limit above its capacity. */
+    @Test
+    void whenRedisFailsRefundsGiveBackRoomInTheLocalLimit() {
+        redis.down = true;
+
+        for (int i = 0; i < 10; i++) {
+            limiter.refund("a", RateLimiter.Scope.ANONYMOUS);
+        }
+        for (int i = 0; i < 3; i++) {
+            assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                    .isTrue();
+        }
+        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .as("ten refunds before did not raise the capacity")
+                .isFalse();
+
+        limiter.refund("a", RateLimiter.Scope.ANONYMOUS);
+
+        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .isTrue();
+        assertThat(limiter.tryConsume("a", RateLimiter.Scope.ANONYMOUS).isConsumed())
+                .isFalse();
+    }
+
+    @Test
     void whenRedisFailsRequestsPassButTheLocalLimitStillApplies() {
         redis.down = true;
 
@@ -191,6 +224,14 @@ class RateLimiterTests {
                 throw new IllegalStateException(ERROR_MESSAGE);
             }
             return ConsumptionProbe.consumed(1, 0);
+        }
+
+        @Override
+        public synchronized void refund(String key, BucketConfiguration configuration) {
+            calls++;
+            if (down) {
+                throw new IllegalStateException(ERROR_MESSAGE);
+            }
         }
     }
 

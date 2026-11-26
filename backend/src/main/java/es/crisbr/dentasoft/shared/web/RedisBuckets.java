@@ -45,6 +45,11 @@ class RedisBuckets implements RateLimiter.DistributedBuckets, DisposableBean {
         return proxyManager().getProxy(key, () -> configuration).tryConsumeAndReturnRemaining(1);
     }
 
+    @Override
+    public void refund(String key, BucketConfiguration configuration) {
+        proxyManager().getProxy(key, () -> configuration).addTokens(1);
+    }
+
     private LettuceBasedProxyManager<String> proxyManager() {
         LettuceBasedProxyManager<String> current = proxyManager;
         if (current != null) {

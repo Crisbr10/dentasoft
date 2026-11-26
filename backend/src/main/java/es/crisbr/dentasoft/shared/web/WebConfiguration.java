@@ -43,16 +43,18 @@ class WebConfiguration {
     }
 
     /**
-     * Browser access from {@code dentasoft.cors.allowed-origins} only. No credentials: the API uses Bearer tokens,
-     * never cookies. Spring Security (M02-T02) must reuse this bean instead of defining its own rules.
+     * Browser access from {@code dentasoft.cors.allowed-origins} only, the exact origins of the variable. No
+     * credentials: the API uses Bearer tokens, never cookies. Only the methods and headers the API uses: {@code
+     * X-Clinic-Id} joins them when the active clinic does (M02-T04), and {@code PATCH} or {@code DELETE} with the first
+     * endpoint that needs them. The {@code CorsFilter} runs before Spring Security, so preflights need no token and a
+     * 401 still carries the headers the browser needs to read it.
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource(CorsProperties properties) {
         CorsConfiguration cors = new CorsConfiguration();
         cors.setAllowedOrigins(properties.allowedOrigins());
-        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE"));
-        cors.setAllowedHeaders(
-                List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, "X-Clinic-Id", RequestIdFilter.HEADER));
+        cors.setAllowedMethods(List.of("GET", "POST", "PUT"));
+        cors.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, RequestIdFilter.HEADER));
         cors.setExposedHeaders(List.of(RequestIdFilter.HEADER, HttpHeaders.RETRY_AFTER));
         cors.setAllowCredentials(false);
         cors.setMaxAge(Duration.ofHours(1));
@@ -121,15 +123,34 @@ class WebConfiguration {
             return new RateLimiter(properties, redisBuckets, registry, InstantSource.system());
         }
 
+        /** The anonymous limit of the client IP, before Spring Security: also counts the requests it rejects. */
         @Bean
-        FilterRegistrationBean<RateLimitFilter> rateLimitFilter(
+        FilterRegistrationBean<RateLimitFilter> clientIpRateLimitFilter(
                 RateLimitProperties properties,
                 RateLimiter rateLimiter,
                 ClientIpResolver clientIpResolver,
                 @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
             return registration(
-                    new RateLimitFilter(rateLimiter, clientIpResolver, exceptionResolver, properties),
-                    RateLimitFilter.ORDER);
+                    new RateLimitFilter(
+                            RateLimitFilter.Stage.CLIENT_IP,
+                            rateLimiter,
+                            clientIpResolver,
+                            exceptionResolver,
+                            properties),
+                    RateLimitFilter.CLIENT_IP_ORDER);
+        }
+
+        /** The limit of each user, after Spring Security, once the user is known. */
+        @Bean
+        FilterRegistrationBean<RateLimitFilter> userRateLimitFilter(
+                RateLimitProperties properties,
+                RateLimiter rateLimiter,
+                ClientIpResolver clientIpResolver,
+                @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver) {
+            return registration(
+                    new RateLimitFilter(
+                            RateLimitFilter.Stage.USER, rateLimiter, clientIpResolver, exceptionResolver, properties),
+                    RateLimitFilter.USER_ORDER);
         }
     }
 }

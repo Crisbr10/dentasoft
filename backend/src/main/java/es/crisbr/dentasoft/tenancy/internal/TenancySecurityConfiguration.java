@@ -1,6 +1,6 @@
 package es.crisbr.dentasoft.tenancy.internal;
 
-import es.crisbr.dentasoft.shared.ClosedApiChain;
+import es.crisbr.dentasoft.shared.ApiSecurity;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,13 +11,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
- * The clinic configuration API is closed to every request until authentication exists (M02-T02): without a signed-in
- * user there is no active clinic to configure. This chain, checked before the application's, denies everything under
- * {@link #PATHS}, whoever asks ({@link ClosedApiChain}). The services behind it also require {@code ADMIN_CLINICA}
- * ({@link ClinicConfiguration}, {@link ClinicOpeningHours}, {@link Locations}), so opening the chain will not open
- * them.
- *
- * <p>M02-T02 replaces it with an authenticated request whose clinic becomes the active one.
+ * The clinic configuration API stays closed until a request can have an active clinic: M02-T04 sets it from the
+ * request, after checking the user's membership. Until then this chain, checked before the application's, denies
+ * everything under {@link #PATHS}: 401 without a valid token, 403 with one, whoever it belongs to ({@link
+ * ApiSecurity}). The services behind it also require {@code ADMIN_CLINICA} ({@link ClinicConfiguration}, {@link
+ * ClinicOpeningHours}, {@link Locations}), so opening the chain will not open them.
  */
 @Configuration(proxyBeanMethods = false)
 class TenancySecurityConfiguration {
@@ -29,6 +27,8 @@ class TenancySecurityConfiguration {
     SecurityFilterChain clinicConfigurationSecurityFilterChain(
             HttpSecurity http, @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver)
             throws Exception {
-        return ClosedApiChain.denyAll(http, PATHS, exceptionResolver);
+        return ApiSecurity.statelessApi(http.securityMatcher(PATHS), exceptionResolver)
+                .authorizeHttpRequests(requests -> requests.anyRequest().denyAll())
+                .build();
     }
 }

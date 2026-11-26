@@ -81,8 +81,9 @@ services:
       DENTASOFT_S3_SECRET_KEY: ${DENTASOFT_S3_SECRET_KEY:?set DENTASOFT_S3_SECRET_KEY in .env}
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: "1025"
-      # Keycloak from inside Docker is http://keycloak:8080, but the tokens it issues carry the
-      # public URL (DENTASOFT_URLS_AUTH) as issuer: M02 has to handle both when it adds JWT.
+      # Tokens carry the public URL (DENTASOFT_URLS_AUTH) as issuer, but from inside Docker
+      # Keycloak's signing keys are at http://keycloak:8080 (M02-T02).
+      DENTASOFT_AUTH_JWK_SET_URI: http://keycloak:8080/realms/dentasoft/protocol/openid-connect/certs
     depends_on:
       postgres:
         condition: service_healthy

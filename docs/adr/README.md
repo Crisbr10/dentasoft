@@ -17,6 +17,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0011](0011-rol-de-plataforma-en-base-de-datos.md) | El administrador de la plataforma usa su propio rol de base de datos | Aceptada |
 | [0012](0012-registro-de-auditoria.md) | Registro de auditoría inmutable, sin datos personales y en la transacción del cambio | Aceptada |
 | [0013](0013-procesos-sin-usuario-y-tareas-programadas.md) | Procesos sin usuario clínica a clínica y tareas programadas con ShedLock | Aceptada |
+| [0014](0014-validacion-de-tokens-y-limite-antes-de-autenticar.md) | Validación de tokens de Keycloak y límite por IP antes de autenticar | Aceptada |
 
 ## Plantilla
 

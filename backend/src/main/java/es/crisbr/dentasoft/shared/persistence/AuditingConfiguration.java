@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.shared.persistence;
 
+import es.crisbr.dentasoft.shared.CurrentUser;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,12 +16,12 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 class AuditingConfiguration {
 
     /**
-     * The user behind each change. Empty until users exist: M02 replaces it with the Keycloak user ID ({@code sub})
-     * of the authenticated request.
+     * The user behind each change: the Keycloak user ID ({@code sub}) of the authenticated request. Empty for the
+     * system (scheduled jobs, asynchronous listeners), which leaves {@code created_by} and {@code updated_by} empty.
      */
     @Bean
     AuditorAware<UUID> auditor() {
-        return Optional::empty;
+        return CurrentUser::id;
     }
 
     /**

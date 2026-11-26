@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -76,6 +77,7 @@ class RequestSizeTests {
 
     private HttpResponse<String> post(HttpRequest.BodyPublisher body) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/test/echo"))
+                .header("Authorization", TestTokens.anyUser())
                 .header("Content-Type", "application/json")
                 .POST(body)
                 .build();

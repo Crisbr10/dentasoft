@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 
+import es.crisbr.dentasoft.TestSecurityContext;
+import es.crisbr.dentasoft.WithJwtUser;
 import es.crisbr.dentasoft.audit.AuditLogDatabase;
 import es.crisbr.dentasoft.audit.AuditLogDatabase.StoredEntry;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
@@ -16,6 +18,7 @@ import es.crisbr.dentasoft.tenancy.persistence.ClinicSettings;
 import es.crisbr.dentasoft.tenancy.persistence.ClinicSettingsRepository;
 import es.crisbr.dentasoft.tenancy.persistence.HoursOfOperation;
 import es.crisbr.dentasoft.tenancy.persistence.HoursOfOperationRepository;
+import es.crisbr.dentasoft.tenancy.persistence.Location;
 import es.crisbr.dentasoft.tenancy.persistence.LocationRepository;
 import java.sql.SQLException;
 import java.time.DayOfWeek;
@@ -33,6 +36,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * not happen.
  */
 class ClinicConfigurationAuditTests extends ClinicConfigurationTestBase {
+
+    private static final UUID USER = UUID.fromString(WithJwtUser.DEFAULT_SUB);
 
     @Autowired
     private Locations locations;
@@ -72,13 +77,42 @@ class ClinicConfigurationAuditTests extends ClinicConfigurationTestBase {
             assertThat(entry.entityType()).isEqualTo("LOCATION");
             assertThat(entry.entityId()).isEqualTo(created.id());
             assertThat(entry.outcome()).isEqualTo("SUCCESS");
-            // No users until M02: the system acts, without an id. No request here, so no request id either.
-            assertThat(entry.actorType()).isEqualTo("SYSTEM");
-            assertThat(entry.actorId()).isNull();
+            // The signed-in user acts, with the token's sub. No request here, so no request id either.
+            assertThat(entry.actorType()).isEqualTo("USER");
+            assertThat(entry.actorId()).isEqualTo(USER);
             assertThat(entry.requestId()).isNull();
             assertThat(entry.details()).isNull();
         });
         assertThat(AuditLogDatabase.entries(CLINIC_B, created.id())).isEmpty();
+    }
+
+    /** {@code created_by} keeps who created the room; {@code updated_by} follows whoever changed it last. */
+    @Test
+    void theAuditColumnsRecordTheUsersWhoMadeTheChanges() throws SQLException {
+        UUID otherUser = UUID.fromString("0190a6e8-0000-7000-8000-00000000beef");
+        LocationDetails created = asClinicA(() -> locations.create(new LocationData("Gabinete 2", null)));
+
+        Location stored = storedLocation(created.id());
+        assertThat(stored.getCreatedBy()).isEqualTo(USER);
+        assertThat(stored.getUpdatedBy()).isEqualTo(USER);
+
+        TestSecurityContext.runAs(
+                otherUser,
+                List.of("ADMIN_CLINICA"),
+                () -> asClinicA(() ->
+                        locations.update(created.id(), new LocationData("Gabinete 2 bis", null), created.version())));
+
+        Location updated = storedLocation(created.id());
+        assertThat(updated.getCreatedBy()).isEqualTo(USER);
+        assertThat(updated.getUpdatedBy()).isEqualTo(otherUser);
+        assertThat(AuditLogDatabase.entries(CLINIC_A, created.id()))
+                .extracting(StoredEntry::actorType, StoredEntry::actorId)
+                .containsExactly(tuple("USER", USER), tuple("USER", otherUser));
+    }
+
+    private Location storedLocation(UUID id) {
+        return asClinicA(() ->
+                transaction.execute(status -> locationRepository.findById(id).orElseThrow()));
     }
 
     @Test

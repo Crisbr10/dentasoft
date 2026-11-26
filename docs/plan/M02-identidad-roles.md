@@ -46,13 +46,23 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T02 · Spring Security como Resource Server
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T01, M00-T08
-- **Descripción**: cadena de seguridad sin estado que valida el JWT de Keycloak (emisor y audiencia `dentasoft-api`), con CORS por variable y rutas públicas mínimas (health, webhooks firmados).
+- **Descripción**: cadena de seguridad sin estado que valida el JWT de Keycloak (emisor y audiencia `dentasoft-api`), con CORS por variable y rutas públicas mínimas (health, liveness y readiness). Las rutas de webhooks se abren con el primer webhook (M07-T04), no antes. `/api/v1/clinic/**` sigue cerrada con `denyAll` hasta M02-T04, que fija la clínica activa.
 - **Criterios de aceptación**:
-  - [ ] Token de otra audiencia o caducado → 401
-  - [ ] Tests con tokens generados en el test, sin Keycloak real
-  - [ ] Una clínica suspendida no puede ser la clínica activa (403 con ProblemDetail) y hay un test que lo comprueba
+  - [x] Token de otra audiencia o caducado → 401
+  - [x] Tests con tokens generados en el test, sin Keycloak real
+  - [x] El emisor sale de `dentasoft.urls.auth` y el realm; la audiencia `dentasoft-api` se exige; solo RS256 (se rechazan `none` y HS256, también firmado con la clave pública); `exp` obligatorio con 30 s de tolerancia; `sub` debe ser un UUID
+  - [x] `jwk-set-uri` explícito: la aplicación arranca aunque Keycloak no responda, y con el JWKS colgado la petición da 401 en segundos (2 s de conexión y 3 s de lectura)
+  - [x] `typ: Bearer` obligatorio: un ID token o un refresh token dan 401
+  - [x] El límite anónimo por IP se aplica antes de Spring Security y cuenta también los 401: muchas peticiones con un token falso desde la misma IP acaban en 429 sin validar la firma, también en paralelo
+  - [x] El 401 lleva `X-Request-Id` y el fallo del JWKS se registra sin datos del token
+  - [x] 401 sin token, caducado, de otra audiencia, de otro emisor, firmado con otra clave, con `alg: none` y con HS256; 401 y 403 con `ProblemDetail` que no dice por qué se rechazó el token
+  - [x] `realm_access.roles` → `ROLE_PLATFORM_ADMIN`; `/api/v1/platform/**` solo para `PLATFORM_ADMIN`
+  - [x] `CurrentActor` registra `USER` con el `sub`; `created_by`/`updated_by` y el `actor_id` de las entradas `PLATFORM` guardan ese `sub`
+  - [x] CORS sin credenciales, con los orígenes exactos de la variable y solo los métodos y cabeceras que usa la API
+  - [x] Rutas públicas: solo health, liveness y readiness, y `/v3/api-docs/**` y `/swagger-ui/**` mientras `springdoc.api-docs.enabled` esté activo; test de que fuera del perfil local no devuelven la documentación
+- **Nota**: el criterio «una clínica suspendida no puede ser la clínica activa» se ha movido a M02-T04, que es la tarea que fija la clínica activa a partir de la petición y valida la membresía.
 
 ### M02-T03 · Usuarios y membresías
 
@@ -62,7 +72,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Criterios de aceptación**:
   - [ ] Un usuario puede pertenecer a varias clínicas con roles distintos
   - [ ] Un usuario sin membresías activas no puede operar
-- **Nota**: cuando el registro de auditoría empiece a guardar `USER` con el usuario del token, los procesos sin usuario (`ClinicBatch`, listeners con `ClinicTransactions`, M01-T08) deben seguir registrándose como `SYSTEM`: sin usuario autenticado, `SYSTEM`. Hoy `ClinicBatchTests.changesMadeByABatchAreAuditedAsTheSystem` pasa siempre porque todo es `SYSTEM`; a partir de aquí tiene que comprobarlo de verdad. Si se permite lanzar un lote desde una petición con usuario (por ejemplo, un `PLATFORM_ADMIN`), aquí se decide si se audita como ese usuario o como `SYSTEM`; en el segundo caso, `ClinicTransactions` tendrá que fijar el actor o limpiar el `SecurityContext`.
+- **Nota**: desde M02-T02 el registro de auditoría guarda `USER` con el `sub` del token, y los procesos sin usuario (`ClinicBatch`, listeners con `ClinicTransactions`, M01-T08) siguen registrándose como `SYSTEM`: sin usuario autenticado, `SYSTEM`. Una autenticación que no sea de token se rechaza en lugar de registrarse como `SYSTEM` (`shared.CurrentUser`). Si se permite lanzar un lote desde una petición con usuario (por ejemplo, un `PLATFORM_ADMIN`), aquí se decide si se audita como ese usuario o como `SYSTEM`; en el segundo caso, `ClinicTransactions` tendrá que fijar el actor o limpiar el `SecurityContext`.
 
 ### M02-T04 · Filtro de clínica activa
 
@@ -71,6 +81,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Descripción**: `TenantFilter` que lee `X-Clinic-Id`, comprueba la membresía activa y que la clínica no esté suspendida, fija el `TenantContext` y convierte el rol de clínica en autoridades de Spring.
 - **Criterios de aceptación**:
   - [ ] Clínica ajena o suspendida → 403
+  - [ ] Una clínica suspendida no puede ser la clínica activa (403 con ProblemDetail) y hay un test que lo comprueba (criterio movido desde M02-T02)
   - [ ] `@PreAuthorize("hasRole('ODONTOLOGO')")` funciona con el rol de la clínica activa
   - [ ] Test de que no se puede cambiar de clínica a mitad de petición
 

@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,6 +40,9 @@ class RateLimiter {
     /** The shared buckets; any exception means they cannot be used right now. */
     interface DistributedBuckets {
         ConsumptionProbe tryConsume(String key, BucketConfiguration configuration);
+
+        /** Gives back one request counted by {@link #tryConsume}, never above the capacity. */
+        void refund(String key, BucketConfiguration configuration);
     }
 
     static final String REDIS_AVAILABLE_METRIC = "dentasoft.rate.limit.redis.available";
@@ -74,7 +78,7 @@ class RateLimiter {
                 .description("1 while Redis holds the rate limits, 0 while the per-instance fallback is in use")
                 .register(registry);
         fallbacks = Counter.builder(FALLBACK_METRIC)
-                .description("Requests checked against the per-instance fallback because Redis was unavailable")
+                .description("Checks and counts done against the per-instance fallback because Redis was unavailable")
                 .register(registry);
         for (Scope scope : Scope.values()) {
             rejections.put(
@@ -95,11 +99,35 @@ class RateLimiter {
         return probe;
     }
 
+    /**
+     * Gives back one request of {@code key} counted by {@link #tryConsume}: for limits that count every request up
+     * front, so concurrent requests cannot slip through, but only keep some once they are done (the client IP limit
+     * keeps the requests that end without a user).
+     */
+    void refund(String key, Scope scope) {
+        BucketConfiguration configuration = configurations.get(scope);
+        distributedOrLocal(
+                buckets -> {
+                    buckets.refund(key, configuration);
+                    return null;
+                },
+                local -> {
+                    local.get(key, configuration).addTokens(1);
+                    return null;
+                });
+    }
+
     private ConsumptionProbe distributedOrLocal(String key, BucketConfiguration configuration) {
+        return distributedOrLocal(
+                buckets -> buckets.tryConsume(key, configuration),
+                local -> local.get(key, configuration).tryConsumeAndReturnRemaining(1));
+    }
+
+    private <T> T distributedOrLocal(Function<DistributedBuckets, T> distributed, Function<LocalBuckets, T> local) {
         Instant now = clock.instant();
         if (mayUseRedis(now)) {
             try {
-                ConsumptionProbe probe = redis.tryConsume(key, configuration);
+                T probe = distributed.apply(redis);
                 if (redisAvailable.compareAndSet(false, true)) {
                     log.info("Redis is available again for rate limiting");
                 }
@@ -112,7 +140,7 @@ class RateLimiter {
         }
         fallbacks.increment();
         fallbacksSinceWarning.incrementAndGet();
-        return localBuckets.get(key, configuration).tryConsumeAndReturnRemaining(1);
+        return local.apply(localBuckets);
     }
 
     /**

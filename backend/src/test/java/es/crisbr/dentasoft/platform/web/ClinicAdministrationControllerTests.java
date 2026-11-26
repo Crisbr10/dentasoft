@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jayway.jsonpath.JsonPath;
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.WithJwtUser;
 import es.crisbr.dentasoft.platform.PlatformTestDatabase;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -16,7 +17,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -27,7 +27,7 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
  */
 @IntegrationTest
 @AutoConfigureMockMvc(addFilters = false)
-@WithMockUser(roles = "PLATFORM_ADMIN")
+@WithJwtUser(roles = "PLATFORM_ADMIN")
 class ClinicAdministrationControllerTests {
 
     private static final String CLINICS = "/api/v1/platform/clinics";
@@ -253,7 +253,7 @@ class ClinicAdministrationControllerTests {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN_CLINICA")
+    @WithJwtUser(roles = "ADMIN_CLINICA")
     void anotherRoleIsForbiddenByTheService() {
         assertThat(mvc.get().uri(CLINICS))
                 .hasStatus(HttpStatus.FORBIDDEN)
