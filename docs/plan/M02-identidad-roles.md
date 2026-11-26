@@ -35,14 +35,14 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T01 · Realm de Keycloak versionado
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T03
 - **Descripción**: realm `dentasoft` con cliente público `dentasoft-web` (PKCE S256), scope `dentasoft-api` con audiencia, organizaciones activadas, OTP obligatorio, protección contra fuerza bruta, política de contraseñas y SMTP a Mailpit; exportado a `infra/keycloak/realm-dentasoft.json` e importado al arrancar. Redirect URIs, orígenes web y SMTP se parametrizan con variables de entorno (ADR 0006).
 - **Criterios de aceptación**:
-  - [ ] `docker compose up` deja el realm listo sin pasos manuales
-  - [ ] El fichero exportado no contiene contraseñas de usuarios reales
-  - [ ] Usuarios de prueba (inventados) documentados para local
-  - [ ] Ningún dominio escrito en el JSON del realm: redirect URIs y orígenes salen de variables
+  - [x] `docker compose up` deja el realm listo sin pasos manuales
+  - [x] El fichero exportado no contiene contraseñas de usuarios reales
+  - [x] Usuarios de prueba (inventados) documentados para local
+  - [x] Ningún dominio escrito en el JSON del realm: redirect URIs y orígenes salen de variables
 
 ### M02-T02 · Spring Security como Resource Server
 

@@ -9,6 +9,8 @@ Servicios de apoyo de Dentasoft para desarrollo, con Docker Compose.
 | `.env.example` | Versiones fijadas de las imágenes y contraseñas de ejemplo (falsas). |
 | `postgres/init/01-init.sh` | Crea bases, roles y la extensión `vector` (solo en el primer arranque). |
 | `postgres/init/02-platform-role.sh` | Crea el rol de plataforma `dentasoft_platform` (primer arranque; se puede repetir a mano). |
+| `keycloak/realm-dentasoft.json` | Realm `dentasoft` de Keycloak, importado si aún no existe. |
+| `keycloak/local/dentasoft-users-0.json` | Usuarios de prueba inventados. Solo en local. |
 
 ## Arrancar
 
@@ -19,6 +21,8 @@ docker compose -f compose.yml -f compose.local.yml up -d --wait
 ```
 
 `--wait` termina cuando todos los servicios están sanos (o falla si alguno no lo consigue). `.env` está en `.gitignore`: nunca lo subas.
+
+Si tu `.env` es de antes de una tarea que añade variables (por ejemplo, las del realm de Keycloak de M02-T01), Compose no arranca ningún servicio y dice cuál falta (`required variable … is missing a value`). Copia las líneas nuevas de `.env.example` a tu `.env` y vuelve a lanzar el comando.
 
 Para parar sin borrar datos:
 
@@ -75,7 +79,7 @@ El script `postgres/init/01-init.sh` crea:
 
 El script `postgres/init/02-platform-role.sh` crea el rol `dentasoft_platform`, con el que la administración de la plataforma ve todas las clínicas (ADR 0011). Necesita `DENTASOFT_DB_PLATFORM_PASSWORD` en `.env`. A diferencia de `01-init.sh`, se puede ejecutar sobre una base que ya existe, sin borrar el volumen: ver [`docs/operaciones/rol-de-plataforma.md`](../docs/operaciones/rol-de-plataforma.md).
 
-Las tablas y sus permisos son cosa de las migraciones de Flyway (M01-T01), y el realm de Keycloak de M02-T01.
+Las tablas y sus permisos son cosa de las migraciones de Flyway (M01-T01); el realm de Keycloak se describe más abajo.
 
 > **Importante**: PostgreSQL ejecuta el script **solo cuando el volumen de datos está vacío**, es decir, en el primer arranque. Si cambias el script o las contraseñas de la base en `.env`, no se aplican solas: hay que borrar el volumen, **lo que elimina todos los datos locales** (también los de Keycloak):
 >
@@ -84,6 +88,63 @@ Las tablas y sus permisos son cosa de las migraciones de Flyway (M01-T01), y el 
 > docker volume rm dentasoft_postgres-data
 > docker compose -f compose.yml -f compose.local.yml up -d --wait
 > ```
+
+## Realm de Keycloak
+
+Keycloak arranca con `--import-realm` y crea el realm `dentasoft` desde `keycloak/realm-dentasoft.json` (M02-T01). `up --wait` termina cuando Keycloak está sano, y para entonces el realm ya está importado: no hay pasos manuales.
+
+Qué configura el realm:
+
+| Ajuste | Valor |
+| --- | --- |
+| Cliente `dentasoft-web` | Público, solo *authorization code* con PKCE S256. Sin *password grant*, *implicit* ni *device flow* |
+| Redirect URI, origen web y *post-logout* | Exactos, sin comodines: `${DENTASOFT_URLS_APP}/` y `${DENTASOFT_URLS_APP}` |
+| Scope `dentasoft-api` | Añade `dentasoft-api` a la audiencia (`aud`) del token de acceso |
+| Roles en el token | Solo `PLATFORM_ADMIN` (`fullScopeAllowed: false`). Los roles de clínica viven en la base de datos (M02-T03) |
+| Login | Contraseña y OTP (TOTP) obligatorios. Quien no tiene OTP lo configura en su primer login |
+| *Password grant* | Denegado en todo el realm, también para `admin-cli` |
+| Tokens | Acceso de 5 minutos. Cada refresh token sirve una sola vez (`revokeRefreshToken`, `refreshTokenMaxReuse: 0`) |
+| Sesión | 30 minutos de inactividad y 10 horas como máximo |
+| Fuerza bruta | Bloqueo temporal tras 5 fallos, con espera creciente hasta 15 minutos |
+| Contraseñas | 12 caracteres o más (128 como máximo), distinta del usuario y del email, sin repetir las 5 últimas |
+| Altas | Registro desactivado: crean los usuarios la clínica o la plataforma. Verificación de email y recuperación de contraseña por SMTP |
+| Organizaciones | Activadas |
+| Eventos de seguridad | Login y administración guardados 90 días, sin el detalle de las peticiones de administración. Sin *listener* de log, para no escribir usuarios ni IP en el log del contenedor |
+
+El JSON no lleva dominios ni secretos: Keycloak sustituye al importar los `${DENTASOFT_...}` por las variables del contenedor, que `compose.yml` toma de `.env`:
+
+| Variable | Para qué | Local |
+| --- | --- | --- |
+| `DENTASOFT_URLS_APP` | Redirect URI, origen web y *post-logout* de `dentasoft-web` | `http://localhost:4200` |
+| `DENTASOFT_MAIL_FROM` | Remitente de los emails de Keycloak | Uno inventado, `.test` |
+| `DENTASOFT_KC_SMTP_HOST` / `_PORT` | Servidor SMTP | `mailpit` / `1025` |
+| `DENTASOFT_KC_SMTP_AUTH` / `_STARTTLS` / `_SSL` | Autenticación y cifrado SMTP | `false` |
+| `DENTASOFT_KC_SMTP_USER` / `_PASSWORD` | Credenciales SMTP (opcionales) | Vacías |
+| `DENTASOFT_KC_LOCAL_USERS_PASSWORD` | Contraseña de los usuarios de prueba (solo `compose.local.yml`) | Cualquiera que cumpla la política |
+
+`KeycloakRealmFileTests` (backend) lee los ficheros sin arrancar Keycloak. Falla si el JSON tiene un dominio, un comodín en las redirecciones, un secreto fuera de una variable o una variable que Compose no pasa a Keycloak. También falla si cambia alguno de los valores de la tabla: el cliente, la audiencia, los roles, el flujo de login con OTP, el *password grant*, los tokens, las sesiones, la fuerza bruta, la política de contraseñas, las altas y los eventos. Que Keycloak importe el realm y pida el OTP en el primer login se comprobó a mano con Keycloak 26.8.2. Si cambias el realm o subes la versión de la imagen, repite esa comprobación (`up -d --wait` y un login).
+
+### Cambios en el realm
+
+> **Importante**: `--import-realm` solo importa realms que **no existen**. Si cambias `realm-dentasoft.json` o las variables de `.env` después del primer arranque, el realm que ya está en la base de datos **no cambia**.
+
+- **En local**, para reimportarlo de cero, borra el realm desde la consola de administración (<http://localhost:8180>, realm `dentasoft` → *Realm settings* → *Action* → *Delete*) y reinicia Keycloak: `docker compose -f compose.yml -f compose.local.yml restart keycloak`. Se pierden los usuarios, las sesiones y el OTP configurado de ese realm, pero no el resto de la base de datos.
+- **En pruebas y producción** no se borra el realm: los cambios se aplican en la consola de administración (o con `kcadm.sh`) y también en el JSON, para que un entorno nuevo nazca igual. Ver la nota de M03-T02 y [cambio de dominio](../docs/operaciones/cambio-de-dominio.md).
+
+### Usuarios de prueba (solo local)
+
+`compose.local.yml` monta además `keycloak/local/dentasoft-users-0.json`, que Keycloak importa junto con el realm. Son personas inventadas con dominios reservados `.test` (los emails llegan a Mailpit), y todos usan la contraseña `DENTASOFT_KC_LOCAL_USERS_PASSWORD` de `.env`:
+
+| Usuario | Rol en Keycloak | Para probar |
+| --- | --- | --- |
+| `plataforma@dentasoft.test` | `PLATFORM_ADMIN` | Administración de clínicas (M01) |
+| `admin@clinica-norte.test` | — | `ADMIN_CLINICA` |
+| `odontologa@clinica-norte.test` | — | `ODONTOLOGO` |
+| `recepcion@clinica-norte.test` | — | `RECEPCION` |
+
+Los roles de clínica no están en Keycloak, sino en las membresías de la base de datos, que llegan con M02-T03: hasta entonces estos usuarios solo pueden iniciar sesión. En el primer login, Keycloak pide configurar el OTP con una app de autenticación (FreeOTP, Google Authenticator…).
+
+Este fichero no se monta fuera de local: `KeycloakRealmFileTests` comprueba que `compose.yml` no lo referencia.
 
 ## Almacenamiento S3: SeaweedFS en lugar de MinIO
 
