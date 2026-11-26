@@ -21,7 +21,10 @@ public interface ActivePractitioners {
     /**
      * The practitioner with {@code id}, to give them a new appointment. Locks the record until the caller's
      * transaction ends: call it in the transaction that stores the appointment, so the practitioner cannot be
-     * deactivated between this check and the commit.
+     * deactivated between this check and the commit. That transaction must not be read-only (PostgreSQL takes no lock
+     * in one), and should call this before reading the record any other way, or it may get the copy already read.
+     * Let the exception propagate: it marks the caller's transaction for rollback, so catching it and committing ends
+     * in {@code UnexpectedRollbackException}.
      *
      * @throws PractitionerUnavailableException if the clinic has no practitioner with {@code id}, or it is inactive
      */
