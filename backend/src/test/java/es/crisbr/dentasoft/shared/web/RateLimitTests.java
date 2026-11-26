@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import es.crisbr.dentasoft.TestJwks;
 import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
+import es.crisbr.dentasoft.identity.IdentityTestDatabase;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -253,6 +254,24 @@ class RateLimitTests {
         assertThat(get(from("203.0.113.6"))).hasStatusOk();
     }
 
+    /**
+     * Someone trying clinics spends their own limit: every refused clinic counts, as any other request, because the
+     * per-user limit runs before the active clinic is checked.
+     */
+    @Test
+    void refusedClinicsCountTowardsTheUserLimit() throws Exception {
+        UUID prober = userId("clinic-prober");
+        try {
+            for (int i = 0; i < USER_LIMIT; i++) {
+                assertThat(tryClinic(prober, UUID.randomUUID())).hasStatus(HttpStatus.FORBIDDEN);
+            }
+
+            assertThat(tryClinic(prober, UUID.randomUUID())).hasStatus(HttpStatus.TOO_MANY_REQUESTS);
+        } finally {
+            IdentityTestDatabase.deleteUsers(List.of(prober));
+        }
+    }
+
     @Test
     void kubernetesProbesAreNeverLimited() {
         for (int i = 0; i < ANONYMOUS_LIMIT * 3; i++) {
@@ -303,6 +322,15 @@ class RateLimitTests {
                         HttpHeaders.AUTHORIZATION,
                         TestTokens.token(userId(user)).bearer())
                 .with(from(ip)::apply)
+                .exchange();
+    }
+
+    private MvcTestResult tryClinic(UUID user, UUID clinic) {
+        return mvc.get()
+                .uri("/api/v1/clinic")
+                .header(HttpHeaders.AUTHORIZATION, TestTokens.token(user).bearer())
+                .header("X-Clinic-Id", clinic.toString())
+                .with(from("203.0.113.11")::apply)
                 .exchange();
     }
 

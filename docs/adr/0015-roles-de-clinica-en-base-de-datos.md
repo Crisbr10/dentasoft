@@ -34,6 +34,15 @@ Un usuario trabaja en una o varias clínicas, con un rol en cada una (M02-T03). 
 - **Alta en el primer acceso**:
   - Un filtro posterior a la autenticación ejecuta `INSERT … ON CONFLICT (id) DO NOTHING`, así que dos primeras peticiones simultáneas no fallan.
   - Cada instancia recuerda los últimos 10 000 usuarios vistos para no repetir el insert en cada petición.
+- **Clínica activa** (M02-T04):
+  - Cada petición a `/api/v1/clinic/**` indica su clínica en la cabecera `X-Clinic-Id`.
+  - Un filtro posterior a Spring Security y al alta del usuario (`identity.internal.ActiveClinicFilter`) la comprueba contra la base de datos en cada petición, sin caché: membresía activa, cuenta `ACTIVE` y clínica no suspendida.
+  - La comprobación usa una transacción de solo lectura propia, en la conexión de `dentasoft_app` con `app.user_id`, nunca en la de plataforma. Así `own_memberships` y `member_select` también la imponen en PostgreSQL.
+  - Si pasa, el resto de la petición corre dentro de `TenantContext` con `ROLE_<rol>` añadido a las autoridades del token, solo para esa petición.
+  - Sin cabecera, con la cabecera repetida o con un valor que no es un UUID: 400.
+  - Clínica inexistente, ajena o suspendida, membresía inactiva o cuenta desactivada: el mismo 403 que cualquier otra denegación, registrado en el log solo con los ids del usuario y de la clínica.
+  - `PLATFORM_ADMIN` sin membresía recibe ese mismo 403.
+- **Los roles de clínica solo valen con `@PreAuthorize` en los servicios**: se añaden después de que Spring Security haya autorizado la petición, así que una regla por URL (`requestMatchers(…).hasRole("ODONTOLOGO")`) nunca los ve y deniega siempre. Las cadenas de seguridad solo piden un usuario autenticado.
 - **Membresías**: no hay endpoint para crearlas: llegan con las invitaciones (M02-T05). `ClinicMembership` lleva `@AuditedEntity` desde ya.
 - **Lotes lanzados por un usuario**: si un proceso por lotes se lanza desde una petición, por ejemplo de un `PLATFORM_ADMIN`, se audita como ese usuario (`USER`, con su `sub`). Así se sabe quién lo lanzó. Los que lanza el planificador siguen siendo `SYSTEM` (ADR 0013).
 
@@ -47,6 +56,8 @@ Un usuario trabaja en una o varias clínicas, con un rol en cada una (M02-T03). 
   - Mantener las organizaciones de Keycloak alineadas con las membresías es trabajo de M02-T05.
   - El guardián de RLS tiene dos categorías nuevas: tablas aisladas por usuario y políticas de lectura de la aplicación.
   - Cada nueva política de lectura que amplíe lo que ve `dentasoft_app` necesita su propio motivo.
+  - Cada petición a la API de clínica hace dos lecturas por clave para comprobar la clínica activa.
+  - La clínica y el rol no pasan a otros hilos, así que ningún endpoint responde de forma asíncrona (`DeferredResult`, `Callable`, `CompletableFuture`…). Lo comprueba `NoAsyncEndpointsTests`.
 - **Pendiente para M02-T05**: con `user_isolation`, una invitación no puede crear la fila de `user_account` de otro usuario, y la FK `clinic_membership.user_id → user_account` la exige. M02-T05 decide entre una política de solo `INSERT` (con `status = 'ACTIVE'`) y quitar la FK.
 
 ## Alternativas descartadas
