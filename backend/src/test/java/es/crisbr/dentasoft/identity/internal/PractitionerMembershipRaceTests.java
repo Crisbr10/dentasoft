@@ -4,16 +4,20 @@ import static es.crisbr.dentasoft.TestPostgresConfiguration.connectAsOwner;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.IntegrationTest;
+import es.crisbr.dentasoft.identity.ActivePractitioners;
 import es.crisbr.dentasoft.identity.ClinicRole;
 import es.crisbr.dentasoft.identity.IdentityTestDatabase;
 import es.crisbr.dentasoft.identity.PractitionerSpecialty;
+import es.crisbr.dentasoft.identity.PractitionerUnavailableException;
 import es.crisbr.dentasoft.identity.internal.PractitionerConflictException.Reason;
 import es.crisbr.dentasoft.identity.internal.PractitionerRoles.PractitionerData;
+import es.crisbr.dentasoft.identity.internal.PractitionerRoles.PractitionerDetails;
 import es.crisbr.dentasoft.identity.persistence.PractitionerRoleStatus;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -36,6 +40,9 @@ class PractitionerMembershipRaceTests extends ClinicUsersTestBase {
 
     @Autowired
     private PractitionerRoles practitioners;
+
+    @Autowired
+    private ActivePractitioners activePractitioners;
 
     @Test
     void aRecordCreatedWhileTheMembershipIsBeingDeactivatedIsRefused() throws Exception {
@@ -120,6 +127,43 @@ class PractitionerMembershipRaceTests extends ClinicUsersTestBase {
         }
         assertThat(IdentityTestDatabase.membership(CLINIC_A, dentist)).contains("ODONTOLOGO/false");
         assertThat(asAdmin(() -> practitioners.get(record)).status()).isEqualTo(PractitionerRoleStatus.INACTIVE);
+    }
+
+    /**
+     * A practitioner deactivated while an appointment is being given to them (M06): {@code requireActive} locks the
+     * record ({@code FOR SHARE}), so it waits for the deactivation and then refuses, instead of reading the record as
+     * it was and giving a deactivated practitioner a new appointment.
+     */
+    @Test
+    void aPractitionerDeactivatedWhileBeingChosenIsUnavailable() throws Exception {
+        PractitionerDetails record = asAdmin(() -> practitioners.create(new PractitionerData(
+                null, "Dr. Externo", PractitionerSpecialty.ORTHODONTICS, "28", "4321", "#1E88E5")));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try (Connection deactivation = connectAsOwner()) {
+            deactivation.setAutoCommit(false);
+            setClinic(deactivation);
+            try (PreparedStatement statement =
+                    deactivation.prepareStatement("UPDATE practitioner_role SET status = 'INACTIVE' WHERE id = ?")) {
+                statement.setObject(1, record.id());
+                assertThat(statement.executeUpdate()).isOne();
+            }
+
+            Future<Throwable> choice = executor.submit(() -> {
+                try {
+                    as(ADMIN, List.of("RECEPCION"), () -> activePractitioners.requireActive(record.id()));
+                    return null;
+                } catch (RuntimeException refused) {
+                    return refused;
+                }
+            });
+            awaitAWaitingTransaction(choice);
+            deactivation.commit();
+
+            assertThat(choice.get(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    .isInstanceOf(PractitionerUnavailableException.class);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private static void setClinic(Connection connection) throws SQLException {

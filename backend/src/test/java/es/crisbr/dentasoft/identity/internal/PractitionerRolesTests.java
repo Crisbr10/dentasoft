@@ -295,6 +295,21 @@ class PractitionerRolesTests extends ClinicUsersTestBase {
         assertConflict(() -> asAdmin(() -> practitioners.deactivate(created.id(), created.version())), Reason.VERSION);
     }
 
+    /** A repeated request whose answer was lost succeeds again, with nothing changed and nothing audited twice. */
+    @Test
+    void deactivatingAnInactiveRecordOrActivatingAnActiveOneChangesNothing() throws SQLException {
+        PractitionerDetails created = asAdmin(() -> practitioners.create(external("Dra. Externa", "28", "1234")));
+        PractitionerDetails deactivated = asAdmin(() -> practitioners.deactivate(created.id(), created.version()));
+
+        PractitionerDetails again = asAdmin(() -> practitioners.deactivate(created.id(), created.version()));
+
+        assertThat(again).isEqualTo(deactivated);
+        PractitionerDetails activated = asAdmin(() -> practitioners.activate(created.id(), deactivated.version()));
+        assertThat(asAdmin(() -> practitioners.activate(created.id(), deactivated.version())))
+                .isEqualTo(activated);
+        assertThat(AuditLogDatabase.actions(CLINIC_A, created.id())).containsExactly("CREATE", "UPDATE", "UPDATE");
+    }
+
     @Test
     void anotherClinicsRecordIsNotFound() {
         PractitionerDetails inB = as(

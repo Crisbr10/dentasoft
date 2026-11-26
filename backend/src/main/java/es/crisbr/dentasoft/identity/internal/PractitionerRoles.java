@@ -149,15 +149,19 @@ public class PractitionerRoles implements ActivePractitioners {
 
     /**
      * Takes the practitioner out of new appointments; the appointments already given keep them. Deactivating an
-     * inactive record changes nothing.
+     * inactive record changes nothing and ignores {@code version}, so a repeated request succeeds.
      *
      * @throws PractitionerNotFoundException if the active clinic has no record with {@code id}
-     * @throws PractitionerConflictException if the record changed since the client read {@code version}
+     * @throws PractitionerConflictException if the record is active and changed since the client read {@code version}
      */
     @PreAuthorize(ADMIN)
     @Transactional
     public PractitionerDetails deactivate(UUID id, long version) {
         PractitionerRole practitioner = find(id);
+        if (!practitioner.isActive()) {
+            // A repeated request, whose answer may have been lost: it succeeds again, whatever version it carries.
+            return PractitionerDetails.of(practitioner);
+        }
         requireVersion(practitioner, version);
         practitioner.setStatus(PractitionerRoleStatus.INACTIVE);
         flush();
@@ -166,7 +170,8 @@ public class PractitionerRoles implements ActivePractitioners {
 
     /**
      * Offers the practitioner for new appointments again. A linked record needs its user to be eligible again:
-     * reactivating a membership never reactivates the record by itself. Activating an active record changes nothing.
+     * reactivating a membership never reactivates the record by itself. Activating an active record changes nothing and
+     * ignores {@code version}, so a repeated request succeeds.
      *
      * @throws PractitionerNotFoundException if the active clinic has no record with {@code id}
      * @throws PractitionerConflictException if the record changed since the client read {@code version}, its user is
@@ -176,19 +181,18 @@ public class PractitionerRoles implements ActivePractitioners {
     @Transactional
     public PractitionerDetails activate(UUID id, long version) {
         PractitionerRole practitioner = find(id);
+        if (practitioner.isActive()) {
+            return PractitionerDetails.of(practitioner);
+        }
         requireVersion(practitioner, version);
-        if (!practitioner.isActive()) {
-            UUID user = practitioner.getUserId();
-            if (user != null) {
-                requireEligible(user, practitioner.getSpecialty());
-            }
-            String province = practitioner.getLicenseProvince();
-            String number = practitioner.getLicenseNumber();
-            if (province != null
-                    && number != null
-                    && practitioners.existsOtherActiveWithLicense(province, number, id)) {
-                throw new PractitionerConflictException(Reason.LICENSE_TAKEN);
-            }
+        UUID user = practitioner.getUserId();
+        if (user != null) {
+            requireEligible(user, practitioner.getSpecialty());
+        }
+        String province = practitioner.getLicenseProvince();
+        String number = practitioner.getLicenseNumber();
+        if (province != null && number != null && practitioners.existsOtherActiveWithLicense(province, number, id)) {
+            throw new PractitionerConflictException(Reason.LICENSE_TAKEN);
         }
         practitioner.setStatus(PractitionerRoleStatus.ACTIVE);
         flushCheckingKeys();
@@ -204,12 +208,13 @@ public class PractitionerRoles implements ActivePractitioners {
                 .toList();
     }
 
+    /** Not read-only: PostgreSQL takes no {@code FOR SHARE} lock in a read-only transaction. */
     @Override
     @PreAuthorize(MEMBER)
-    @Transactional(readOnly = true)
+    @Transactional
     public PractitionerSummary requireActive(UUID id) {
         return practitioners
-                .findById(id)
+                .lockSharedById(id)
                 .filter(PractitionerRole::isActive)
                 .map(PractitionerRoles::summary)
                 .orElseThrow(PractitionerUnavailableException::new);

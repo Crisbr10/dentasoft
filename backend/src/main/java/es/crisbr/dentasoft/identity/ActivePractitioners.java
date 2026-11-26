@@ -10,7 +10,8 @@ import java.util.UUID;
  * for new appointments ({@link #list()}, {@link #requireActive}), but what was already given with them keeps showing
  * them ({@link #describe}): practitioner records are never deleted.
  *
- * <p>For any member of the clinic: reception books appointments too.
+ * <p>For any member of the clinic: reception books appointments too. A signed-in member is required, so processes
+ * without a user (M07 reminders) cannot call it yet: the task that first needs it decides how they may.
  */
 public interface ActivePractitioners {
 
@@ -18,7 +19,9 @@ public interface ActivePractitioners {
     List<PractitionerSummary> list();
 
     /**
-     * The practitioner with {@code id}, to give them a new appointment.
+     * The practitioner with {@code id}, to give them a new appointment. Locks the record until the caller's
+     * transaction ends: call it in the transaction that stores the appointment, so the practitioner cannot be
+     * deactivated between this check and the commit.
      *
      * @throws PractitionerUnavailableException if the clinic has no practitioner with {@code id}, or it is inactive
      */
