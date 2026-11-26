@@ -25,8 +25,9 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * What every security chain of the API shares: a stateless OAuth2 Resource Server that authenticates the Keycloak
  * access token in the {@code Authorization: Bearer} header. The decoder and the conversion of the token into a user
  * with roles are beans of the {@code identity} module. Each chain then adds its own rules: the platform API requires
- * {@code PLATFORM_ADMIN}, the clinic API stays closed until the active clinic exists (M02-T04), and the application's
- * chain requires an authenticated user except on the health checks.
+ * {@code PLATFORM_ADMIN}, the clinic API ({@link #CLINIC_API}) an authenticated user whose active clinic the {@code
+ * identity} module then checks ({@link #CLINIC_HEADER}), and the application's chain an authenticated user except on
+ * the health checks.
  *
  * <p>Refusals are answered by the MVC exception resolvers, so the client gets the same {@code ProblemDetail} as from
  * any other error: 401 without a valid token, 403 with a token that lacks the right. Neither says why: an expired
@@ -39,6 +40,15 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * Spring Security does not write them a second time and a 401 still carries the CORS headers the browser needs.
  */
 public final class ApiSecurity {
+
+    /**
+     * The clinic API: everything under it acts on the request's active clinic, named in {@link #CLINIC_HEADER}. Its
+     * security chain and the filter that checks the clinic both match this pattern, so they cover the same requests.
+     */
+    public static final String CLINIC_API = "/api/v1/clinic/**";
+
+    /** The header in which every request to the {@link #CLINIC_API} names its active clinic, by ID. */
+    public static final String CLINIC_HEADER = "X-Clinic-Id";
 
     private static final Logger log = LoggerFactory.getLogger(ApiSecurity.class);
 

@@ -108,7 +108,9 @@ class SecurityHeadersAndCorsTests {
                     .uri(path)
                     .header(HttpHeaders.ORIGIN, WithTestEnvironment.APP)
                     .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
-                    .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization, content-type, x-request-id")
+                    .header(
+                            HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
+                            "authorization, content-type, x-request-id, x-clinic-id")
                     .exchange();
 
             assertThat(result).hasStatusOk();
@@ -119,14 +121,15 @@ class SecurityHeadersAndCorsTests {
             assertThat(result.getResponse().getHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS))
                     .containsIgnoringCase("authorization")
                     .containsIgnoringCase("content-type")
-                    .containsIgnoringCase("x-request-id");
+                    .containsIgnoringCase("x-request-id")
+                    .containsIgnoringCase("x-clinic-id");
             assertThat(result.getResponse().getHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS))
                     .isEqualTo("GET,POST,PUT");
         }
 
-        /** Only what the API uses today: no clinic header until M02-T04, no PATCH or DELETE endpoint yet. */
+        /** Only what the API uses today: no cookies, no PATCH or DELETE endpoint yet. */
         @ParameterizedTest
-        @ValueSource(strings = {"x-clinic-id", "cookie"})
+        @ValueSource(strings = {"cookie", "x-forwarded-for"})
         void preflightWithAHeaderTheApiDoesNotUseYetIsRejected(String header) {
             assertThat(mvc.options()
                             .uri("/api/v1/test/ping")

@@ -3,6 +3,7 @@ package es.crisbr.dentasoft.identity.internal;
 import es.crisbr.dentasoft.identity.ClinicRole;
 import es.crisbr.dentasoft.shared.CurrentUser;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,5 +58,21 @@ public class UserAccounts {
                 .query((row, rowNumber) -> new ActiveMembership(
                         row.getObject("tenant_id", UUID.class), ClinicRole.valueOf(row.getString("role"))))
                 .list();
+    }
+
+    /**
+     * The signed-in user's role in {@code clinicId}, if they have an active membership there and their account is
+     * active. Row Level Security only shows the user's own memberships, so another user's never counts.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ClinicRole> activeRoleIn(UUID clinicId) {
+        UUID user = CurrentUser.id().orElseThrow(() -> new IllegalStateException("No signed-in user"));
+        return jdbc.sql("SELECT m.role FROM clinic_membership m"
+                        + " JOIN user_account u ON u.id = m.user_id"
+                        + " WHERE m.user_id = :user AND m.tenant_id = :clinic AND m.active AND u.status = 'ACTIVE'")
+                .param("user", user)
+                .param("clinic", clinicId)
+                .query((row, rowNumber) -> ClinicRole.valueOf(row.getString("role")))
+                .optional();
     }
 }

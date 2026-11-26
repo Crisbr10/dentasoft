@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.shared.web;
 
+import es.crisbr.dentasoft.shared.ApiSecurity;
 import es.crisbr.dentasoft.shared.DentasoftUrls;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -44,8 +45,8 @@ class WebConfiguration {
 
     /**
      * Browser access from {@code dentasoft.cors.allowed-origins} only, the exact origins of the variable. No
-     * credentials: the API uses Bearer tokens, never cookies. Only the methods and headers the API uses: {@code
-     * X-Clinic-Id} joins them when the active clinic does (M02-T04), and {@code PATCH} or {@code DELETE} with the first
+     * credentials: the API uses Bearer tokens, never cookies. Only the methods and headers the API uses, the active
+     * clinic's {@link ApiSecurity#CLINIC_HEADER} among them; {@code PATCH} or {@code DELETE} join with the first
      * endpoint that needs them. The {@code CorsFilter} runs before Spring Security, so preflights need no token and a
      * 401 still carries the headers the browser needs to read it.
      */
@@ -54,7 +55,11 @@ class WebConfiguration {
         CorsConfiguration cors = new CorsConfiguration();
         cors.setAllowedOrigins(properties.allowedOrigins());
         cors.setAllowedMethods(List.of("GET", "POST", "PUT"));
-        cors.setAllowedHeaders(List.of(HttpHeaders.AUTHORIZATION, HttpHeaders.CONTENT_TYPE, RequestIdFilter.HEADER));
+        cors.setAllowedHeaders(List.of(
+                HttpHeaders.AUTHORIZATION,
+                HttpHeaders.CONTENT_TYPE,
+                RequestIdFilter.HEADER,
+                ApiSecurity.CLINIC_HEADER));
         cors.setExposedHeaders(List.of(RequestIdFilter.HEADER, HttpHeaders.RETRY_AFTER));
         cors.setAllowCredentials(false);
         cors.setMaxAge(Duration.ofHours(1));
