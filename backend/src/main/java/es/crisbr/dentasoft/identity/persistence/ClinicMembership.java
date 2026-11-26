@@ -14,7 +14,7 @@ import java.util.UUID;
 /**
  * What a user is in the active clinic ({@code clinic_membership}, V007): one role per clinic. Memberships come with the
  * invitations of M02-T05; no one can create their own. Never deleted: a membership that ends is made inactive, and an
- * inactive membership grants nothing.
+ * inactive membership grants nothing until an administrator invites the person again.
  *
  * <p>Every insert, change of role and deactivation is recorded in {@code audit_log}.
  */
@@ -58,5 +58,11 @@ public class ClinicMembership extends TenantScopedEntity {
 
     public void deactivate() {
         this.active = false;
+    }
+
+    /** Makes an inactive membership active again, with {@code role}: what inviting the person again does (M02-T05). */
+    public void reactivate(ClinicRole role) {
+        this.role = role;
+        this.active = true;
     }
 }
