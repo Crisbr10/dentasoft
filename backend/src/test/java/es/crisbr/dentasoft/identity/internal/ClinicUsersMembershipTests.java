@@ -286,8 +286,9 @@ class ClinicUsersMembershipTests extends ClinicUsersTestBase {
                 .findFirst()
                 .orElseThrow();
         assertThat(listed.role()).isEqualTo(ClinicRole.ODONTOLOGO);
+        assertThat(listed.invitationPending()).isFalse();
         assertThat(listed.profile())
-                .isEqualTo(new ClinicUserDetails.Profile("pendiente@clinica-a.test", "Luis", "Pruebas", true));
+                .isEqualTo(new ClinicUserDetails.Profile("pendiente@clinica-a.test", "Luis", "Pruebas"));
         // The administrator is not in the fake Keycloak: no profile, but still listed.
         assertThat(page.stream().filter(details -> details.userId().equals(ADMIN)))
                 .singleElement()

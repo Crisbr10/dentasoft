@@ -23,10 +23,11 @@ public interface ClinicMembershipRepository extends JpaRepository<ClinicMembersh
     Optional<ClinicMembership> findByUserId(UUID userId);
 
     /**
-     * The active clinic's active memberships with {@code role}, locked ({@code SELECT … FOR UPDATE}) until the
+     * The active clinic's active and accepted memberships with {@code role}, locked ({@code SELECT … FOR UPDATE}) until the
      * transaction ends: two changes that each check how many administrators remain run one after the other.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT m FROM ClinicMembership m WHERE m.role = :role AND m.active = true ORDER BY m.id")
+    @Query("SELECT m FROM ClinicMembership m WHERE m.role = :role AND m.active = true AND m.acceptedAt IS NOT NULL"
+            + " ORDER BY m.id")
     List<ClinicMembership> lockActiveWithRole(ClinicRole role);
 }

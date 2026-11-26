@@ -36,6 +36,9 @@ abstract class ClinicUsersTestBase {
     FakeKeycloak keycloak;
 
     @Autowired
+    MyClinics myClinics;
+
+    @Autowired
     private StringRedisTemplate redis;
 
     /** Users of the database to delete after the test, besides those the fake Keycloak knows. */
@@ -101,6 +104,11 @@ abstract class ClinicUsersTestBase {
         AtomicReference<T> result = new AtomicReference<>();
         TestSecurityContext.runAs(user, roles, () -> TenantContext.runAs(clinic, () -> result.set(operation.get())));
         return result.get();
+    }
+
+    /** {@code user} accepts their invitation, as {@code POST /api/v1/me/invitations/{id}/acceptance} does. */
+    void acceptAs(UUID user, UUID membership) {
+        TestSecurityContext.runAs(user, List.of(), () -> myClinics.accept(membership));
     }
 
     /** The id of {@code user}'s membership of clinic A, as the administrator sees it in the list. */

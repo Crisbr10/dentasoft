@@ -230,6 +230,44 @@ class UserRowLevelSecurityTests {
         }
     }
 
+    /**
+     * Only the invited user accepts their invitation, once, inside the clinic (V009): not an administrator of the
+     * clinic for them, and a membership is never created already accepted.
+     */
+    @Test
+    void onlyTheInvitedUserAcceptsTheirInvitationOnce() throws SQLException {
+        IdentityTestDatabase.insertInvitation(CLINIC_B, USER_C, ClinicRole.RECEPCION);
+        String accept = "UPDATE clinic_membership SET accepted_at = now() WHERE user_id = '" + USER_C + "'";
+
+        assertRejected(USER_B, CLINIC_B, accept);
+        int accepted = inTransactionCommitted(USER_C, CLINIC_B, connection -> update(connection, accept));
+        assertThat(accepted).isEqualTo(1);
+        assertRejected(
+                USER_C,
+                CLINIC_B,
+                "UPDATE clinic_membership SET accepted_at = now() - interval '1 day' WHERE user_id = '" + USER_C + "'");
+        assertRejected(
+                USER_B,
+                CLINIC_B,
+                "INSERT INTO clinic_membership (id, tenant_id, user_id, role, created_at, updated_at, accepted_at)"
+                        + " VALUES (gen_random_uuid(), '" + CLINIC_B + "', '" + USER_A + "', 'RECEPCION', now(), now(),"
+                        + " now())");
+    }
+
+    /** A pending invitation does not make its clinic one of the user's, but its name can be shown in the invitation. */
+    @Test
+    void aPendingInvitationGivesNoClinicButShowsItsName() throws SQLException {
+        IdentityTestDatabase.insertInvitation(CLINIC_A, USER_C, ClinicRole.RECEPCION);
+
+        assertThat(clinics(USER_C)).containsExactly(CLINIC_A.toString());
+        List<String> accepted = inTransaction(
+                USER_C,
+                null,
+                connection -> strings(
+                        connection, "SELECT tenant_id::text FROM clinic_membership WHERE accepted_at IS NOT NULL"));
+        assertThat(accepted).isEmpty();
+    }
+
     @Test
     void withoutAClinicAUserSeesOnlyTheClinicsOfTheirActiveMemberships() throws SQLException {
         assertThat(clinics(USER_A)).containsExactlyInAnyOrder(CLINIC_A.toString(), CLINIC_B.toString());

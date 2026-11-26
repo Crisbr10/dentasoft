@@ -197,6 +197,62 @@ class ClinicUsersApiTests {
         assertThat(keycloak.logouts()).containsExactly(dentist);
     }
 
+    /**
+     * The invited person sees the invitation in {@code GET /api/v1/me}, cannot work in the clinic until they accept
+     * it, and can from the very next request after accepting.
+     */
+    @Test
+    void anInvitationGivesAccessOnlyOnceAccepted() {
+        assertThat(invite("invitada@clinica-a.test", "Ana", "Pruebas", "HIGIENISTA"))
+                .hasStatus(HttpStatus.ACCEPTED);
+        UUID invited =
+                keycloak.userByEmail("invitada@clinica-a.test").orElseThrow().id();
+
+        MvcTestResult me = me(invited);
+        assertThat(me)
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.clinics")
+                .asArray()
+                .isEmpty();
+        assertThat(me).bodyJson().extractingPath("$.invitations[0].role").isEqualTo("HIGIENISTA");
+        assertForbidden(context(invited));
+        String invitation = JsonPath.read(body(me), "$.invitations[0].id");
+
+        assertThat(mvc.post()
+                        .uri("/api/v1/me/invitations/" + invitation + "/acceptance")
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                TestTokens.token(invited).bearer())
+                        .exchange())
+                .hasStatus(HttpStatus.NO_CONTENT);
+
+        assertThat(context(invited)).hasStatusOk();
+        assertThat(me(invited))
+                .bodyJson()
+                .extractingPath("$.invitations")
+                .asArray()
+                .isEmpty();
+        assertThat(mvc.post()
+                        .uri("/api/v1/me/invitations/" + invitation + "/acceptance")
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                TestTokens.token(invited).bearer())
+                        .exchange())
+                .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    private MvcTestResult me(UUID user) {
+        return mvc.get()
+                .uri("/api/v1/me")
+                .header(HttpHeaders.AUTHORIZATION, TestTokens.token(user).bearer())
+                .exchange();
+    }
+
+    private static String body(MvcTestResult result) {
+        return new String(result.getResponse().getContentAsByteArray(), StandardCharsets.UTF_8);
+    }
+
     @Test
     void theListShowsRolesAndProfiles() {
         assertThat(mvc.get()

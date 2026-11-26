@@ -161,7 +161,7 @@ class ClinicUsersInvitationTests extends ClinicUsersTestBase {
         UUID user = keycloak.userByEmail(EMAIL).orElseThrow().id();
         assertThat(IdentityTestDatabase.membership(CLINIC_A, user)).contains("ODONTOLOGO/true");
         assertThat(keycloak.actionsEmails()).isEmpty();
-        assertThat(detailsOf(user).profile().invitationPending()).isTrue();
+        assertThat(detailsOf(user).invitationPending()).isTrue();
 
         UUID membership = membershipOf(user);
         asAdmin(() -> users.resendInvitation(membership));
@@ -169,16 +169,68 @@ class ClinicUsersInvitationTests extends ClinicUsersTestBase {
         assertThat(keycloak.actionsEmails()).extracting(ActionsEmail::userId).containsExactly(user);
     }
 
+    /**
+     * Someone who already had an account (from another clinic) gets no email when the invitation is sent again, but
+     * the answer is the same as for someone new: it reveals nothing about other clinics.
+     */
     @Test
-    void noInvitationIsSentAgainOnceTheAccountIsSetUp() {
+    void resendingToSomeoneWithAnAccountSucceedsWithoutAnEmail() {
         asAdmin(() -> users.invite(invitation(EMAIL, ClinicRole.ODONTOLOGO)));
         UUID user = keycloak.userByEmail(EMAIL).orElseThrow().id();
         keycloak.completeInvitation(user);
         UUID membership = membershipOf(user);
 
+        asAdmin(() -> users.resendInvitation(membership));
+
+        assertThat(keycloak.actionsEmails()).hasSize(1);
+    }
+
+    @Test
+    void anAcceptedInvitationIsNotSentAgain() {
+        asAdmin(() -> users.invite(invitation(EMAIL, ClinicRole.ODONTOLOGO)));
+        UUID user = keycloak.userByEmail(EMAIL).orElseThrow().id();
+        UUID membership = membershipOf(user);
+        acceptAs(user, membership);
+
         assertThatThrownBy(() -> asAdmin(() -> users.resendInvitation(membership)))
                 .isInstanceOf(InvitationNotPendingException.class);
         assertThat(keycloak.actionsEmails()).hasSize(1);
+    }
+
+    /**
+     * Until the person accepts, the administrator sees the same for someone new and for someone who already works in
+     * another clinic: the email they typed and a pending invitation, never the name stored in Keycloak or whether the
+     * account was already set up (ADR 0016).
+     */
+    @Test
+    void untilAcceptedTheListLooksTheSameForSomeoneNewAndSomeoneFromAnotherClinic() throws SQLException {
+        String known = "ya-trabaja@clinica-b.test";
+        UUID existing = keycloak.addUser(known, "Nombre", "Guardado En Keycloak", true, List.of());
+        IdentityTestDatabase.insertUser(existing);
+        IdentityTestDatabase.insertMembership(CLINIC_B, existing, ClinicRole.RECEPCION, true);
+
+        asAdmin(() -> users.invite(new ClinicUsers.Invitation(EMAIL, "Ana", "Pruebas", ClinicRole.ODONTOLOGO)));
+        asAdmin(() -> users.invite(new ClinicUsers.Invitation(known, "Otro", "Nombre", ClinicRole.ODONTOLOGO)));
+
+        UUID created = keycloak.userByEmail(EMAIL).orElseThrow().id();
+        ClinicUserDetails newPerson = detailsOf(created);
+        ClinicUserDetails knownPerson = detailsOf(existing);
+        assertThat(List.of(newPerson, knownPerson)).allSatisfy(details -> {
+            assertThat(details.invitationPending()).isTrue();
+            assertThat(details.active()).isTrue();
+            assertThat(details.role()).isEqualTo(ClinicRole.ODONTOLOGO);
+            assertThat(details.profile().firstName()).isNull();
+            assertThat(details.profile().lastName()).isNull();
+        });
+        assertThat(newPerson.profile().email()).isEqualTo(EMAIL);
+        assertThat(knownPerson.profile().email()).isEqualTo(known);
+        asAdmin(() -> users.resendInvitation(newPerson.id()));
+        asAdmin(() -> users.resendInvitation(knownPerson.id()));
+
+        acceptAs(existing, knownPerson.id());
+
+        assertThat(detailsOf(existing).profile())
+                .isEqualTo(new ClinicUserDetails.Profile(known, "Nombre", "Guardado En Keycloak"));
     }
 
     /**

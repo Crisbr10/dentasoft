@@ -114,6 +114,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
     - `POST /{id}/invitation` reenvía la invitación;
     - `PUT /{id}/role` cambia el rol;
     - `POST /{id}/deactivation` desactiva la membresía.
+  - **Aceptación**: la invitación queda pendiente hasta que la persona la acepta, con `GET /api/v1/me` (`invitations`) y `POST /api/v1/me/invitations/{id}/acceptance` (V009).
   - **FK de `user_account`**: se mantiene. V008 añade la política `invited_insert` y la función `create_invited_user_account`.
   - **Cuenta de servicio**: `dentasoft-backend`, limitada con FGAP v2 al grupo `clinic-users`. #136 lo comprobará en la CI.
   - **Reglas del servicio**:

@@ -79,7 +79,7 @@ public class ClinicUsers {
             ClinicUserDetails.@Nullable Profile profile = null;
             if (keycloakAnswers) {
                 try {
-                    profile = profileOf(membership.getUserId());
+                    profile = profileOf(membership);
                 } catch (KeycloakUnavailableException | KeycloakAdminException unavailable) {
                     keycloakAnswers = false;
                     log.warn(
@@ -101,7 +101,8 @@ public class ClinicUsers {
      *   <li>Their Keycloak user is looked up by email, or created in group {@code clinic-users}, without a password:
      *       they set it themselves. Nothing is written in the database yet.
      *   <li>They are added to the clinic's Keycloak organization (created on first use).
-     *   <li>One transaction creates their account if missing and gives them an active membership.
+     *   <li>One transaction creates their account if missing and gives them an active membership, pending until they
+     *       accept it ({@code POST /api/v1/me/invitations/{id}/acceptance}): until then it grants nothing.
      *   <li>After it commits, if they have not set up their account yet, Keycloak emails them the link to verify the
      *       address, choose a password and set up the one-time code, which expires.
      * </ol>
@@ -139,12 +140,14 @@ public class ClinicUsers {
     }
 
     /**
-     * Sends the invitation email again, for someone who has not set up their account yet (the link expired, or the
-     * email was lost). Counts against the same quota as invitations.
+     * Sends the invitation email again, while the invitation is pending (the link expired, or the email was lost).
+     * Keycloak only emails someone who has not set up their account yet; someone who already had one (from another
+     * clinic) gets nothing, but the answer is the same, so it reveals nothing about other clinics. Counts against the
+     * same quota as invitations.
      *
      * @throws MembershipNotFoundException if the active clinic has no membership with {@code membershipId}
      * @throws MembershipInactiveException if it is inactive
-     * @throws InvitationNotPendingException if the person has already set up their account
+     * @throws InvitationNotPendingException if the person has already accepted the invitation
      * @throws InvitationLimitExceededException if the clinic has used its invitations for now
      * @throws IdentityProviderUnavailableException if Keycloak fails
      */
@@ -153,15 +156,17 @@ public class ClinicUsers {
         if (!membership.isActive()) {
             throw new MembershipInactiveException();
         }
+        if (membership.isAccepted()) {
+            throw new InvitationNotPendingException();
+        }
+        requireInvitationQuota(TenantContext.current());
         try {
-            boolean pending = keycloak.findUser(membership.getUserId())
+            boolean setupPending = keycloak.findUser(membership.getUserId())
                     .map(KeycloakUser::invitationPending)
                     .orElse(false);
-            if (!pending) {
-                throw new InvitationNotPendingException();
+            if (setupPending) {
+                keycloak.sendActionsEmail(membership.getUserId());
             }
-            requireInvitationQuota(TenantContext.current());
-            keycloak.sendActionsEmail(membership.getUserId());
         } catch (KeycloakUnavailableException | KeycloakAdminException failure) {
             throw unavailable(failure);
         }
@@ -170,7 +175,7 @@ public class ClinicUsers {
     /** @see ClinicMemberships#changeRole */
     public ClinicUserDetails changeRole(UUID membershipId, ClinicRole role, long version) {
         ClinicMembership membership = memberships.changeRole(membershipId, role, version);
-        return ClinicUserDetails.of(membership, profileOrNull(membership.getUserId()));
+        return ClinicUserDetails.of(membership, profileOrNull(membership));
     }
 
     /**
@@ -195,7 +200,7 @@ public class ClinicUsers {
                     membership.getId(),
                     Logging.redacted(failure));
         }
-        return ClinicUserDetails.of(membership, profileOrNull(userId));
+        return ClinicUserDetails.of(membership, profileOrNull(membership));
     }
 
     private void requireInvitationQuota(UUID clinic) {
@@ -241,17 +246,19 @@ public class ClinicUsers {
         }
     }
 
-    private ClinicUserDetails.@Nullable Profile profileOrNull(UUID userId) {
+    private ClinicUserDetails.@Nullable Profile profileOrNull(ClinicMembership membership) {
         try {
-            return profileOf(userId);
+            return profileOf(membership);
         } catch (KeycloakUnavailableException | KeycloakAdminException unavailable) {
-            log.warn("Keycloak did not answer for user {}", userId, Logging.redacted(unavailable));
+            log.warn("Keycloak did not answer for membership {}", membership.getId(), Logging.redacted(unavailable));
             return null;
         }
     }
 
-    private ClinicUserDetails.@Nullable Profile profileOf(UUID userId) {
-        return keycloak.findUser(userId).map(ClinicUserDetails.Profile::of).orElse(null);
+    private ClinicUserDetails.@Nullable Profile profileOf(ClinicMembership membership) {
+        return keycloak.findUser(membership.getUserId())
+                .map(user -> ClinicUserDetails.Profile.of(user, membership.isAccepted()))
+                .orElse(null);
     }
 
     private static IdentityProviderUnavailableException unavailable(RuntimeException failure) {

@@ -48,6 +48,11 @@ Con M02-T05, `ADMIN_CLINICA` invita a personas a su clínica, les cambia el rol 
   Qué pasa si falla cada paso:
   - En los pasos 1 a 3, repetir la petición termina el trabajo sin duplicar nada: el usuario se encuentra por email, añadir un miembro dos veces no cambia nada y `UNIQUE (tenant_id, user_id)` evita dos membresías. Un usuario de Keycloak que se quede huérfano (sin membresía) no tiene contraseña ni acceso.
   - Si falla el paso 4, la membresía queda hecha y `POST /api/v1/clinic/users/{id}/invitation` reenvía el email.
+- **Aceptación explícita** (V009). La revisión de M02-T05 vio que, si no, el listado revelaba quién usaba ya Dentasoft en otra clínica, y que se añadía a una persona a una clínica sin preguntarle.
+  - Una invitación crea una membresía activa pero **pendiente** (`accepted_at` nulo), que no da acceso: el filtro de clínica activa y `GET /api/v1/me` solo cuentan las aceptadas.
+  - La persona ve sus invitaciones en `GET /api/v1/me` (`invitations`) y acepta con `POST /api/v1/me/invitations/{id}/acceptance`. Desde la petición siguiente, la clínica es suya.
+  - El trigger de V009 impide que la aplicación cree una membresía ya aceptada y que nadie que no sea su usuario la acepte, y solo una vez. Volver a invitar a un antiguo miembro la deja pendiente otra vez.
+  - Mientras está pendiente, el listado solo muestra el email que escribió el administrador y `invitationPending: true`, sin el nombre guardado en Keycloak ni si la cuenta ya estaba configurada. El reenvío responde siempre `202`: Keycloak solo envía el email a quien aún no ha configurado su cuenta.
 - **Respuesta idéntica**: `202` sin cuerpo, tanto si la persona ya existía en Keycloak como si no.
   - Si el email es de un usuario que la cuenta de servicio no ve (un administrador de plataforma), crearlo da 409 y no se hace nada, con la misma respuesta. Un administrador de plataforma usa otra cuenta para trabajar en una clínica.
   - A quien ya tenía la cuenta configurada no le llega ningún email de Keycloak. El aviso de «te han añadido a la clínica» queda para M07 (#141).

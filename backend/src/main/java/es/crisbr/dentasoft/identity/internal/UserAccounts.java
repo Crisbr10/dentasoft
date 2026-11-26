@@ -28,6 +28,9 @@ public class UserAccounts {
     /** One of the user's active memberships. */
     public record ActiveMembership(UUID clinicId, ClinicRole role) {}
 
+    /** One of the user's invitations they have not accepted yet. */
+    public record PendingInvitation(UUID membershipId, UUID clinicId, ClinicRole role) {}
+
     /**
      * Creates the account of the signed-in user on their first access, with nothing but the Keycloak user ID. Two first
      * requests at the same time both succeed: the second insert finds the row and does nothing.
@@ -45,15 +48,15 @@ public class UserAccounts {
     }
 
     /**
-     * The signed-in user's active memberships, in every clinic. Empty when the account is disabled or missing: such a
-     * user belongs to no clinic.
+     * The signed-in user's active memberships, in every clinic, once accepted. Empty when the account is disabled or
+     * missing: such a user belongs to no clinic.
      */
     @Transactional(readOnly = true)
     public List<ActiveMembership> activeMembershipsOfCurrentUser() {
         UUID user = CurrentUser.id().orElseThrow(() -> new IllegalStateException("No signed-in user"));
         return jdbc.sql("SELECT m.tenant_id, m.role FROM clinic_membership m"
                         + " JOIN user_account u ON u.id = m.user_id"
-                        + " WHERE m.user_id = :user AND m.active AND u.status = 'ACTIVE'")
+                        + " WHERE m.user_id = :user AND m.active AND m.accepted_at IS NOT NULL AND u.status = 'ACTIVE'")
                 .param("user", user)
                 .query((row, rowNumber) -> new ActiveMembership(
                         row.getObject("tenant_id", UUID.class), ClinicRole.valueOf(row.getString("role"))))
@@ -61,15 +64,34 @@ public class UserAccounts {
     }
 
     /**
-     * The signed-in user's role in {@code clinicId}, if they have an active membership there and their account is
-     * active. Row Level Security only shows the user's own memberships, so another user's never counts.
+     * The signed-in user's invitations they have not accepted yet, in every clinic: active memberships without
+     * {@code accepted_at}. Empty when the account is disabled or missing.
+     */
+    @Transactional(readOnly = true)
+    public List<PendingInvitation> pendingInvitationsOfCurrentUser() {
+        UUID user = CurrentUser.id().orElseThrow(() -> new IllegalStateException("No signed-in user"));
+        return jdbc.sql("SELECT m.id, m.tenant_id, m.role FROM clinic_membership m"
+                        + " JOIN user_account u ON u.id = m.user_id"
+                        + " WHERE m.user_id = :user AND m.active AND m.accepted_at IS NULL AND u.status = 'ACTIVE'")
+                .param("user", user)
+                .query((row, rowNumber) -> new PendingInvitation(
+                        row.getObject("id", UUID.class),
+                        row.getObject("tenant_id", UUID.class),
+                        ClinicRole.valueOf(row.getString("role"))))
+                .list();
+    }
+
+    /**
+     * The signed-in user's role in {@code clinicId}, if they have an active membership there that they have accepted
+     * and their account is active. Row Level Security only shows the user's own memberships, so another user's never counts.
      */
     @Transactional(readOnly = true)
     public Optional<ClinicRole> activeRoleIn(UUID clinicId) {
         UUID user = CurrentUser.id().orElseThrow(() -> new IllegalStateException("No signed-in user"));
         return jdbc.sql("SELECT m.role FROM clinic_membership m"
                         + " JOIN user_account u ON u.id = m.user_id"
-                        + " WHERE m.user_id = :user AND m.tenant_id = :clinic AND m.active AND u.status = 'ACTIVE'")
+                        + " WHERE m.user_id = :user AND m.tenant_id = :clinic AND m.active AND m.accepted_at IS NOT NULL"
+                        + " AND u.status = 'ACTIVE'")
                 .param("user", user)
                 .param("clinic", clinicId)
                 .query((row, rowNumber) -> ClinicRole.valueOf(row.getString("role")))

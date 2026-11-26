@@ -87,14 +87,25 @@ public final class IdentityTestDatabase {
         }
     }
 
-    /** Gives {@code user} the {@code role} in {@code clinic}, with a fresh id. */
+    /** Gives {@code user} the {@code role} in {@code clinic}, with a fresh id, as an accepted membership. */
     public static UUID insertMembership(UUID clinic, UUID user, ClinicRole role, boolean active) throws SQLException {
+        return insertMembership(clinic, user, role, active, true);
+    }
+
+    /** Invites {@code user} to {@code clinic} with {@code role}: an active membership they have not accepted yet. */
+    public static UUID insertInvitation(UUID clinic, UUID user, ClinicRole role) throws SQLException {
+        return insertMembership(clinic, user, role, true, false);
+    }
+
+    private static UUID insertMembership(UUID clinic, UUID user, ClinicRole role, boolean active, boolean accepted)
+            throws SQLException {
         UUID id = UUID.randomUUID();
         try (Connection connection = connectAsOwner()) {
             setSession(connection, "app.tenant_id", clinic);
             try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO clinic_membership (id, tenant_id, user_id, role, active, created_at, updated_at)"
-                            + " VALUES (?, ?, ?, ?, ?, now(), now())")) {
+                    "INSERT INTO clinic_membership (id, tenant_id, user_id, role, active, created_at, updated_at,"
+                            + " accepted_at) VALUES (?, ?, ?, ?, ?, now(), now(), " + (accepted ? "now()" : "NULL")
+                            + ")")) {
                 statement.setObject(1, id);
                 statement.setObject(2, clinic);
                 statement.setObject(3, user);
