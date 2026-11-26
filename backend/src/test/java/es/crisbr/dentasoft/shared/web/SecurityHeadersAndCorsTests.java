@@ -127,10 +127,10 @@ class SecurityHeadersAndCorsTests {
                     .isEqualTo("GET,POST,PUT");
         }
 
-        /** Only what the API uses today: no cookies, no PATCH or DELETE endpoint yet. */
+        /** Only the headers the API uses: no cookies, no forwarding headers from the browser. */
         @ParameterizedTest
         @ValueSource(strings = {"cookie", "x-forwarded-for"})
-        void preflightWithAHeaderTheApiDoesNotUseYetIsRejected(String header) {
+        void preflightWithAHeaderTheApiDoesNotUseIsRejected(String header) {
             assertThat(mvc.options()
                             .uri("/api/v1/test/ping")
                             .header(HttpHeaders.ORIGIN, WithTestEnvironment.APP)

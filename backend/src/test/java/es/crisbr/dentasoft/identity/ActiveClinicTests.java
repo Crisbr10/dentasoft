@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.TestData;
 import es.crisbr.dentasoft.TestTokens;
+import es.crisbr.dentasoft.shared.ApiSecurity;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
@@ -51,7 +52,7 @@ class ActiveClinicTests {
     /** Platform administrator, with no membership. */
     private static final UUID PLATFORM_ADMIN = UUID.fromString("5f0c2b1e-0000-4000-8000-0000000004a6");
 
-    private static final String HEADER = "X-Clinic-Id";
+    private static final String HEADER = ApiSecurity.CLINIC_HEADER;
 
     @Autowired
     private MockMvcTester mvc;

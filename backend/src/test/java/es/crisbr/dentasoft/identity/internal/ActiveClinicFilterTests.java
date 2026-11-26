@@ -26,6 +26,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -117,9 +118,9 @@ class ActiveClinicFilterTests {
         verifyNoInteractions(access);
     }
 
+    /** A signed-in user without the header gets the 400, on every path of the clinic API. */
     @ParameterizedTest
     @ValueSource(strings = {"/api/v1/clinic", "/api/v1/clinic/", "/api/v1/clinic/locations", "/api/v1/clinic/a/b"})
-    /** A signed-in user without the header gets the 400, on every path of the clinic API. */
     void everyPathOfTheClinicApiNeedsTheHeader(String path) throws Exception {
         AtomicReference<Boolean> reached = new AtomicReference<>(false);
 
@@ -130,6 +131,20 @@ class ActiveClinicFilterTests {
 
         assertThat(reached.get()).isFalse();
         verify(resolver).resolveException(any(), any(), isNull(), isA(InvalidClinicHeaderException.class));
+        verifyNoInteractions(access);
+    }
+
+    /** Without a token user nothing opens, even if the security chain ever let the request through: 403. */
+    @Test
+    void withoutATokenUserTheRequestIsDenied() throws Exception {
+        SecurityContextHolder.clearContext();
+        AtomicReference<Boolean> reached = new AtomicReference<>(false);
+
+        filter.doFilter(
+                clinicRequest(CLINIC.toString()), new MockHttpServletResponse(), (req, res) -> reached.set(true));
+
+        assertThat(reached.get()).isFalse();
+        verify(resolver).resolveException(any(), any(), isNull(), isA(AccessDeniedException.class));
         verifyNoInteractions(access);
     }
 
