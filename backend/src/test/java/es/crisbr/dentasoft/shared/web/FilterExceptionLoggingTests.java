@@ -3,6 +3,7 @@ package es.crisbr.dentasoft.shared.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.ContextLoggingExtension;
+import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -113,6 +114,7 @@ class FilterExceptionLoggingTests {
 
     private HttpResponse<String> get(String path) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                .header("Authorization", TestTokens.anyUser())
                 .header(RequestIdFilter.HEADER, REQUEST_ID)
                 .GET()
                 .build();

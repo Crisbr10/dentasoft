@@ -2,21 +2,28 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import es.crisbr.dentasoft.WithJwtUser;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,8 +33,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 // Only this controller: the slice does not load the services other controllers need.
 @WebMvcTest(controllers = GlobalExceptionHandlerTests.FailingController.class)
-@Import({GlobalExceptionHandlerTests.FailingController.class, SecurityConfiguration.class})
+@Import({
+    GlobalExceptionHandlerTests.FailingController.class,
+    SecurityConfiguration.class,
+    GlobalExceptionHandlerTests.AnyTokenIsValid.class
+})
 class GlobalExceptionHandlerTests {
+
+    /** Any token is valid here ({@link AnyTokenIsValid}): these tests are about the errors after authentication. */
+    private static final String SIGNED_IN = "Bearer test-token";
 
     private static final String INTERNAL_MESSAGE = "internal detail that must not leak";
 
@@ -38,7 +52,7 @@ class GlobalExceptionHandlerTests {
 
     @Test
     void unexpectedErrorReturnsGenericProblemDetailWithoutInternals() {
-        assertThat(mvc.get().uri("/test/unexpected"))
+        assertThat(mvc.get().uri("/test/unexpected").header(HttpHeaders.AUTHORIZATION, SIGNED_IN))
                 .hasStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .satisfies(result -> assertThat(result.getResponse().getContentAsString())
@@ -58,7 +72,7 @@ class GlobalExceptionHandlerTests {
     /** What method security ({@code @PreAuthorize}) throws for an authenticated user it refuses. */
     @Test
     void accessDeniedReturnsForbiddenProblemDetailInsteadOfAnInternalError() {
-        assertThat(mvc.get().uri("/test/access-denied"))
+        assertThat(mvc.get().uri("/test/access-denied").header(HttpHeaders.AUTHORIZATION, SIGNED_IN))
                 .hasStatus(HttpStatus.FORBIDDEN)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .satisfies(result ->
@@ -75,7 +89,7 @@ class GlobalExceptionHandlerTests {
     /** What method security throws when nobody is authenticated. */
     @Test
     void missingAuthenticationReturnsUnauthorizedProblemDetail() {
-        assertThat(mvc.get().uri("/test/unauthenticated"))
+        assertThat(mvc.get().uri("/test/unauthenticated").header(HttpHeaders.AUTHORIZATION, SIGNED_IN))
                 .hasStatus(HttpStatus.UNAUTHORIZED)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .satisfies(result ->
@@ -87,7 +101,7 @@ class GlobalExceptionHandlerTests {
 
     @Test
     void exceptionAnnotatedWithResponseStatusKeepsItsStatus() {
-        assertThat(mvc.get().uri("/test/conflict"))
+        assertThat(mvc.get().uri("/test/conflict").header(HttpHeaders.AUTHORIZATION, SIGNED_IN))
                 .hasStatus(HttpStatus.CONFLICT)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .satisfies(result ->
@@ -98,6 +112,7 @@ class GlobalExceptionHandlerTests {
     void invalidRequestBodyReturnsProblemDetailWithFieldErrors() {
         assertThat(mvc.post()
                         .uri("/test/echo")
+                        .header(HttpHeaders.AUTHORIZATION, SIGNED_IN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"\"}"))
                 .hasStatus(HttpStatus.BAD_REQUEST)
@@ -115,7 +130,7 @@ class GlobalExceptionHandlerTests {
 
     @Test
     void constraintViolationReturnsBadRequestProblemDetail() {
-        assertThat(mvc.get().uri("/test/constraint"))
+        assertThat(mvc.get().uri("/test/constraint").header(HttpHeaders.AUTHORIZATION, SIGNED_IN))
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .satisfies(result ->
@@ -127,7 +142,7 @@ class GlobalExceptionHandlerTests {
 
     @Test
     void realConstraintViolationsNameTheLeafFieldAndNeverTheRejectedValue() {
-        assertThat(mvc.get().uri("/test/constraint-violations"))
+        assertThat(mvc.get().uri("/test/constraint-violations").header(HttpHeaders.AUTHORIZATION, SIGNED_IN))
                 .hasStatus(HttpStatus.BAD_REQUEST)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .satisfies(result ->
@@ -145,7 +160,7 @@ class GlobalExceptionHandlerTests {
 
     @Test
     void unknownPathReturnsNotFoundProblemDetail() {
-        assertThat(mvc.get().uri("/test/does-not-exist"))
+        assertThat(mvc.get().uri("/test/does-not-exist").header(HttpHeaders.AUTHORIZATION, SIGNED_IN))
                 .hasStatus(HttpStatus.NOT_FOUND)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
                 .bodyJson()
@@ -210,6 +225,21 @@ class GlobalExceptionHandlerTests {
         @PostMapping("/test/echo")
         EchoRequest echo(@Valid @RequestBody EchoRequest request) {
             return request;
+        }
+    }
+
+    /** The slice has no {@code identity} module: a decoder that accepts any token as a signed-in user. */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class AnyTokenIsValid {
+
+        @Bean
+        JwtDecoder anyTokenIsValid() {
+            return token -> Jwt.withTokenValue(token)
+                    .header("alg", "RS256")
+                    .subject(WithJwtUser.DEFAULT_SUB)
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(300))
+                    .build();
         }
     }
 }

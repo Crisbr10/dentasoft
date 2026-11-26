@@ -25,6 +25,9 @@ import org.springframework.test.web.servlet.assertj.MockMvcTester;
 @Import(TestEndpoints.class)
 class RateLimitWithoutRedisTests {
 
+    /** Public, so anonymous requests reach the rate limiter; not a probe path, which is never limited. */
+    private static final String ANONYMOUS_PATH = "/actuator/health";
+
     @Autowired
     private MockMvcTester mvc;
 
@@ -46,9 +49,9 @@ class RateLimitWithoutRedisTests {
 
     @Test
     void requestsPassUnderThePerInstanceLimit() {
-        assertThat(mvc.get().uri("/api/v1/test/ping")).hasStatusOk();
-        assertThat(mvc.get().uri("/api/v1/test/ping")).hasStatusOk();
-        assertThat(mvc.get().uri("/api/v1/test/ping")).hasStatus(HttpStatus.TOO_MANY_REQUESTS);
+        assertThat(mvc.get().uri(ANONYMOUS_PATH)).hasStatusOk();
+        assertThat(mvc.get().uri(ANONYMOUS_PATH)).hasStatusOk();
+        assertThat(mvc.get().uri(ANONYMOUS_PATH)).hasStatus(HttpStatus.TOO_MANY_REQUESTS);
 
         assertThat(registry.get(RateLimiter.REDIS_AVAILABLE_METRIC).gauge().value())
                 .isZero();

@@ -3,6 +3,7 @@ package es.crisbr.dentasoft.shared.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.ContextLoggingExtension;
+import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import tools.jackson.databind.JsonNode;
@@ -37,11 +39,15 @@ class RequestLoggingTests {
     @Test
     void everyLineOfARequestIsJsonWithItsIdAndNoPersonalData(CapturedOutput output) throws InterruptedException {
         // Warm up so that lazy initialisation (Redis connection, MVC) does not log inside the measured request.
-        assertThat(mvc.get().uri("/api/v1/test/ping")).hasStatusOk();
+        assertThat(mvc.get().uri("/api/v1/test/ping").header(HttpHeaders.AUTHORIZATION, TestTokens.anyUser()))
+                .hasStatusOk();
         int start = output.getOut().length();
         logFromAnotherThread();
 
-        assertThat(mvc.get().uri("/api/v1/test/failure").header("X-Request-Id", REQUEST_ID))
+        assertThat(mvc.get()
+                        .uri("/api/v1/test/failure")
+                        .header(HttpHeaders.AUTHORIZATION, TestTokens.anyUser())
+                        .header("X-Request-Id", REQUEST_ID))
                 .hasStatus(HttpStatus.INTERNAL_SERVER_ERROR);
 
         // Every line is JSON, but only those of the request thread belong to the request: MockMvc runs it here.

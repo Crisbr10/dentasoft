@@ -16,13 +16,15 @@ import org.springframework.test.context.TestPropertySource;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Inherited
-@Import(TestPostgresConfiguration.class)
+@Import({TestPostgresConfiguration.class, TestJwksConfiguration.class})
 @TestPropertySource(
         properties = {
             "dentasoft.urls.app=" + WithTestEnvironment.APP,
             "dentasoft.urls.api=" + WithTestEnvironment.API,
             "dentasoft.urls.auth=" + WithTestEnvironment.AUTH,
             "dentasoft.rate-limit.key=" + WithTestEnvironment.RATE_LIMIT_KEY,
+            // Tokens are checked against the local JWK set of TestJwks, never a real Keycloak.
+            "dentasoft.auth.jwk-set-uri=${" + TestJwksConfiguration.PROPERTY + "}",
             // Test-only tables (db/testmigration), numbered from V900 so they always run after the real ones.
             "spring.flyway.locations=classpath:db/migration,classpath:db/testmigration"
         })

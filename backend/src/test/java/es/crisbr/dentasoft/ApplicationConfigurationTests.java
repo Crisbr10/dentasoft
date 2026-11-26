@@ -2,11 +2,13 @@ package es.crisbr.dentasoft;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
@@ -35,8 +37,10 @@ class ApplicationConfigurationTests {
 
     @Test
     void onlyHealthAndInfoEndpointsAreExposed() {
-        assertThat(mvc.get().uri("/actuator/env")).hasStatus(HttpStatus.NOT_FOUND);
-        assertThat(mvc.get().uri("/actuator/beans")).hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(mvc.get().uri("/actuator/env").header(HttpHeaders.AUTHORIZATION, TestTokens.anyUser()))
+                .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(mvc.get().uri("/actuator/beans").header(HttpHeaders.AUTHORIZATION, TestTokens.anyUser()))
+                .hasStatus(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -48,7 +52,11 @@ class ApplicationConfigurationTests {
 
     @Test
     void apiDocsAreDisabledWithoutProfile() {
-        assertThat(mvc.get().uri("/v3/api-docs")).hasStatus(HttpStatus.NOT_FOUND);
-        assertThat(mvc.get().uri("/swagger-ui/index.html")).hasStatus(HttpStatus.NOT_FOUND);
+        for (String path : List.of("/v3/api-docs", "/swagger-ui/index.html")) {
+            // Not public without springdoc: a 401 without a token, and nothing to find with one.
+            assertThat(mvc.get().uri(path)).hasStatus(HttpStatus.UNAUTHORIZED);
+            assertThat(mvc.get().uri(path).header(HttpHeaders.AUTHORIZATION, TestTokens.anyUser()))
+                    .hasStatus(HttpStatus.NOT_FOUND);
+        }
     }
 }

@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
@@ -47,6 +48,7 @@ class ForwardedHeadersOnKubernetesTests {
 
         HttpResponse<String> response = client.send(
                 HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + ClientIpEndpoint.PATH))
+                        .header("Authorization", TestTokens.anyUser())
                         .header("X-Forwarded-For", SPOOFED_IP)
                         .build(),
                 HttpResponse.BodyHandlers.ofString());

@@ -2,8 +2,11 @@ package es.crisbr.dentasoft.shared.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import es.crisbr.dentasoft.TestTokens;
 import es.crisbr.dentasoft.WithTestEnvironment;
+import java.nio.charset.StandardCharsets;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +18,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.assertj.MvcTestResult;
 
@@ -37,6 +39,13 @@ class RateLimitTests {
     static final int ANONYMOUS_LIMIT = 3;
     static final int USER_LIMIT = 5;
 
+    /**
+     * A public path, so anonymous requests reach the rate limiter: elsewhere Spring Security answers 401 before it.
+     * Not one of the probe paths, which are never limited.
+     */
+    private static final String ANONYMOUS_PATH = "/actuator/health";
+
+    /** Needs a signed-in user. */
     private static final String PING = "/api/v1/test/ping";
 
     @Autowired
@@ -77,7 +86,7 @@ class RateLimitTests {
         }
 
         MvcTestResult rejected = mvc.get()
-                .uri(PING)
+                .uri(ANONYMOUS_PATH)
                 .header(HttpHeaders.ORIGIN, WithTestEnvironment.APP)
                 .with(from("203.0.113.2")::apply)
                 .exchange();
@@ -169,7 +178,7 @@ class RateLimitTests {
                 .isNotEmpty()
                 .allSatisfy(key -> assertThat(key)
                         .doesNotContain("203.0.113")
-                        .doesNotContain("user-with-visible-id")
+                        .doesNotContain(userId("user-with-visible-id").toString())
                         .matches(RateLimitFilter.KEY_PREFIX + "(ip|user):[A-Za-z0-9_-]{43}"));
     }
 
@@ -183,19 +192,26 @@ class RateLimitTests {
     }
 
     private MvcTestResult get(UnaryOperator<MockHttpServletRequest> request) {
-        return mvc.get().uri(PING).with(request::apply).exchange();
+        return mvc.get().uri(ANONYMOUS_PATH).with(request::apply).exchange();
     }
 
     /**
-     * Authenticated through Spring Security, as the application will be (M02): its chain runs before the rate limiter
-     * and is what the request's user principal comes from, so a principal set on the raw request is not seen.
+     * Authenticated with an access token through Spring Security: its chain runs before the rate limiter and is what
+     * the request's user principal (the token's {@code sub}) comes from, so a principal set on the raw request is not
+     * seen.
      */
     private MvcTestResult asUser(String user, String ip) {
         return mvc.get()
                 .uri(PING)
-                .with(SecurityMockMvcRequestPostProcessors.user(user))
+                .header(
+                        HttpHeaders.AUTHORIZATION,
+                        TestTokens.token(userId(user)).bearer())
                 .with(from(ip)::apply)
                 .exchange();
+    }
+
+    private static UUID userId(String user) {
+        return UUID.nameUUIDFromBytes(user.getBytes(StandardCharsets.UTF_8));
     }
 
     private static Processor from(String ip) {
