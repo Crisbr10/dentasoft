@@ -184,6 +184,9 @@ class UserRowLevelSecurityTests {
         assertRejected(USER_C, CLINIC_B, invite(invited, "ACTIVE", USER_C));
         // An administrator of clinic B acting as clinic A, where they are not one.
         assertRejected(USER_B, CLINIC_A, invite(invited, "ACTIVE", USER_B));
+        // An administrator who has not accepted their own invitation yet (V009).
+        IdentityTestDatabase.insertInvitation(CLINIC_A, USER_C, ClinicRole.ADMIN_CLINICA);
+        assertRejected(USER_C, CLINIC_A, invite(invited, "ACTIVE", USER_C));
         IdentityTestDatabase.setMembershipActive(CLINIC_B, USER_B, false);
         assertRejected(USER_B, CLINIC_B, invite(invited, "ACTIVE", USER_B));
         assertThat(IdentityTestDatabase.userStatus(invited)).isEmpty();

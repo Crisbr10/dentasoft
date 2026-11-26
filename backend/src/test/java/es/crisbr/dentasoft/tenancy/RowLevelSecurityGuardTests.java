@@ -97,7 +97,7 @@ class RowLevelSecurityGuardTests {
             "invited_insert",
             "(((status)::text = 'ACTIVE'::text) AND (created_by = " + CURRENT_USER + ") AND (updated_by = created_by)"
                     + " AND (EXISTS ( SELECT 1\n   FROM clinic_membership m\n  WHERE ((m.tenant_id = " + CURRENT_CLINIC
-                    + ") AND (m.user_id = " + CURRENT_USER + ") AND m.active"
+                    + ") AND (m.user_id = " + CURRENT_USER + ") AND m.active AND (m.accepted_at IS NOT NULL)"
                     + " AND ((m.role)::text = 'ADMIN_CLINICA'::text)))))"));
 
     /**

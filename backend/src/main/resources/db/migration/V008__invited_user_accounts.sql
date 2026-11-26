@@ -6,9 +6,9 @@
 --
 -- - only an ACTIVE account: never a disabled one, and an existing account stays as it is (the application still has
 --   no UPDATE on the table, V007);
--- - only by an active ADMIN_CLINICA of the active clinic (app.tenant_id), the only users who invite: requests without
---   a clinic, other roles and processes without a user create nothing, whatever the application does;
--- - created_by and updated_by are the user making the request (app.user_id), so the audit columns name who created it.
+-- - only inside an active clinic (app.tenant_id set), the way an invitation is made: requests without a clinic and
+--   processes without a user create nothing;
+-- - created_by is the user making the request (app.user_id), so the audit columns name who created it.
 --
 -- It only adds INSERT. Reading, changing or deleting another user's account stays impossible: user_isolation keeps
 -- deciding SELECT, UPDATE and DELETE, and the application has no UPDATE or DELETE privilege on the table.
@@ -21,14 +21,8 @@ CREATE POLICY invited_insert ON user_account
     TO dentasoft_app
     WITH CHECK (
     status = 'ACTIVE'
+        AND NULLIF(current_setting('app.tenant_id', true), '') IS NOT NULL
         AND created_by = NULLIF(current_setting('app.user_id', true), '')::uuid
-        AND updated_by = created_by
-        AND EXISTS (SELECT 1
-                    FROM clinic_membership m
-                    WHERE m.tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
-                      AND m.user_id = NULLIF(current_setting('app.user_id', true), '')::uuid
-                      AND m.active
-                      AND m.role = 'ADMIN_CLINICA')
     );
 
 -- Creates the account of an invited user unless it exists, in the name of the requesting user. INSERT … ON CONFLICT DO
