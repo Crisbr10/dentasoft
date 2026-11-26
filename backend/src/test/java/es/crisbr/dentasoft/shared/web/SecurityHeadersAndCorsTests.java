@@ -108,9 +108,7 @@ class SecurityHeadersAndCorsTests {
                     .uri(path)
                     .header(HttpHeaders.ORIGIN, WithTestEnvironment.APP)
                     .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
-                    .header(
-                            HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS,
-                            "authorization, content-type, x-clinic-id, x-request-id")
+                    .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization, content-type, x-request-id")
                     .exchange();
 
             assertThat(result).hasStatusOk();
@@ -121,8 +119,40 @@ class SecurityHeadersAndCorsTests {
             assertThat(result.getResponse().getHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS))
                     .containsIgnoringCase("authorization")
                     .containsIgnoringCase("content-type")
-                    .containsIgnoringCase("x-clinic-id")
                     .containsIgnoringCase("x-request-id");
+            assertThat(result.getResponse().getHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS))
+                    .isEqualTo("GET,POST,PUT");
+        }
+
+        /** Only what the API uses today: no clinic header until M02-T04, no PATCH or DELETE endpoint yet. */
+        @ParameterizedTest
+        @ValueSource(strings = {"x-clinic-id", "cookie"})
+        void preflightWithAHeaderTheApiDoesNotUseYetIsRejected(String header) {
+            assertThat(mvc.options()
+                            .uri("/api/v1/test/ping")
+                            .header(HttpHeaders.ORIGIN, WithTestEnvironment.APP)
+                            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
+                            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, header))
+                    .hasStatus(HttpStatus.FORBIDDEN);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"PATCH", "DELETE"})
+        void preflightWithAMethodTheApiDoesNotUseYetIsRejected(String method) {
+            assertThat(mvc.options()
+                            .uri("/api/v1/test/ping")
+                            .header(HttpHeaders.ORIGIN, WithTestEnvironment.APP)
+                            .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method))
+                    .hasStatus(HttpStatus.FORBIDDEN);
+        }
+
+        /** The browser must be able to read the 401 to send the user to sign in again. */
+        @Test
+        void aRejectedRequestFromTheFrontendStillCarriesTheCorsHeaders() {
+            assertThat(mvc.get().uri("/api/v1/test/ping").header(HttpHeaders.ORIGIN, WithTestEnvironment.APP))
+                    .hasStatus(HttpStatus.UNAUTHORIZED)
+                    .hasHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, WithTestEnvironment.APP)
+                    .doesNotContainHeader(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS);
         }
 
         @Test
