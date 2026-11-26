@@ -25,7 +25,9 @@ public final class SecurityResponses {
         assertThat(result)
                 .hasStatus(HttpStatus.UNAUTHORIZED)
                 .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
-                .hasHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+                .hasHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer")
+                // Written after the request filters ran, like any other answer.
+                .containsHeader("X-Request-Id");
         assertThat(result.getResponse().getHeaders(HttpHeaders.WWW_AUTHENTICATE))
                 .containsExactly("Bearer");
         assertThat(result).bodyJson().extractingPath("$.title").isEqualTo("Autenticación necesaria");
@@ -37,7 +39,10 @@ public final class SecurityResponses {
     }
 
     public static void assertForbidden(MvcTestResult result) {
-        assertThat(result).hasStatus(HttpStatus.FORBIDDEN).hasContentType(MediaType.APPLICATION_PROBLEM_JSON);
+        assertThat(result)
+                .hasStatus(HttpStatus.FORBIDDEN)
+                .hasContentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .containsHeader("X-Request-Id");
         assertThat(result).bodyJson().extractingPath("$.title").isEqualTo("Acceso denegado");
         assertThat(result)
                 .bodyJson()
