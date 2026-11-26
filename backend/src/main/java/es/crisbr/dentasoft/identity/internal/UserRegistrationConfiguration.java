@@ -1,5 +1,6 @@
 package es.crisbr.dentasoft.identity.internal;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -12,7 +13,7 @@ class UserRegistrationConfiguration {
     static final int REMEMBERED_USERS = 10_000;
 
     @Bean
-    FilterRegistrationBean<UserRegistrationFilter> userRegistrationFilter(UserAccounts accounts) {
+    FilterRegistrationBean<UserRegistrationFilter> userRegistrationFilter(ObjectProvider<UserAccounts> accounts) {
         FilterRegistrationBean<UserRegistrationFilter> registration = new FilterRegistrationBean<>(
                 new UserRegistrationFilter(accounts, new RegisteredUsers(REMEMBERED_USERS)));
         registration.setOrder(UserRegistrationFilter.ORDER);
