@@ -50,6 +50,7 @@ curl http://localhost:8080/actuator/health/readiness   # {"status":"UP"}
 ```
 
 - Las URL públicas (`DENTASOFT_URLS_*`) apuntan a `localhost`, que es desde donde las ve el navegador. Los servicios de apoyo se alcanzan por su nombre dentro de la red de Docker (`postgres`, `redis`, `seaweedfs`, `mailpit`). Esas variables quedan preparadas aunque el backend aún no las use: llegan con M01-T01 (base de datos), M00-T08 (Redis), M05 (S3) y M07 (email), y esas tareas pueden renombrarlas.
+- Los tokens llevan como emisor la URL pública de Keycloak (`DENTASOFT_URLS_AUTH`), pero desde el contenedor sus claves de firma están en `http://keycloak:8080`: por eso `compose.local.yml` fija `DENTASOFT_AUTH_JWK_SET_URI`. Con `mvnw spring-boot:run` no hace falta, porque las dos direcciones coinciden.
 - El contenedor corre con el UID 10001, el sistema de ficheros en solo lectura (solo `/tmp` es escribible), sin *capabilities* y con `no-new-privileges`.
 - `stop_grace_period` (40 s) es mayor que el apagado ordenado del backend (`SHUTDOWN_TIMEOUT`, 30 s).
 
@@ -123,6 +124,22 @@ El JSON no lleva dominios ni secretos: Keycloak sustituye al importar los `${DEN
 | `DENTASOFT_KC_LOCAL_USERS_PASSWORD` | Contraseña de los usuarios de prueba (solo `compose.local.yml`) | Cualquiera que cumpla la política |
 
 `KeycloakRealmFileTests` (backend) lee los ficheros sin arrancar Keycloak. Falla si el JSON tiene un dominio, un comodín en las redirecciones, un secreto fuera de una variable o una variable que Compose no pasa a Keycloak. También falla si cambia alguno de los valores de la tabla: el cliente, la audiencia, los roles, el flujo de login con OTP, el *password grant*, los tokens, las sesiones, la fuerza bruta, la política de contraseñas, las altas y los eventos. Que Keycloak importe el realm y pida el OTP en el primer login se comprobó a mano con Keycloak 26.8.2. Si cambias el realm o subes la versión de la imagen, repite esa comprobación (`up -d --wait` y un login).
+
+### Tokens en el backend
+
+El backend valida los tokens de acceso como Resource Server (M02-T02), sin pedir nada a Keycloak al arrancar:
+
+| Comprobación | Valor |
+| --- | --- |
+| Emisor | `${DENTASOFT_URLS_AUTH}/realms/${DENTASOFT_AUTH_REALM}` (el realm es `dentasoft` si no se fija) |
+| Claves | `DENTASOFT_AUTH_JWK_SET_URI`; si no se fija, sale del emisor (`.../protocol/openid-connect/certs`). Se piden con el primer token, con 2 s para conectar y 3 s para leer, se guardan 5 minutos y se vuelven a pedir como mucho dos veces cada 30 s |
+| Firma | Solo RS256: se rechazan `alg: none`, HS256 y cualquier otro algoritmo |
+| Audiencia | Debe incluir `dentasoft-api` |
+| Caducidad | `exp` obligatorio, con 30 s de tolerancia de reloj |
+| Usuario | `sub` debe ser un UUID: es el que guardan `created_by`, `updated_by` y el registro de auditoría |
+| Roles | Solo los roles del realm que el backend conoce (`PLATFORM_ADMIN` → `ROLE_PLATFORM_ADMIN`) |
+
+Sin token válido, la respuesta es un 401 con `ProblemDetail` y `WWW-Authenticate: Bearer`, el mismo sea cual sea el motivo. Si Keycloak no responde, también es un 401, y el backend lo registra en el log. Las únicas rutas públicas son `/actuator/health`, `/actuator/health/liveness` y `/actuator/health/readiness`, además de `/v3/api-docs/**` y `/swagger-ui/**` mientras `springdoc.api-docs.enabled` esté activo (solo en el perfil `local`, para `pnpm api:gen`).
 
 ### Cambios en el realm
 
