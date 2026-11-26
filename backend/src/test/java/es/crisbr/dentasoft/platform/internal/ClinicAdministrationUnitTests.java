@@ -14,6 +14,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 /** Paths that need a race to happen, so they are forced here without a database. */
 class ClinicAdministrationUnitTests {
@@ -35,5 +36,24 @@ class ClinicAdministrationUnitTests {
 
         assertThatThrownBy(() -> administration.suspend(id)).isInstanceOf(ClinicStatusConflictException.class);
         assertThat(clinic.getStatus()).isEqualTo(ClinicStatus.SUSPENDED);
+    }
+
+    /**
+     * Another request changes the clinic between the version check and the write: 409, not a 500. The audit record is
+     * written in the same transaction, which the conflict rolls back.
+     */
+    @Test
+    void aConcurrentFiscalDataCorrectionIsAConflict() {
+        UUID id = UUID.randomUUID();
+        PlatformClinic clinic = new PlatformClinic("Clínica", "Clínica S.L.", "B12345674", "Europe/Madrid", "es-ES");
+        ReflectionTestUtils.setField(clinic, "version", 3L);
+        when(clinics.find(id)).thenReturn(Optional.of(clinic));
+        doThrow(new ObjectOptimisticLockingFailureException(PlatformClinic.class, id))
+                .when(clinics)
+                .flush();
+
+        assertThatThrownBy(() -> administration.correctFiscalData(
+                        id, new ClinicAdministration.FiscalDataCorrection("Otra S.L.", "B00000000", 3L)))
+                .isInstanceOf(ClinicVersionConflictException.class);
     }
 }

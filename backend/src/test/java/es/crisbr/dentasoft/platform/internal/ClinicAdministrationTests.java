@@ -326,6 +326,24 @@ class ClinicAdministrationTests {
         assertThat(AuditLogDatabase.actions(clinic.id(), clinic.id())).containsExactly("CREATE", "UPDATE");
     }
 
+    /**
+     * A client that retries a correction that was already made, with the version it read before it, is not told that
+     * someone else changed the clinic: nothing changes and nothing more is recorded.
+     */
+    @Test
+    void retryingACorrectionAlreadyMadeIsNotAConflict() throws SQLException {
+        ClinicDetails clinic = create("Reintento", null, null);
+        FiscalDataCorrection correction = new FiscalDataCorrection("Reintento S.L.", "B00000000", clinic.version());
+        ClinicDetails corrected = administration.correctFiscalData(clinic.id(), correction);
+
+        ClinicDetails retried = administration.correctFiscalData(clinic.id(), correction);
+
+        assertThat(retried.version()).isEqualTo(corrected.version());
+        assertThat(PlatformTestDatabase.fiscalData(clinic.id()))
+                .contains(new FiscalData("Reintento S.L.", "B00000000"));
+        assertThat(AuditLogDatabase.actions(clinic.id(), clinic.id())).containsExactly("CREATE", "UPDATE");
+    }
+
     /** Sending the values the clinic already has changes nothing and records nothing. */
     @Test
     void theSameFiscalDataIsNotAChange() throws SQLException {

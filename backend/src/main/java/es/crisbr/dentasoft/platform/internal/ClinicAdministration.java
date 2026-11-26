@@ -82,21 +82,23 @@ public class ClinicAdministration {
     /**
      * Corrects the clinic's legal name and tax identifier, which the clinic itself cannot change. The values are not
      * recorded in the audit log: only that they were corrected. Sending the values the clinic already has changes
-     * nothing and records nothing.
+     * nothing and records nothing, whatever the version, so retrying a correction already made is safe.
      *
-     * @throws ClinicVersionConflictException if the clinic changed since the client read {@code correction.version()}
+     * @throws ClinicVersionConflictException if the values differ from the clinic's and the clinic changed since the
+     *     client read {@code correction.version()}
      */
     @Transactional(PlatformPersistenceConfiguration.TRANSACTION_MANAGER)
     public ClinicDetails correctFiscalData(UUID clinicId, FiscalDataCorrection correction) {
         requireNoActiveClinic();
         PlatformClinic clinic = clinics.find(clinicId).orElseThrow(ClinicNotFoundException::new);
+        // Checked before the version, so a client that retries a correction already made is not told it conflicts.
+        if (clinic.hasFiscalData(correction.legalName(), correction.taxId())) {
+            return ClinicDetails.of(clinic);
+        }
         // @Version only compares the version loaded in this transaction: the one the client read is compared here.
         Long current = clinic.getVersion();
         if (current == null || current != correction.version()) {
             throw new ClinicVersionConflictException();
-        }
-        if (clinic.hasFiscalData(correction.legalName(), correction.taxId())) {
-            return ClinicDetails.of(clinic);
         }
         clinic.correctFiscalData(correction.legalName(), correction.taxId());
         clinics.add(PlatformAuditRecord.ofClinic(
