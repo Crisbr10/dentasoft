@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.AllowedPolicy;
+import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.ApplicationInsertPolicy;
 import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.ApplicationReadPolicy;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -195,6 +196,34 @@ class TenantIsolationInspectorTests {
                         "all_commands: unexpected policy own",
                         "other_expression: unexpected policy own",
                         "undeclared: unexpected policy own");
+    }
+
+    @Test
+    void acceptsADeclaredInsertPolicyOfTheApplicationOnlyAsDeclared() throws SQLException {
+        String active = "((status)::text = 'ACTIVE'::text)";
+        for (String table : List.of("insert", "other_check", "with_using", "undeclared")) {
+            isolatedTable(table);
+            execute("ALTER TABLE guard_probe.%s ADD COLUMN status varchar(20)".formatted(table));
+        }
+        execute(
+                "CREATE POLICY invited ON guard_probe.insert FOR INSERT TO dentasoft_app WITH CHECK (status = 'ACTIVE')");
+        execute("CREATE POLICY invited ON guard_probe.other_check FOR INSERT TO dentasoft_app WITH CHECK (true)");
+        execute("CREATE POLICY invited ON guard_probe.with_using TO dentasoft_app USING (true)"
+                + " WITH CHECK (status = 'ACTIVE')");
+        execute("CREATE POLICY invited ON guard_probe.undeclared FOR INSERT TO dentasoft_app"
+                + " WITH CHECK (status = 'ACTIVE')");
+        Set<ApplicationInsertPolicy> declared = Set.of("insert", "other_check", "with_using").stream()
+                .map(table -> new ApplicationInsertPolicy(table, "invited", active))
+                .collect(Collectors.toSet());
+
+        TenantIsolationInspector inspector = new TenantIsolationInspector(
+                connection, SCHEMA, Map.of(), Set.of(), Set.of(), Set.of(), declared, Map.of());
+
+        assertThat(inspector.problems())
+                .containsExactlyInAnyOrder(
+                        "other_check: unexpected policy invited",
+                        "with_using: unexpected policy invited",
+                        "undeclared: unexpected policy invited");
     }
 
     @Test

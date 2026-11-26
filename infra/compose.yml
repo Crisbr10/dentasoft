@@ -71,6 +71,8 @@ services:
       DENTASOFT_KC_SMTP_AUTH: ${DENTASOFT_KC_SMTP_AUTH:?set DENTASOFT_KC_SMTP_AUTH in .env}
       DENTASOFT_KC_SMTP_STARTTLS: ${DENTASOFT_KC_SMTP_STARTTLS:?set DENTASOFT_KC_SMTP_STARTTLS in .env}
       DENTASOFT_KC_SMTP_SSL: ${DENTASOFT_KC_SMTP_SSL:?set DENTASOFT_KC_SMTP_SSL in .env}
+      # Secret of the dentasoft-backend client (Admin API, M02-T05); the backend gets the same value.
+      DENTASOFT_KC_BACKEND_CLIENT_SECRET: ${DENTASOFT_KC_BACKEND_CLIENT_SECRET:?set DENTASOFT_KC_BACKEND_CLIENT_SECRET in .env}
       # Empty when the SMTP server needs no authentication (Mailpit in local).
       DENTASOFT_KC_SMTP_USER: ${DENTASOFT_KC_SMTP_USER:-}
       DENTASOFT_KC_SMTP_PASSWORD: ${DENTASOFT_KC_SMTP_PASSWORD:-}

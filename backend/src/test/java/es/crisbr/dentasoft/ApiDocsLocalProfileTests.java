@@ -10,12 +10,16 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @Import({TestRedisConfiguration.class, TestPostgresConfiguration.class})
+// The local profile reads the Keycloak admin secret from the environment, like every secret; this test never calls
+// Keycloak.
+@TestPropertySource(properties = "dentasoft.keycloak-admin.client-secret=" + FakeKeycloak.CLIENT_SECRET)
 class ApiDocsLocalProfileTests {
 
     @Autowired

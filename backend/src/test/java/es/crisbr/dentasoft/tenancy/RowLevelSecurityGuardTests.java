@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.AllowedPolicy;
+import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.ApplicationInsertPolicy;
 import es.crisbr.dentasoft.tenancy.TenantIsolationInspector.ApplicationReadPolicy;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -36,6 +37,9 @@ class RowLevelSecurityGuardTests {
 
     /** {@code app.user_id} as PostgreSQL prints it in a policy expression. */
     private static final String CURRENT_USER = "(NULLIF(current_setting('app.user_id'::text, true), ''::text))::uuid";
+
+    private static final String CURRENT_CLINIC =
+            "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid";
 
     /**
      * Tables whose policy compares a column other than {@code tenant_id}. Every entry needs a reason: {@code clinic} is
@@ -84,6 +88,19 @@ class RowLevelSecurityGuardTests {
                             + " AND (m.user_id = " + CURRENT_USER + ") AND m.active)))"));
 
     /**
+     * {@code INSERT} policies of the application role allowed next to the isolation policy. Every entry needs a reason:
+     * an administrator inviting someone creates that person's account, which {@code user_isolation} would refuse, but
+     * only an active one, by an active administrator of the active clinic and in their name (V008, ADR 0016).
+     */
+    private static final Set<ApplicationInsertPolicy> APPLICATION_INSERT_POLICIES = Set.of(new ApplicationInsertPolicy(
+            "user_account",
+            "invited_insert",
+            "(((status)::text = 'ACTIVE'::text) AND (created_by = " + CURRENT_USER + ") AND (updated_by = created_by)"
+                    + " AND (EXISTS ( SELECT 1\n   FROM clinic_membership m\n  WHERE ((m.tenant_id = " + CURRENT_CLINIC
+                    + ") AND (m.user_id = " + CURRENT_USER + ") AND m.active AND (m.accepted_at IS NOT NULL)"
+                    + " AND ((m.role)::text = 'ADMIN_CLINICA'::text)))))"));
+
+    /**
      * Schemas other than {@code public}, which hold no clinic data and so have no Row Level Security. Every entry needs a
      * reason, and its tables and grants are checked one by one: {@code scheduler} holds ShedLock's lock rows (V005,
      * ADR 0013).
@@ -122,6 +139,7 @@ class RowLevelSecurityGuardTests {
                 Set.of(flyway.getConfiguration().getTable()),
                 ALLOWED_POLICIES,
                 APPLICATION_READ_POLICIES,
+                APPLICATION_INSERT_POLICIES,
                 USER_ISOLATED_TABLES);
 
         assertThat(inspector.tables()).as("tables of schema %s", SCHEMA).contains("clinic", "user_account");

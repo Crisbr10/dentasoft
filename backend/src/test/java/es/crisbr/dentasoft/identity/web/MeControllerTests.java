@@ -67,7 +67,7 @@ class MeControllerTests {
                         {"clinics": [
                           {"clinicId": "%s", "name": "Clínica Prueba Norte", "role": "ODONTOLOGO", "suspended": false},
                           {"clinicId": "%s", "name": "Clínica Prueba Sur", "role": "RECEPCION", "suspended": true}
-                        ]}""".formatted(CLINIC_A, CLINIC_B));
+                        ], "invitations": []}""".formatted(CLINIC_A, CLINIC_B));
     }
 
     /** Clinic B has two members, but each one only ever sees their own membership. */
@@ -76,7 +76,7 @@ class MeControllerTests {
         assertThat(me(ADMIN_OF_B)).hasStatusOk().bodyJson().isStrictlyEqualTo("""
                         {"clinics": [
                           {"clinicId": "%s", "name": "Clínica Prueba Sur", "role": "ADMIN_CLINICA", "suspended": true}
-                        ]}""".formatted(CLINIC_B));
+                        ], "invitations": []}""".formatted(CLINIC_B));
         assertThat(me(TWO_CLINICS))
                 .bodyJson()
                 .extractingPath("$.clinics[*].role")
@@ -103,7 +103,10 @@ class MeControllerTests {
         IdentityTestDatabase.insertUser(formerMember);
         IdentityTestDatabase.insertMembership(CLINIC_A, formerMember, ClinicRole.HIGIENISTA, false);
 
-        assertThat(me(formerMember)).hasStatusOk().bodyJson().isStrictlyEqualTo("{\"clinics\": []}");
+        assertThat(me(formerMember))
+                .hasStatusOk()
+                .bodyJson()
+                .isStrictlyEqualTo("{\"clinics\": [], \"invitations\": []}");
     }
 
     @Test
@@ -112,7 +115,7 @@ class MeControllerTests {
         IdentityTestDatabase.insertUser(disabled, "DISABLED");
         IdentityTestDatabase.insertMembership(CLINIC_A, disabled, ClinicRole.FACTURACION, true);
 
-        assertThat(me(disabled)).hasStatusOk().bodyJson().isStrictlyEqualTo("{\"clinics\": []}");
+        assertThat(me(disabled)).hasStatusOk().bodyJson().isStrictlyEqualTo("{\"clinics\": [], \"invitations\": []}");
     }
 
     @Test
@@ -120,7 +123,7 @@ class MeControllerTests {
         UUID newcomer = newUser();
         assertThat(IdentityTestDatabase.userStatus(newcomer)).isEmpty();
 
-        assertThat(me(newcomer)).hasStatusOk().bodyJson().isStrictlyEqualTo("{\"clinics\": []}");
+        assertThat(me(newcomer)).hasStatusOk().bodyJson().isStrictlyEqualTo("{\"clinics\": [], \"invitations\": []}");
 
         assertThat(IdentityTestDatabase.userStatus(newcomer)).contains("ACTIVE");
     }

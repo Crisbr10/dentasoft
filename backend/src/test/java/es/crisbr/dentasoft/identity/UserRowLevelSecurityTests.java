@@ -150,6 +150,133 @@ class UserRowLevelSecurityTests {
         assertThat(IdentityTestDatabase.userStatus(USER_A)).contains("ACTIVE");
     }
 
+    /** Inviting someone (M02-T05, V008): inside the active clinic, the account of another user can be created. */
+    @Test
+    void inAnActiveClinicTheApplicationCanCreateTheActiveAccountOfAnInvitedUser() throws SQLException {
+        UUID invited = UUID.fromString("5f0c2b1e-0000-4000-8000-0000000000e5");
+        try {
+            int created = inTransactionCommitted(
+                    USER_B, CLINIC_B, connection -> update(connection, invite(invited, "ACTIVE", USER_B)));
+
+            assertThat(created).isEqualTo(1);
+            assertThat(IdentityTestDatabase.userStatus(invited)).contains("ACTIVE");
+            // Created, but as invisible to the inviting user as any other account.
+            List<String> visible = inTransaction(
+                    USER_B, CLINIC_B, connection -> strings(connection, "SELECT id::text FROM user_account"));
+            assertThat(visible).containsExactly(USER_B.toString());
+        } finally {
+            IdentityTestDatabase.deleteUsers(List.of(invited));
+        }
+    }
+
+    @Test
+    void anInvitedUsersAccountIsOnlyCreatedActiveByAnAdministratorOfTheClinicInTheirName() throws SQLException {
+        UUID invited = UUID.fromString("5f0c2b1e-0000-4000-8000-0000000000e6");
+        String updatedByAnother =
+                invite(invited, "ACTIVE", USER_B).replace("now(), '" + USER_B + "')", "now(), '" + USER_A + "')");
+
+        assertRejected(USER_B, CLINIC_B, invite(invited, "DISABLED", USER_B));
+        assertRejected(USER_B, null, invite(invited, "ACTIVE", USER_B));
+        assertRejected(USER_B, CLINIC_B, invite(invited, "ACTIVE", USER_A));
+        assertRejected(USER_B, CLINIC_B, updatedByAnother);
+        // USER_A is a receptionist in clinic B, and USER_C belongs to no clinic: neither is an administrator there.
+        assertRejected(USER_A, CLINIC_B, invite(invited, "ACTIVE", USER_A));
+        assertRejected(USER_C, CLINIC_B, invite(invited, "ACTIVE", USER_C));
+        // An administrator of clinic B acting as clinic A, where they are not one.
+        assertRejected(USER_B, CLINIC_A, invite(invited, "ACTIVE", USER_B));
+        // An administrator who has not accepted their own invitation yet (V009).
+        IdentityTestDatabase.insertInvitation(CLINIC_A, USER_C, ClinicRole.ADMIN_CLINICA);
+        assertRejected(USER_C, CLINIC_A, invite(invited, "ACTIVE", USER_C));
+        IdentityTestDatabase.setMembershipActive(CLINIC_B, USER_B, false);
+        assertRejected(USER_B, CLINIC_B, invite(invited, "ACTIVE", USER_B));
+        assertThat(IdentityTestDatabase.userStatus(invited)).isEmpty();
+    }
+
+    /**
+     * Inviting someone who already has an account, the usual case for a person working in another clinic: their
+     * account is not visible, so {@code ON CONFLICT DO NOTHING} is refused, and V008's function is what the application
+     * uses. The account stays as it is, even a disabled one, and nothing else is allowed on it.
+     */
+    @Test
+    void invitingAUserWhoAlreadyHasAnAccountLeavesItUnchanged() throws SQLException {
+        UUID disabled = UUID.fromString("5f0c2b1e-0000-4000-8000-0000000000f7");
+        IdentityTestDatabase.insertUser(disabled, "DISABLED");
+        try {
+            String createInvited = "SELECT create_invited_user_account('" + disabled + "')";
+            List<String> result = inTransaction(USER_B, CLINIC_B, connection -> strings(connection, createInvited));
+
+            assertThat(result).hasSize(1);
+            assertRejected(USER_B, CLINIC_B, invite(disabled, "ACTIVE", USER_B) + " ON CONFLICT (id) DO NOTHING");
+            assertRejected(USER_B, CLINIC_B, "UPDATE user_account SET status = 'ACTIVE' WHERE id = '" + disabled + "'");
+            assertRejected(USER_B, CLINIC_B, "DELETE FROM user_account WHERE id = '" + disabled + "'");
+            assertThat(IdentityTestDatabase.userStatus(disabled)).contains("DISABLED");
+        } finally {
+            IdentityTestDatabase.deleteUsers(List.of(disabled));
+        }
+    }
+
+    /** The function creates the account of someone new, in the name of the requesting user, and only in a clinic. */
+    @Test
+    void theInvitationFunctionCreatesNewAccountsOnlyInsideAClinic() throws SQLException {
+        UUID invited = UUID.fromString("5f0c2b1e-0000-4000-8000-0000000000e8");
+        String createInvited = "SELECT create_invited_user_account('" + invited + "')";
+        try {
+            assertRejected(USER_B, null, createInvited);
+            assertThat(IdentityTestDatabase.userStatus(invited)).isEmpty();
+
+            inTransactionCommitted(USER_B, CLINIC_B, connection -> strings(connection, createInvited));
+
+            assertThat(IdentityTestDatabase.userStatus(invited)).contains("ACTIVE");
+            assertThat(IdentityTestDatabase.userCreatedBy(invited)).contains(USER_B);
+        } finally {
+            IdentityTestDatabase.deleteUsers(List.of(invited));
+        }
+    }
+
+    /**
+     * Only the invited user accepts their invitation, once, inside the clinic (V009): not an administrator of the
+     * clinic for them, and a membership is never created already accepted.
+     */
+    @Test
+    void onlyTheInvitedUserAcceptsTheirInvitationOnce() throws SQLException {
+        IdentityTestDatabase.insertInvitation(CLINIC_B, USER_C, ClinicRole.RECEPCION);
+        String accept = "UPDATE clinic_membership SET accepted_at = now() WHERE user_id = '" + USER_C + "'";
+
+        assertRejected(USER_B, CLINIC_B, accept);
+        // Accepting changes nothing else: not the role, not whether it is active (V011).
+        assertRejected(
+                USER_C,
+                CLINIC_B,
+                "UPDATE clinic_membership SET accepted_at = now(), role = 'ADMIN_CLINICA' WHERE user_id = '" + USER_C
+                        + "'");
+        int accepted = inTransactionCommitted(USER_C, CLINIC_B, connection -> update(connection, accept));
+        assertThat(accepted).isEqualTo(1);
+        assertRejected(
+                USER_C,
+                CLINIC_B,
+                "UPDATE clinic_membership SET accepted_at = now() - interval '1 day' WHERE user_id = '" + USER_C + "'");
+        assertRejected(
+                USER_B,
+                CLINIC_B,
+                "INSERT INTO clinic_membership (id, tenant_id, user_id, role, created_at, updated_at, accepted_at)"
+                        + " VALUES (gen_random_uuid(), '" + CLINIC_B + "', '" + USER_A + "', 'RECEPCION', now(), now(),"
+                        + " now())");
+    }
+
+    /** A pending invitation does not make its clinic one of the user's, but its name can be shown in the invitation. */
+    @Test
+    void aPendingInvitationGivesNoClinicButShowsItsName() throws SQLException {
+        IdentityTestDatabase.insertInvitation(CLINIC_A, USER_C, ClinicRole.RECEPCION);
+
+        assertThat(clinics(USER_C)).containsExactly(CLINIC_A.toString());
+        List<String> accepted = inTransaction(
+                USER_C,
+                null,
+                connection -> strings(
+                        connection, "SELECT tenant_id::text FROM clinic_membership WHERE accepted_at IS NOT NULL"));
+        assertThat(accepted).isEmpty();
+    }
+
     @Test
     void withoutAClinicAUserSeesOnlyTheClinicsOfTheirActiveMemberships() throws SQLException {
         assertThat(clinics(USER_A)).containsExactlyInAnyOrder(CLINIC_A.toString(), CLINIC_B.toString());
@@ -195,6 +322,12 @@ class UserRowLevelSecurityTests {
                 .isEqualTo(INSUFFICIENT_PRIVILEGE);
     }
 
+    /** The insert of an invited user's account, as the application makes it, by {@code creator}. */
+    private static String invite(UUID user, String status, UUID creator) {
+        return "INSERT INTO user_account (id, status, created_at, created_by, updated_at, updated_by)" + " VALUES ('"
+                + user + "', '" + status + "', now(), '" + creator + "', now(), '" + creator + "')";
+    }
+
     private interface Work<T> {
         T run(Connection connection) throws SQLException;
     }
@@ -212,6 +345,18 @@ class UserRowLevelSecurityTests {
             } finally {
                 connection.rollback();
             }
+        }
+    }
+
+    /** Like {@link #inTransaction}, but committed, for checking the result as the owner afterwards. */
+    private static <T> T inTransactionCommitted(UUID user, UUID clinic, Work<T> work) throws SQLException {
+        try (Connection connection = connectAsApplication()) {
+            connection.setAutoCommit(false);
+            setLocal(connection, "app.user_id", user);
+            setLocal(connection, "app.tenant_id", clinic);
+            T result = work.run(connection);
+            connection.commit();
+            return result;
         }
     }
 

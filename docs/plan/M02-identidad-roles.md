@@ -100,15 +100,27 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T05 · Gestión de usuarios de la clínica
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T04
 - **Descripción**: `ADMIN_CLINICA` invita usuarios (creación en Keycloak con la Admin API, alta en la organización y email de bienvenida), cambia roles y desactiva membresías.
 - **Criterios de aceptación**:
-  - [ ] Credenciales de la Admin API solo por variables de entorno y con permisos mínimos
-  - [ ] Desactivar una membresía impide el acceso a esa clínica de inmediato
-  - [ ] Cada cambio queda en `audit_log`
-- **Nota**: la FK `clinic_membership.user_id → user_account` (V007) exige que el invitado tenga cuenta, pero con `user_isolation` (ADR 0015) la aplicación solo puede crear la del usuario que hace la petición. Aquí se decide entre una política de solo `INSERT` en `user_account` (con `status = 'ACTIVE'`) y quitar la FK.
-- **Nota**: dentro de la clínica activa, la base de datos deja cambiar el rol y el estado de cualquier membresía de esa clínica, también la propia. Que solo `ADMIN_CLINICA` lo haga, y que nadie se ascienda ni se reactive a sí mismo, lo garantiza la autorización de esta tarea. M02-T04 rechaza las membresías inactivas. Una cuenta `DISABLED` todavía lee sus clínicas por SQL (`member_select` no mira `user_account.status`): se decide cuando exista la forma de desactivar cuentas.
+  - [x] Credenciales de la Admin API solo por variables de entorno y con permisos mínimos
+  - [x] Desactivar una membresía impide el acceso a esa clínica de inmediato
+  - [x] Cada cambio queda en `audit_log`
+- **Notas** (decisiones en el ADR 0016):
+  - **Endpoints**, todos bajo `/api/v1/clinic/users` y solo para `ADMIN_CLINICA`:
+    - `GET` lista, con un máximo de 50 por página;
+    - `POST /invitations`, que responde `202` sin cuerpo en todos los casos;
+    - `POST /{id}/invitation` reenvía la invitación;
+    - `PUT /{id}/role` cambia el rol;
+    - `POST /{id}/deactivation` desactiva la membresía.
+  - **Aceptación**: la invitación queda pendiente hasta que la persona la acepta, con `GET /api/v1/me` (`invitations`) y `POST /api/v1/me/invitations/{id}/acceptance` (V009).
+  - **FK de `user_account`**: se mantiene. V008 añade la política `invited_insert` y la función `create_invited_user_account`.
+  - **Cuenta de servicio**: `dentasoft-backend`, limitada con FGAP v2 al grupo `clinic-users`. #136 lo comprobará en la CI.
+  - **Reglas del servicio**:
+    - nadie cambia su propio rol ni se desactiva;
+    - los cambios bloquean las membresías de administrador y comprueban que quien hace el cambio sigue siéndolo, así que nunca se queda una clínica sin `ADMIN_CLINICA`.
+  - **Pendiente**: una cuenta `DISABLED` todavía lee sus clínicas por SQL (`member_select` no mira `user_account.status`). Se decide cuando exista la forma de desactivar cuentas.
 
 ### M02-T06 · Profesionales
 

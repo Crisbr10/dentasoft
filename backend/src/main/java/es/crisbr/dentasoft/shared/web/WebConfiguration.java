@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.shared.web;
 
 import es.crisbr.dentasoft.shared.ApiSecurity;
 import es.crisbr.dentasoft.shared.DentasoftUrls;
+import es.crisbr.dentasoft.shared.Quotas;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
@@ -9,6 +10,8 @@ import io.swagger.v3.oas.models.servers.Server;
 import java.time.Duration;
 import java.time.InstantSource;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -113,6 +116,23 @@ class WebConfiguration {
         return registration;
     }
 
+    /**
+     * With the rate limits off ({@code DENTASOFT_RATE_LIMIT_ENABLED=false}, only for troubleshooting) the quotas are
+     * off too: they share the limits' buckets and key. A warning at startup says so.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnBooleanProperty(name = "dentasoft.rate-limit.enabled", havingValue = false)
+    static class NoQuotasConfiguration {
+
+        private static final Logger log = LoggerFactory.getLogger(NoQuotasConfiguration.class);
+
+        @Bean
+        Quotas quotas() {
+            log.warn("Rate limits are off, and so are the quotas (invitations per clinic)");
+            return (name, key, limit, period) -> Quotas.Decision.allow();
+        }
+    }
+
     /** Only built while the limit is on, so {@code DENTASOFT_RATE_LIMIT_ENABLED=false} needs no key or Redis. */
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnBooleanProperty(name = "dentasoft.rate-limit.enabled", matchIfMissing = true)
@@ -126,6 +146,12 @@ class WebConfiguration {
         @Bean
         RateLimiter rateLimiter(RateLimitProperties properties, RedisBuckets redisBuckets, MeterRegistry registry) {
             return new RateLimiter(properties, redisBuckets, registry, InstantSource.system());
+        }
+
+        /** The quotas of the application (invitations per clinic…), on the same buckets as the request limits. */
+        @Bean
+        Quotas quotas(RateLimiter rateLimiter, MeterRegistry registry) {
+            return new RedisQuotas(rateLimiter, registry);
         }
 
         /** The anonymous limit of the client IP, before Spring Security: also counts the requests it rejects. */

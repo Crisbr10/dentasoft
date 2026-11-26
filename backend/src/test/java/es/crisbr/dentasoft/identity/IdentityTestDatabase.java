@@ -54,6 +54,20 @@ public final class IdentityTestDatabase {
         }
     }
 
+    /** Who created {@code user}'s account, empty when it does not exist or has no creator. */
+    public static Optional<UUID> userCreatedBy(UUID user) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSession(connection, "app.user_id", user);
+            try (PreparedStatement statement =
+                    connection.prepareStatement("SELECT created_by FROM user_account WHERE id = ?")) {
+                statement.setObject(1, user);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? Optional.ofNullable(result.getObject(1, UUID.class)) : Optional.empty();
+                }
+            }
+        }
+    }
+
     /** How many accounts {@code user} has: 0 or 1. */
     public static int userCount(UUID user) throws SQLException {
         return userStatus(user).isPresent() ? 1 : 0;
@@ -73,14 +87,25 @@ public final class IdentityTestDatabase {
         }
     }
 
-    /** Gives {@code user} the {@code role} in {@code clinic}, with a fresh id. */
+    /** Gives {@code user} the {@code role} in {@code clinic}, with a fresh id, as an accepted membership. */
     public static UUID insertMembership(UUID clinic, UUID user, ClinicRole role, boolean active) throws SQLException {
+        return insertMembership(clinic, user, role, active, true);
+    }
+
+    /** Invites {@code user} to {@code clinic} with {@code role}: an active membership they have not accepted yet. */
+    public static UUID insertInvitation(UUID clinic, UUID user, ClinicRole role) throws SQLException {
+        return insertMembership(clinic, user, role, true, false);
+    }
+
+    private static UUID insertMembership(UUID clinic, UUID user, ClinicRole role, boolean active, boolean accepted)
+            throws SQLException {
         UUID id = UUID.randomUUID();
         try (Connection connection = connectAsOwner()) {
             setSession(connection, "app.tenant_id", clinic);
             try (PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO clinic_membership (id, tenant_id, user_id, role, active, created_at, updated_at)"
-                            + " VALUES (?, ?, ?, ?, ?, now(), now())")) {
+                    "INSERT INTO clinic_membership (id, tenant_id, user_id, role, active, created_at, updated_at,"
+                            + " accepted_at) VALUES (?, ?, ?, ?, ?, now(), now(), " + (accepted ? "now()" : "NULL")
+                            + ")")) {
                 statement.setObject(1, id);
                 statement.setObject(2, clinic);
                 statement.setObject(3, user);
@@ -90,6 +115,21 @@ public final class IdentityTestDatabase {
             }
         }
         return id;
+    }
+
+    /** {@code user}'s membership of {@code clinic} as {@code ROLE/active}, empty if there is none. */
+    public static Optional<String> membership(UUID clinic, UUID user) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSession(connection, "app.tenant_id", clinic);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT role || '/' || active FROM clinic_membership WHERE tenant_id = ? AND user_id = ?")) {
+                statement.setObject(1, clinic);
+                statement.setObject(2, user);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? Optional.of(result.getString(1)) : Optional.empty();
+                }
+            }
+        }
     }
 
     /** Makes {@code user}'s membership of {@code clinic} active or inactive. */

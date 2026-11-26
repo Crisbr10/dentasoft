@@ -117,6 +117,14 @@ class RateLimiter {
                 });
     }
 
+    /**
+     * Counts one use of {@code key} against its own {@code configuration}, with the same Redis fallback as the request
+     * limits but without their metrics: for {@link RedisQuotas}.
+     */
+    ConsumptionProbe tryConsume(String key, BucketConfiguration configuration) {
+        return distributedOrLocal(key, configuration);
+    }
+
     private ConsumptionProbe distributedOrLocal(String key, BucketConfiguration configuration) {
         return distributedOrLocal(
                 buckets -> buckets.tryConsume(key, configuration),

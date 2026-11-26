@@ -110,6 +110,9 @@ Qué configura el realm:
 | Contraseñas | 12 caracteres o más (128 como máximo), distinta del usuario y del email, sin repetir las 5 últimas |
 | Altas | Registro desactivado: crean los usuarios la clínica o la plataforma. Verificación de email y recuperación de contraseña por SMTP |
 | Organizaciones | Activadas |
+| Cliente `dentasoft-backend` | Confidencial, solo con cuenta de servicio (*client credentials*), para la API de administración de Keycloak (M02-T05). Ver más abajo |
+| Grupo `clinic-users` | Todos los usuarios de clínica, con `id` fijo. Los administradores de plataforma nunca están en él |
+| Permisos finos de administración | Activados (FGAP v2): la cuenta de servicio del backend solo ve y gestiona a los miembros de `clinic-users` |
 | Eventos de seguridad | Login y administración guardados 90 días, sin el detalle de las peticiones de administración. Sin *listener* de log, para no escribir usuarios ni IP en el log del contenedor |
 
 El JSON no lleva dominios ni secretos: Keycloak sustituye al importar los `${DENTASOFT_...}` por las variables del contenedor, que `compose.yml` toma de `.env`:
@@ -122,8 +125,17 @@ El JSON no lleva dominios ni secretos: Keycloak sustituye al importar los `${DEN
 | `DENTASOFT_KC_SMTP_AUTH` / `_STARTTLS` / `_SSL` | Autenticación y cifrado SMTP | `false` |
 | `DENTASOFT_KC_SMTP_USER` / `_PASSWORD` | Credenciales SMTP (opcionales) | Vacías |
 | `DENTASOFT_KC_LOCAL_USERS_PASSWORD` | Contraseña de los usuarios de prueba (solo `compose.local.yml`) | Cualquiera que cumpla la política |
+| `DENTASOFT_KC_BACKEND_CLIENT_SECRET` | Secreto del cliente `dentasoft-backend`. `compose.local.yml` pasa el mismo valor al backend como `DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET` | Uno aleatorio, largo |
 
-`KeycloakRealmFileTests` (backend) lee los ficheros sin arrancar Keycloak. Falla si el JSON tiene un dominio, un comodín en las redirecciones, un secreto fuera de una variable o una variable que Compose no pasa a Keycloak. También falla si cambia alguno de los valores de la tabla: el cliente, la audiencia, los roles, el flujo de login con OTP, el *password grant*, los tokens, las sesiones, la fuerza bruta, la política de contraseñas, las altas y los eventos. Que Keycloak importe el realm y pida el OTP en el primer login se comprobó a mano con Keycloak 26.8.2. Si cambias el realm o subes la versión de la imagen, repite esa comprobación (`up -d --wait` y un login).
+`KeycloakRealmFileTests` (backend) lee los ficheros sin arrancar Keycloak. Falla si el JSON tiene un dominio, un comodín en las redirecciones, un secreto fuera de una variable o una variable que Compose no pasa a Keycloak. También falla si cambia alguno de los valores de la tabla: el cliente, la audiencia, los roles, el flujo de login con OTP, el *password grant*, los tokens, las sesiones, la fuerza bruta, la política de contraseñas, las altas y los eventos. Y si `dentasoft-backend` deja de ser solo una cuenta de servicio, si recibe más roles de `realm-management` o si los permisos finos dejan de limitarla a `clinic-users`. Que Keycloak importe el realm y pida el OTP en el primer login se comprobó a mano con Keycloak 26.8.2. Si cambias el realm o subes la versión de la imagen, repite esa comprobación (`up -d --wait` y un login).
+
+### Cliente `dentasoft-backend` y permisos finos (FGAP v2)
+
+El backend invita usuarios, los añade a la organización de su clínica y cierra sus sesiones con la API de administración de Keycloak (M02-T05). Para eso usa el cliente confidencial `dentasoft-backend`, sin login de navegador ni redirecciones, nunca el administrador del realm `master`. Su cuenta de servicio tiene solo los roles `query-users`, `query-groups` y `manage-organizations` de `realm-management`, y el scope `kc-admin-api`, que añade la audiencia que exige la API.
+
+No tiene `manage-users` a propósito: con ese rol, la cuenta de servicio podía asignar `PLATFORM_ADMIN` a cualquiera (también a sí misma) o resetear la contraseña y borrar el OTP de un administrador de plataforma (comprobado con Keycloak 26.8.2). En su lugar, los permisos finos de administración (FGAP v2) le dejan ver y gestionar solo a los miembros del grupo `clinic-users`: una política de usuario sobre `service-account-dentasoft-backend` y un permiso sobre ese grupo con `view`, `view-members`, `manage-members` y `manage-membership`. Solo puede crear usuarios dentro del grupo, y para ella un administrador de plataforma no existe: no lo encuentra al buscar y recibe un 403 si intenta tocarlo. Por eso los administradores de plataforma **nunca** se añaden a `clinic-users`. El permiso nombra el grupo por su `id`, que está fijo en el JSON.
+
+La comprobación 5 del issue #136 (el realm en la CI) verificará contra un Keycloak real que la cuenta de servicio recibe 403 al asignar `PLATFORM_ADMIN` o al tocar a un usuario de plataforma, para que un cambio en el JSON que rompa estos permisos haga fallar la CI.
 
 ### Tokens en el backend
 
@@ -147,6 +159,12 @@ Sin token válido, la respuesta es un 401 con `ProblemDetail` y `WWW-Authenticat
 > **Importante**: `--import-realm` solo importa realms que **no existen**. Si cambias `realm-dentasoft.json` o las variables de `.env` después del primer arranque, el realm que ya está en la base de datos **no cambia**.
 
 - **En local**, para reimportarlo de cero, borra el realm desde la consola de administración (<http://localhost:8180>, realm `dentasoft` → *Realm settings* → *Action* → *Delete*) y reinicia Keycloak: `docker compose -f compose.yml -f compose.local.yml restart keycloak`. Se pierden los usuarios, las sesiones y el OTP configurado de ese realm, pero no el resto de la base de datos.
+  - Ojo: los usuarios de prueba no tienen un id fijo. Al reimportar cambian de `sub`, y sus membresías en la base de datos dejan de corresponderles.
+- **En local, para un realm importado antes de M02-T05**, sin borrar nada: `bash infra/keycloak/local/apply-m02-t05.sh`, desde la raíz del repositorio. Aplica el cliente `dentasoft-backend`, el grupo `clinic-users` y los permisos finos (ADR 0016), y comprueba al final que la cuenta de servicio no puede tocar al administrador de plataforma. Antes:
+  1. Añade `DENTASOFT_KC_BACKEND_CLIENT_SECRET` a `.env`.
+  2. Recrea Keycloak para que la reciba: `docker compose -f compose.yml -f compose.local.yml up -d keycloak`. No borra volúmenes y no reimporta el realm.
+
+  Se puede ejecutar más de una vez.
 - **En pruebas y producción** no se borra el realm: los cambios se aplican en la consola de administración (o con `kcadm.sh`) y también en el JSON, para que un entorno nuevo nazca igual. Ver la nota de M03-T02 y [cambio de dominio](../docs/operaciones/cambio-de-dominio.md).
 
 ### Usuarios de prueba (solo local)
@@ -161,6 +179,8 @@ Sin token válido, la respuesta es un 401 con `ProblemDetail` y `WWW-Authenticat
 | `recepcion@clinica-norte.test` | — | `RECEPCION` |
 
 Los roles de clínica no están en Keycloak, sino en las membresías de la base de datos, que llegan con M02-T03: hasta entonces estos usuarios solo pueden iniciar sesión. En el primer login, Keycloak pide configurar el OTP con una app de autenticación (FreeOTP, Google Authenticator…).
+
+Los tres usuarios de clínica están en el grupo `clinic-users`, y `plataforma@dentasoft.test` no: `KeycloakRealmFileTests` lo comprueba.
 
 Este fichero no se monta fuera de local: `KeycloakRealmFileTests` comprueba que `compose.yml` no lo referencia.
 
