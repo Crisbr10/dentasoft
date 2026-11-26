@@ -1,0 +1,65 @@
+{
+  "realm": "dentasoft",
+  "users": [
+    {
+      "username": "plataforma@dentasoft.test",
+      "email": "plataforma@dentasoft.test",
+      "emailVerified": true,
+      "firstName": "Paula",
+      "lastName": "Plataforma Prueba",
+      "enabled": true,
+      "realmRoles": ["default-roles-dentasoft", "PLATFORM_ADMIN"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DENTASOFT_KC_LOCAL_USERS_PASSWORD}"
+        }
+      ]
+    },
+    {
+      "username": "admin@clinica-norte.test",
+      "email": "admin@clinica-norte.test",
+      "emailVerified": true,
+      "firstName": "Andrés",
+      "lastName": "Admin Prueba",
+      "enabled": true,
+      "realmRoles": ["default-roles-dentasoft"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DENTASOFT_KC_LOCAL_USERS_PASSWORD}"
+        }
+      ]
+    },
+    {
+      "username": "odontologa@clinica-norte.test",
+      "email": "odontologa@clinica-norte.test",
+      "emailVerified": true,
+      "firstName": "Olga",
+      "lastName": "Odontóloga Prueba",
+      "enabled": true,
+      "realmRoles": ["default-roles-dentasoft"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DENTASOFT_KC_LOCAL_USERS_PASSWORD}"
+        }
+      ]
+    },
+    {
+      "username": "recepcion@clinica-norte.test",
+      "email": "recepcion@clinica-norte.test",
+      "emailVerified": true,
+      "firstName": "Rosa",
+      "lastName": "Recepción Prueba",
+      "enabled": true,
+      "realmRoles": ["default-roles-dentasoft"],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DENTASOFT_KC_LOCAL_USERS_PASSWORD}"
+        }
+      ]
+    }
+  ]
+}

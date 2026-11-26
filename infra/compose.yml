@@ -47,7 +47,14 @@ services:
 
   keycloak:
     image: ${KEYCLOAK_IMAGE:?set KEYCLOAK_IMAGE in .env}
-    # The command (start-dev / start) is set by each environment file.
+    # The command (start-dev / start) is set by each environment file, always with --import-realm.
+    # --import-realm creates the `dentasoft` realm from keycloak/realm-dentasoft.json only when it
+    # does not exist yet: later changes to the file or to the DENTASOFT_* variables below are not
+    # applied to an existing realm (see README.md, "Realm de Keycloak").
+    volumes:
+      # Mounted as <realm>-realm.json: Keycloak only pairs a <realm>-users-<n>.json file
+      # (compose.local.yml) with a realm file named like that.
+      - ./keycloak/realm-dentasoft.json:/opt/keycloak/data/import/dentasoft-realm.json:ro
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
@@ -56,6 +63,17 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?set KC_BOOTSTRAP_ADMIN_USERNAME in .env}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?set KC_BOOTSTRAP_ADMIN_PASSWORD in .env}
       KC_HEALTH_ENABLED: "true"
+      # Placeholders of the realm file (ADR 0006): no domain is written in it.
+      DENTASOFT_URLS_APP: ${DENTASOFT_URLS_APP:?set DENTASOFT_URLS_APP in .env}
+      DENTASOFT_MAIL_FROM: ${DENTASOFT_MAIL_FROM:?set DENTASOFT_MAIL_FROM in .env}
+      DENTASOFT_KC_SMTP_HOST: ${DENTASOFT_KC_SMTP_HOST:?set DENTASOFT_KC_SMTP_HOST in .env}
+      DENTASOFT_KC_SMTP_PORT: ${DENTASOFT_KC_SMTP_PORT:?set DENTASOFT_KC_SMTP_PORT in .env}
+      DENTASOFT_KC_SMTP_AUTH: ${DENTASOFT_KC_SMTP_AUTH:?set DENTASOFT_KC_SMTP_AUTH in .env}
+      DENTASOFT_KC_SMTP_STARTTLS: ${DENTASOFT_KC_SMTP_STARTTLS:?set DENTASOFT_KC_SMTP_STARTTLS in .env}
+      DENTASOFT_KC_SMTP_SSL: ${DENTASOFT_KC_SMTP_SSL:?set DENTASOFT_KC_SMTP_SSL in .env}
+      # Empty when the SMTP server needs no authentication (Mailpit in local).
+      DENTASOFT_KC_SMTP_USER: ${DENTASOFT_KC_SMTP_USER:-}
+      DENTASOFT_KC_SMTP_PASSWORD: ${DENTASOFT_KC_SMTP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
