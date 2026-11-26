@@ -48,11 +48,11 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 - **Estado**: pendiente
 - **Depende de**: M02-T01, M00-T08
-- **Descripción**: cadena de seguridad sin estado que valida el JWT de Keycloak (emisor y audiencia `dentasoft-api`), con CORS por variable y rutas públicas mínimas (health, webhooks firmados).
+- **Descripción**: cadena de seguridad sin estado que valida el JWT de Keycloak (emisor y audiencia `dentasoft-api`), con CORS por variable y rutas públicas mínimas (health, liveness y readiness). Las rutas de webhooks se abren con el primer webhook (M07-T04), no antes. `/api/v1/clinic/**` sigue cerrada con `denyAll` hasta M02-T04, que fija la clínica activa.
 - **Criterios de aceptación**:
   - [ ] Token de otra audiencia o caducado → 401
   - [ ] Tests con tokens generados en el test, sin Keycloak real
-  - [ ] Una clínica suspendida no puede ser la clínica activa (403 con ProblemDetail) y hay un test que lo comprueba
+- **Nota**: el criterio «una clínica suspendida no puede ser la clínica activa» se ha movido a M02-T04, que es la tarea que fija la clínica activa a partir de la petición y valida la membresía.
 
 ### M02-T03 · Usuarios y membresías
 
@@ -71,6 +71,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Descripción**: `TenantFilter` que lee `X-Clinic-Id`, comprueba la membresía activa y que la clínica no esté suspendida, fija el `TenantContext` y convierte el rol de clínica en autoridades de Spring.
 - **Criterios de aceptación**:
   - [ ] Clínica ajena o suspendida → 403
+  - [ ] Una clínica suspendida no puede ser la clínica activa (403 con ProblemDetail) y hay un test que lo comprueba (criterio movido desde M02-T02)
   - [ ] `@PreAuthorize("hasRole('ODONTOLOGO')")` funciona con el rol de la clínica activa
   - [ ] Test de que no se puede cambiar de clínica a mitad de petición
 
