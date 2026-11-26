@@ -58,7 +58,7 @@ Un usuario trabaja en una o varias clínicas, con un rol en cada una (M02-T03). 
   - Cada nueva política de lectura que amplíe lo que ve `dentasoft_app` necesita su propio motivo.
   - Cada petición a la API de clínica hace dos lecturas por clave para comprobar la clínica activa.
   - La clínica y el rol no pasan a otros hilos, así que ningún endpoint responde de forma asíncrona (`DeferredResult`, `Callable`, `CompletableFuture`…). Lo comprueba `NoAsyncEndpointsTests`.
-- **Pendiente para M02-T05**: con `user_isolation`, una invitación no puede crear la fila de `user_account` de otro usuario, y la FK `clinic_membership.user_id → user_account` la exige. M02-T05 decide entre una política de solo `INSERT` (con `status = 'ACTIVE'`) y quitar la FK.
+- **Resuelto en M02-T05** ([ADR 0016](0016-admin-api-de-keycloak-desde-el-backend.md)): con `user_isolation`, una invitación no podía crear la fila de `user_account` de otro usuario, y la FK `clinic_membership.user_id → user_account` la exige. Se mantiene la FK, y V008 añade una política de solo `INSERT` (`invited_insert`): cuenta `ACTIVE`, dentro de una clínica activa y a nombre de quien invita.
 
 ## Alternativas descartadas
 
