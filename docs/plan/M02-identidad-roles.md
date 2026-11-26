@@ -124,12 +124,17 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T06 · Profesionales
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T05
 - **Descripción**: ficha de profesional (número de colegiado, especialidad, color en la agenda) enlazada al usuario.
 - **Criterios de aceptación**:
-  - [ ] CRUD con test de aislamiento
-  - [ ] Un profesional desactivado no aparece para nuevas citas
+  - [x] CRUD con test de aislamiento
+  - [x] Un profesional desactivado no aparece para nuevas citas
+- **Notas** (decisiones en el ADR 0017):
+  - **Modelo**: tabla `practitioner_role` (FHIR PractitionerRole), una ficha por clínica, con `display_name` escrito por la clínica. En los textos visibles el campo se llama «área clínica», no «especialidad».
+  - **Endpoints**: bajo `/api/v1/clinic/practitioner-roles`. Los gestiona solo `ADMIN_CLINICA` y los lee cualquier rol de la clínica.
+  - **Usuario**: opcional, para colaboradores externos sin cuenta. Si se enlaza, debe ser `ODONTOLOGO` o `HIGIENISTA` de la clínica, y no cambia una vez fijado. Desactivar la membresía, o quitarle el rol clínico, desactiva la ficha.
+  - **Para M06**: `ActivePractitioners` (`list`, `requireActive` con bloqueo `FOR SHARE`, `describe`). Exige un usuario: los procesos sin usuario (M07) tendrán que decidir cómo usarlo.
 
 ### M02-T07 · Login y sesión en el frontend
 
