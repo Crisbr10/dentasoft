@@ -38,6 +38,7 @@ export type { UpdateClinicRequest } from './models/update-clinic-request';
 export type { UpdateClinicSettingsRequest } from './models/update-clinic-settings-request';
 export type { UpdateLocationRequest } from './models/update-location-request';
 export type { UpdatePractitionerRoleRequest } from './models/update-practitioner-role-request';
+export type { VisibleSection } from './models/visible-section';
 
 export type { CorrectFiscalData$Params as CorrectFiscalData$Params } from './fn/clinic-administration-controller/correct-fiscal-data';
 export { correctFiscalData as correctFiscalData } from './fn/clinic-administration-controller/correct-fiscal-data';
@@ -99,3 +100,7 @@ export type { Accept$Params as Accept$Params } from './fn/me-controller/accept';
 export { accept as accept } from './fn/me-controller/accept';
 export type { Me$Params as Me$Params } from './fn/me-controller/me';
 export { me as me } from './fn/me-controller/me';
+export type { PlatformSections$Params as PlatformSections$Params } from './fn/configuration-sections-controller/platform-sections';
+export { platformSections as platformSections } from './fn/configuration-sections-controller/platform-sections';
+export type { ClinicSections$Params as ClinicSections$Params } from './fn/configuration-sections-controller/clinic-sections';
+export { clinicSections as clinicSections } from './fn/configuration-sections-controller/clinic-sections';
