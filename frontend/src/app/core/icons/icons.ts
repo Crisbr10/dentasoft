@@ -15,6 +15,10 @@ export const ICONS = [
   'logout',
   'swap',
   'business',
+  'settings',
+  'lock',
+  'group',
+  'person',
 ] as const;
 
 export function provideIcons(): EnvironmentProviders {

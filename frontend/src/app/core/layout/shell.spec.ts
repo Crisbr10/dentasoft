@@ -101,14 +101,14 @@ describe('Shell', () => {
     expect(toggle?.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('shows the menu of a clinic role without the platform area', async () => {
-    expect(menu(await render())).toEqual([es.layout.nav.home]);
+  it('shows the menu of a clinic role with the configuration', async () => {
+    expect(menu(await render())).toEqual([es.layout.nav.home, es.layout.nav.configuration]);
   });
 
-  it('adds the platform area for a platform administrator', async () => {
+  it('shows the configuration once to a platform administrator who works in a clinic', async () => {
     session.isPlatformAdmin.set(true);
 
-    expect(menu(await render())).toEqual([es.layout.nav.home, es.layout.nav.platform]);
+    expect(menu(await render())).toEqual([es.layout.nav.home, es.layout.nav.configuration]);
   });
 
   it('shows the active clinic, the user and a way to change clinic', async () => {

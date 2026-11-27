@@ -6,18 +6,18 @@ function paths(items: { path: string }[]): string[] {
 }
 
 describe('visibleNavigation', () => {
-  it.each(CLINIC_ROLES)('shows %s the clinic entries and not the platform', (role) => {
-    expect(paths(visibleNavigation(NAVIGATION, role, false))).toEqual(['/']);
+  it.each(CLINIC_ROLES)('shows %s the home page and the configuration', (role) => {
+    expect(paths(visibleNavigation(NAVIGATION, role, false))).toEqual(['/', '/configuracion']);
   });
 
-  it('shows a platform administrator without an active clinic only the platform', () => {
-    expect(paths(visibleNavigation(NAVIGATION, null, true))).toEqual(['/plataforma']);
+  it('shows a platform administrator without an active clinic only the configuration', () => {
+    expect(paths(visibleNavigation(NAVIGATION, null, true))).toEqual(['/configuracion']);
   });
 
-  it('shows a platform administrator who also works in a clinic both', () => {
+  it('shows a platform administrator who also works in a clinic each entry once', () => {
     expect(paths(visibleNavigation(NAVIGATION, 'ADMIN_CLINICA', true))).toEqual([
       '/',
-      '/plataforma',
+      '/configuracion',
     ]);
   });
 

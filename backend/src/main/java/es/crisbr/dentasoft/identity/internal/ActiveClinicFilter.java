@@ -145,7 +145,8 @@ final class ActiveClinicFilter extends OncePerRequestFilter {
         return withRole;
     }
 
-    private static String authority(ClinicRole role) {
+    /** The authority that carries {@code role} during a request of the clinic API. */
+    static String authority(ClinicRole role) {
         return "ROLE_" + role.name();
     }
 

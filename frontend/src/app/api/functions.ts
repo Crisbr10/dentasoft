@@ -61,3 +61,7 @@ export type { Accept$Params as Accept$Params } from './fn/me-controller/accept';
 export { accept as accept } from './fn/me-controller/accept';
 export type { Me$Params as Me$Params } from './fn/me-controller/me';
 export { me as me } from './fn/me-controller/me';
+export type { PlatformSections$Params as PlatformSections$Params } from './fn/configuration-sections-controller/platform-sections';
+export { platformSections as platformSections } from './fn/configuration-sections-controller/platform-sections';
+export type { ClinicSections$Params as ClinicSections$Params } from './fn/configuration-sections-controller/clinic-sections';
+export { clinicSections as clinicSections } from './fn/configuration-sections-controller/clinic-sections';

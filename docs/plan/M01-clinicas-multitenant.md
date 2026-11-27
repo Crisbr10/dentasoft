@@ -286,10 +286,11 @@ Para que una tarea programada se ejecute una sola vez con varias réplicas, se a
 
 - **Estado**: pendiente
 - **Depende de**: M01-T06, M02-T02, M02-T09
-- **Descripción**: pantallas de la sección «Clínica» del apartado de Configuración (ver `configuracion.md`, marco de M02-T09) sobre la API de M01-T06, con el cliente generado (`pnpm api:gen`): datos y zona horaria, ajustes, horario semanal con varios tramos por día y gestión de gabinetes (alta, edición, desactivación y reactivación). El logo no entra: lo añade M05-T06.
+- **Descripción**: pantallas de la sección «Clínica» del apartado de Configuración (ver `configuracion.md`, marco de M02-T09) sobre la API de M01-T06, con el cliente generado (`pnpm api:gen`): datos y zona horaria, ajustes, horario semanal con varios tramos por día y gestión de gabinetes (alta, edición, desactivación y reactivación). Las pantallas de gabinetes son solo de esta tarea (M02-T08 no las incluye). El logo no entra: lo añade M05-T06.
 - **Criterios de aceptación**:
   - [ ] Textos con Transloco y formularios validados; los errores del servidor (validación, nombre de gabinete repetido, conflicto de versión) se muestran en el formulario
   - [ ] El nombre y los datos fiscales se ven; solo el nombre se edita (los fiscales los cambia la plataforma, M01-T11)
+  - [ ] Como dice la matriz de `configuracion.md`, los demás roles de la clínica ven la sección sin editarla: las lecturas de datos, ajustes, horario y gabinetes de M01-T06 se abren a cualquier rol de la clínica (hoy solo `ADMIN_CLINICA`), y las escrituras siguen siendo solo de `ADMIN_CLINICA` (test por rol)
 
 ### M01-T11 · Corrección de los datos fiscales por la plataforma
 

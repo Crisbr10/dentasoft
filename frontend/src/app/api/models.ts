@@ -32,3 +32,4 @@ export type { UpdateClinicRequest } from './models/update-clinic-request';
 export type { UpdateClinicSettingsRequest } from './models/update-clinic-settings-request';
 export type { UpdateLocationRequest } from './models/update-location-request';
 export type { UpdatePractitionerRoleRequest } from './models/update-practitioner-role-request';
+export type { VisibleSection } from './models/visible-section';

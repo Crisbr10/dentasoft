@@ -150,21 +150,26 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 ### M02-T08 · Pantallas de administración
 
 - **Estado**: pendiente
-- **Depende de**: M02-T05, M01-T05
-- **Descripción**: pantallas para `PLATFORM_ADMIN` (clínicas) y para `ADMIN_CLINICA` (usuarios, roles, profesionales, gabinetes).
+- **Depende de**: M02-T05, M02-T06, M02-T09, M02-T11, M01-T05
+- **Descripción**: pantallas para `PLATFORM_ADMIN` (clínicas, con la invitación del primer administrador de M02-T11) y, dentro del apartado de Configuración (M02-T09), para `ADMIN_CLINICA` (usuarios, roles y profesionales), con el cliente generado (`pnpm api:gen`). Los gabinetes no entran: son de la sección «Clínica» (M01-T10).
 - **Criterios de aceptación**:
   - [ ] Textos con Transloco y formularios validados
-  - [ ] Flujo completo: crear clínica → invitar administrador → el administrador invita a un odontólogo
+  - [ ] Flujo completo: crear clínica → invitar administrador → el administrador invita a un odontólogo. Se cubre con tests de componentes y con el test de integración del backend de M02-T11, y se comprueba a mano en local (anotado en el PR). El test de extremo a extremo es M03-T07.
 
 ### M02-T09 · Apartado de Configuración
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T07, M01-T06
 - **Descripción**: marco del apartado de Configuración (ver `configuracion.md`): ruta `/configuracion` con menú de secciones filtrado por rol, guardias por sección, patrón común de formulario (guardar, descartar, validación del servidor) y componente para secretos de solo escritura. En el backend, endpoint que devuelve las secciones visibles para el usuario y auditoría de cambios de configuración.
 - **Criterios de aceptación**:
-  - [ ] Cada rol ve exactamente las secciones de la matriz de `configuracion.md` (test por rol)
-  - [ ] Acceder por URL a una sección no permitida → página de «sin acceso» y 403 en la API
-  - [ ] Las secciones ya existentes (clínica, gabinetes, usuarios, profesionales) cuelgan de este apartado
+  - [x] Cada rol ve exactamente las secciones de la matriz de `configuracion.md` (test por rol)
+  - [x] Acceder por URL a una sección no permitida → página de «sin acceso» y 403 en la API
+  - [x] Las rutas de las secciones Clínica (con los gabinetes), Usuarios y roles y Profesionales quedan creadas en el apartado; sus pantallas las añaden M01-T10 y M02-T08
+- **Notas**:
+  - **Catálogo**: `ConfigurationSection` (raíz de `identity`) con la matriz de `configuracion.md` para las secciones que existen; cada tarea que añade una sección añade su fila y la de `ConfigurationSectionTests`.
+  - **Endpoints**: `GET /api/v1/clinic/configuration/sections` (rol de la clínica activa) y `GET /api/v1/platform/configuration/sections` (`PLATFORM_ADMIN`, sin clínica).
+  - **Frontend**: `/configuracion` con una ruta por sección y `/configuracion/sin-acceso`; `/plataforma` redirige a `/configuracion/plataforma`. Patrón de formulario y campo de secretos en `src/app/shared/forms/`.
+  - **Secretos**: solo «configurado» o «sin configurar», con cuándo y quién lo cambió; nunca ningún carácter del valor.
 
 ### M02-T10 · Preferencias personales
 
@@ -174,3 +179,14 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 - **Criterios de aceptación**:
   - [ ] Las preferencias siguen al usuario en cualquier navegador
   - [ ] Valores por defecto de la clínica cuando el usuario no ha elegido
+
+### M02-T11 · Invitación del primer administrador de una clínica
+
+- **Estado**: pendiente
+- **Depende de**: M02-T05, M01-T05
+- **Descripción**: una clínica recién creada no tiene miembros, y V010 exige que quien invita sea un `ADMIN_CLINICA` aceptado de la clínica, así que nadie puede invitar a su primer administrador. `PLATFORM_ADMIN` lo invita desde `/api/v1/platform/clinics/{id}/...`, y puede reenviar o cancelar esa invitación. El módulo `platform` lo pide a través de la API pública de `identity`, nunca de sus clases internas ni de `KeycloakAdmin`. Migración nueva y ADR 0018 con el diseño de permisos (con qué rol de base de datos se crea la membresía, sin abrir la política `invited_insert`).
+- **Criterios de aceptación**:
+  - [ ] Solo `PLATFORM_ADMIN`, y solo mientras la clínica no tenga ningún `ADMIN_CLINICA`. La base de datos impone esta regla, no solo el servicio: dos peticiones a la vez no crean dos «primeros» administradores (test de concurrencia)
+  - [ ] Cuentan las invitaciones pendientes: si ya hay una invitación pendiente de administrador, la plataforma no puede crear otra; tiene que reenviarla o cancelarla
+  - [ ] Cada invitación, reenvío y cancelación queda en `audit_log` con actor `PLATFORM`
+  - [ ] Test de integración del backend del flujo completo: crear clínica → invitar administrador → aceptar → el administrador invita a un odontólogo

@@ -6,8 +6,9 @@ Dentasoft tiene un apartado **Configuración** con secciones por área. Cada cl�
 
 - **Tres niveles con herencia**: plataforma (valores por defecto) → clínica (sobrescribe) → usuario (solo preferencias personales). Si la clínica no define un valor, se usa el de la plataforma.
 - **Cada módulo es dueño de su configuración**: los datos viven en tablas tipadas del propio módulo (por ejemplo, `channel_config` en `notifications`), no en un almacén genérico de clave-valor. El apartado de Configuración solo reúne las pantallas.
-- **Secretos de solo escritura**: tokens y contraseñas (por ejemplo, el token de WhatsApp de una clínica) se guardan cifrados, nunca se devuelven al navegador y solo se muestran como «configurado · terminado en ••••1234». Para cambiarlos se escribe uno nuevo.
-- **Cambios auditados**: cada cambio de configuración queda en `audit_log` (quién, cuándo, qué sección; sin valores secretos).
+- **Secretos de solo escritura**: tokens y contraseñas (por ejemplo, el token de WhatsApp de una clínica) se guardan cifrados y el backend nunca devuelve el valor ni ningún trozo de él (ni siquiera los últimos caracteres). La pantalla solo muestra «configurado» o «sin configurar», y cuándo y quién lo cambió por última vez. Para cambiarlos se escribe uno nuevo.
+- **Cambios auditados**: cada cambio de configuración queda en `audit_log` (quién, cuándo, qué sección; sin valores secretos). Lo hace cada módulo con `@AuditedEntity` en las entidades de su sección (ADR 0012), como ya las de la clínica, el horario, los gabinetes, las membresías y los profesionales: una sección nueva lo añade a sus entidades.
+- **Qué secciones ve cada uno**: el backend las da según la tabla de abajo (`ConfigurationSection`, M02-T09), y una sección nueva añade allí su fila. Es solo lo que muestra el menú: cada endpoint de una sección comprueba el rol con `@PreAuthorize`.
 - **Probar antes de activar**: los canales de comunicación tienen un botón «Enviar prueba» y no se pueden activar si la prueba no ha funcionado.
 - **Validación en el servidor**: la pantalla ayuda, pero el backend valida siempre y aplica los permisos.
 
@@ -19,7 +20,7 @@ Leyenda: **E** = ve y edita · **V** = solo ve · — = no ve la sección.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Clínica | Datos generales y fiscales (los fiscales, solo lectura: los corrige la plataforma, M01-T11), logo, horario, zona horaria, idioma, gabinetes | — | E | V | V | V | V | M01-T06, M01-T10, M05-T06 |
 | Usuarios y roles | Invitar, cambiar rol, desactivar | — | E | — | — | — | — | M02-T05, M02-T08 |
-| Profesionales | Colegiado, área clínica, color en agenda | — | E | V | V | V | V (1) | M02-T06 |
+| Profesionales | Colegiado, área clínica, color en agenda | — | E | V | V | V | V (1) | M02-T06, M02-T08 |
 | Agenda | Duración de cita por defecto, horarios de profesionales, festivos y cierres | — | E | V | V | E (festivos y bloqueos) | — | M06-T03 |
 | Comunicaciones | Email y WhatsApp: activación, remitente, credenciales, tipos de mensaje, recordatorios, horario permitido, plantillas, prueba de envío | — | E | — | — | V | — | M07-T07 |
 | Catálogo de tratamientos | Tratamientos, precios, duración, ámbito | — | E | V | V | V | E (precios) | M08-T03 |
@@ -28,7 +29,7 @@ Leyenda: **E** = ve y edita · **V** = solo ve · — = no ve la sección.
 | Privacidad y RGPD | Textos legales, finalidades de consentimiento, plazo de conservación, exportación de datos | — | E | — | — | — | — | M04-T07 |
 | Seguridad y auditoría | Registro de auditoría consultable, sesiones activas de usuarios | — | E | — | — | — | — | M01-T09 |
 | Preferencias personales | Idioma, vista de agenda por defecto, profesional o gabinete por defecto; el odontólogo, también el color de su ficha en la agenda | E | E | E | E | E | E | M02-T10 |
-| Plataforma | Clínicas, proveedor de email común, app de Meta y webhook, plantillas por defecto, funciones activables por clínica | E | — | — | — | — | — | M01-T05, M07-T07 |
+| Plataforma | Clínicas, proveedor de email común, app de Meta y webhook, plantillas por defecto, funciones activables por clínica | E | — | — | — | — | — | M01-T05, M02-T11, M02-T08, M07-T07 |
 
 (1) FACTURACION ve los profesionales porque los necesita en presupuestos y facturas (M11).
 
