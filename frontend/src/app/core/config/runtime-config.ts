@@ -27,9 +27,20 @@ export class RuntimeConfigStore {
     return this.current;
   }
 
-  async load(): Promise<void> {
-    const raw = await firstValueFrom(this.http.get<unknown>(RUNTIME_CONFIG_FILE));
-    this.current = parseRuntimeConfig(raw);
+  /** The configuration, or null while config.json is still being read. */
+  peek(): RuntimeConfig | null {
+    return this.current;
+  }
+
+  private loading: Promise<RuntimeConfig> | null = null;
+
+  /** Reads config.json once; later calls, such as the login setup's, wait for the same read. */
+  load(): Promise<RuntimeConfig> {
+    this.loading ??= firstValueFrom(this.http.get<unknown>(RUNTIME_CONFIG_FILE)).then((raw) => {
+      this.current = parseRuntimeConfig(raw);
+      return this.current;
+    });
+    return this.loading;
   }
 }
 
@@ -52,5 +63,7 @@ function requireUrl(values: Record<string, unknown>, key: keyof RuntimeConfig): 
 
 /** Loads config.json before the app starts; the app does not start without it. */
 export function provideRuntimeConfig(): EnvironmentProviders {
-  return provideAppInitializer(() => inject(RuntimeConfigStore).load());
+  return provideAppInitializer(async () => {
+    await inject(RuntimeConfigStore).load();
+  });
 }

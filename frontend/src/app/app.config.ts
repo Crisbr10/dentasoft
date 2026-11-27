@@ -1,5 +1,5 @@
 import { registerLocaleData } from '@angular/common';
-import { provideHttpClient, withFetch } from '@angular/common/http';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import localeEs from '@angular/common/locales/es';
 import {
   ApplicationConfig,
@@ -10,6 +10,7 @@ import {
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
+import { AUTH_INTERCEPTORS, provideAuthentication } from './core/auth/provide-authentication';
 import { provideApiClient } from './core/config/api-client';
 import { provideRuntimeConfig } from './core/config/runtime-config';
 import { provideI18n } from './core/i18n/i18n';
@@ -21,8 +22,9 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(withFetch()),
+    provideHttpClient(withFetch(), withInterceptors(AUTH_INTERCEPTORS)),
     provideRuntimeConfig(),
+    provideAuthentication(),
     provideApiClient(),
     provideI18n(),
     provideIcons(),

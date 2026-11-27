@@ -141,3 +141,5 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+  # Responses are JSON; documented as */*, the frontend generator would read them as binary blobs (M02-T07).
+  default-produces-media-type: application/json

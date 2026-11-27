@@ -1,0 +1,27 @@
+.selector__title {
+  margin-block-end: var(--ds-space-4);
+}
+
+.selector__section {
+  max-width: 48rem;
+  margin-block-end: var(--ds-space-4);
+}
+
+.selector__status {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.selector__actions {
+  display: flex;
+  align-items: center;
+}
+
+.selector__current {
+  font-weight: 600;
+}
+
+.selector__error {
+  color: var(--mat-sys-error);
+}

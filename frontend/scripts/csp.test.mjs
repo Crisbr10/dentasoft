@@ -28,6 +28,10 @@ describe('buildMetaCsp', () => {
     assert.match(policy, /object-src 'none';/);
   });
 
+  it('allows no frames: the token is renewed with the refresh token, not in an iframe', () => {
+    assert.match(buildMetaCsp(CONFIG), /frame-src 'none';/);
+  });
+
   it('lists a shared origin once', () => {
     const policy = buildMetaCsp({
       apiUrl: 'https://dentasoft.test/api',

@@ -6,8 +6,39 @@
     "toggleMenu": "Mostrar u ocultar el menú",
     "mainNavigation": "Navegación principal",
     "nav": {
-      "home": "Inicio"
-    }
+      "home": "Inicio",
+      "platform": "Plataforma"
+    },
+    "clinic": {
+      "change": "Cambiar de clínica"
+    },
+    "logout": "Cerrar sesión"
+  },
+  "roles": {
+    "ADMIN_CLINICA": "Administración de la clínica",
+    "ODONTOLOGO": "Odontología",
+    "HIGIENISTA": "Higiene dental",
+    "RECEPCION": "Recepción",
+    "FACTURACION": "Facturación"
+  },
+  "clinicSelector": {
+    "title": "Elige una clínica",
+    "loading": "Cargando tus clínicas…",
+    "loadError": "No se han podido cargar tus clínicas.",
+    "retry": "Volver a intentarlo",
+    "clinics": "Tus clínicas",
+    "current": "Clínica actual",
+    "choose": "Entrar",
+    "suspended": "Suspendida",
+    "suspendedHint": "Esta clínica está suspendida y no se puede usar.",
+    "invitations": "Invitaciones pendientes",
+    "accept": "Aceptar invitación",
+    "acceptError": "No se ha podido aceptar la invitación. Inténtalo de nuevo.",
+    "empty": "Todavía no perteneces a ninguna clínica. Pide a quien administra tu clínica que te invite."
+  },
+  "platform": {
+    "title": "Administración de la plataforma",
+    "intro": "Desde aquí se darán de alta y se gestionarán las clínicas."
   },
   "home": {
     "title": "Inicio",
