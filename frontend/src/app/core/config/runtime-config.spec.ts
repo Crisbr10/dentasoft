@@ -64,6 +64,18 @@ describe('RuntimeConfigStore', () => {
     });
   });
 
+  it('reads config.json once, however many callers wait for it', async () => {
+    const first = store.load();
+    const second = store.load();
+    expect(store.peek()).toBeNull();
+    http
+      .expectOne(RUNTIME_CONFIG_FILE)
+      .flush({ apiUrl: 'https://api.other.test', authUrl: 'https://auth.other.test' });
+
+    await expect(first).resolves.toEqual(await second);
+    expect(store.peek()?.apiUrl).toBe('https://api.other.test');
+  });
+
   it('fails to start when config.json cannot be read', async () => {
     const loading = store.load();
     http.expectOne(RUNTIME_CONFIG_FILE).flush('', { status: 404, statusText: 'Not Found' });
