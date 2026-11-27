@@ -28,6 +28,17 @@ Trivy sigue la misma política que en local ([backend/README.md](../../backend/R
 
 El escaneo también corre en los PR que tocan el backend, así que una vulnerabilidad crítica nueva en la imagen base o en una dependencia bloquea esos PR aunque no tengan relación con ella. Lo normal es actualizar la imagen o la dependencia. Si no hay versión corregida, se hace una excepción temporal en [`backend/.trivyignore`](../../backend/.trivyignore): un CVE por línea, precedido de un comentario con el issue que la justifica y la fecha de revisión. Las bases de datos de Trivy se descargan una vez por ejecución, con 3 reintentos ante un fallo transitorio del registro.
 
+### Caché de la construcción
+
+Cada construcción de la imagen descargaba de Maven Central la distribución de Maven y todas las dependencias, y Maven Central a veces responde HTTP 429 (demasiadas peticiones) a los runners de GitHub ([#144](https://github.com/Crisbr10/dentasoft/issues/144)). Para evitarlo:
+
+- El [`Dockerfile`](../../backend/Dockerfile) descarga Maven, los plugins y las dependencias en una capa propia que solo depende del Maven Wrapper y de `pom.xml`. Esa capa ejecuta la misma build sobre una aplicación vacía, porque `dependency:go-offline` no descarga todo (por ejemplo, los procesadores de anotaciones del compilador). La compilación del código va después y **sin red** (`--network=none`, `--offline`): si a la capa le faltara algo, la build falla en lugar de descargarlo cada vez.
+- El job `image` construye con Buildx (`docker/setup-buildx-action` y `docker/build-push-action`) y guarda las capas de todas las etapas en la caché de GitHub Actions (`type=gha`, `mode=max`, ámbito `backend-image`). Los PR leen la caché que escribe `main`; la de un PR solo la reutilizan las siguientes ejecuciones de ese PR.
+- Solo un cambio de `pom.xml` o del wrapper vuelve a descargar las dependencias, una vez por rama. Un cambio de código reutiliza la capa.
+- La imagen no lleva atestaciones (`provenance` y `sbom` desactivados) y el registro de la build no se sube como artefacto: la imagen es la misma que con `docker build`.
+
+En local no cambia nada: `docker build -t dentasoft-backend:local backend` usa la caché de capas de Docker de la misma forma. Si hiciera falta forzar una descarga limpia, `docker build --no-cache`.
+
 ## Protección de `main`
 
 El ruleset está en [`.github/rulesets/main.json`](../../.github/rulesets/main.json) y se aplica con:
@@ -51,7 +62,7 @@ Todo esto necesita que el repositorio sea **público**: en el plan gratuito, Git
 ## Mantenimiento
 
 - **Actions fijadas por hash**: cada `uses:` lleva el SHA del commit y la versión en un comentario (`# v7.0.1`). Dependabot actualiza los dos. Nunca uses una etiqueta (`@v7`): se puede mover a otro código.
-- **Imágenes de herramientas** (gitleaks y Trivy): fijadas por etiqueta y digest en las variables `GITLEAKS_IMAGE` y `TRIVY_IMAGE` de `ci.yml`. Dependabot no las ve; se actualizan a mano, igual que la versión de Trivy de `backend/README.md`.
+- **Imágenes de herramientas** (gitleaks, Trivy y BuildKit): fijadas por etiqueta y digest en las variables `GITLEAKS_IMAGE`, `TRIVY_IMAGE` y `BUILDKIT_IMAGE` de `ci.yml`. Dependabot no las ve; se actualizan a mano, igual que la versión de Trivy de `backend/README.md`.
 - **Imágenes de `infra/`**: salen de variables de `infra/.env.example`, así que también se actualizan a mano.
 - **Espera de una semana** (`cooldown`): Dependabot no propone una versión hasta 7 días después de publicarse, para dar tiempo a detectar y retirar una versión comprometida. Las actualizaciones de seguridad no esperan.
 - **`pnpm audit` bloquea a propósito**: depende de la base de avisos del registro, así que un aviso alto nuevo sobre una dependencia que ya teníamos hace fallar cualquier PR que toque el frontend, aunque no tenga relación. Lo normal es actualizar la dependencia (Dependabot suele abrir ya el PR de seguridad). Si no hay versión corregida, se hace una excepción temporal añadiendo `--ignore GHSA-xxxx-xxxx-xxxx` al paso *Audit dependencies* de `ci.yml`, con un comentario que enlace el issue que la justifica y la fecha de revisión.
