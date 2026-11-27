@@ -290,6 +290,7 @@ Para que una tarea programada se ejecute una sola vez con varias réplicas, se a
 - **Criterios de aceptación**:
   - [ ] Textos con Transloco y formularios validados; los errores del servidor (validación, nombre de gabinete repetido, conflicto de versión) se muestran en el formulario
   - [ ] El nombre y los datos fiscales se ven; solo el nombre se edita (los fiscales los cambia la plataforma, M01-T11)
+  - [ ] Como dice la matriz de `configuracion.md`, los demás roles de la clínica ven la sección sin editarla: las lecturas de datos, ajustes, horario y gabinetes de M01-T06 se abren a cualquier rol de la clínica (hoy solo `ADMIN_CLINICA`), y las escrituras siguen siendo solo de `ADMIN_CLINICA` (test por rol)
 
 ### M01-T11 · Corrección de los datos fiscales por la plataforma
 

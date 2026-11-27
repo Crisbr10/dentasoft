@@ -83,7 +83,7 @@ Regla: los mensajes llevan los datos justos (fecha y hora de la cita, nombre de 
 - **Descripción**: sección «Comunicaciones» del apartado de Configuración (ver `configuracion.md`): activar email y WhatsApp por clínica, remitente y `Reply-To`, modo de WhatsApp y credenciales propias (token de solo escritura), tipos de mensaje activos, horas de recordatorio, canal preferido y alternativo, horario permitido, plantillas y botón «Enviar prueba». A nivel de plataforma, `PLATFORM_ADMIN` configura el proveedor de email común, la app de Meta (webhook) y las plantillas por defecto.
 - **Criterios de aceptación**:
   - [ ] Un canal no se puede activar sin una prueba de envío correcta
-  - [ ] El token de WhatsApp nunca vuelve al navegador; solo se muestra «configurado · ••••1234»
+  - [ ] El token de WhatsApp nunca vuelve al navegador, ni entero ni ningún trozo; solo se muestra «configurado» o «sin configurar», y cuándo y quién lo cambió por última vez
   - [ ] Validación de las credenciales contra la API de Meta al guardarlas
   - [ ] Desactivar un canal o un tipo de mensaje detiene los envíos pendientes de ese tipo
   - [ ] Cada cambio queda en `audit_log` sin valores secretos
