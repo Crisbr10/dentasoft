@@ -6,16 +6,17 @@ La CI corre en GitHub Actions. Este documento explica qué comprueba, qué bloqu
 
 | Fichero | Cuándo | Qué hace |
 | --- | --- | --- |
-| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | Cada PR y cada push a `main` | Filtro por rutas, gitleaks, backend, frontend, `ci-ok` y, en `main`, la imagen |
+| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | Cada PR y cada push a `main` | Filtro por rutas, gitleaks, backend, frontend, scripts, `ci-ok` y, en `main`, la imagen |
 | [`.github/workflows/codeql.yml`](../../.github/workflows/codeql.yml) | Cada PR, cada push a `main` y los lunes | CodeQL de Java y TypeScript (`security-extended`) |
 | [`.github/dependabot.yml`](../../.github/dependabot.yml) | Los lunes | Actualizaciones de Actions, Maven, npm y las imágenes base del Dockerfile |
 
 ### Jobs de `ci.yml`
 
-- **`changes`**: decide qué partes cambiaron. `backend` corre si cambia `backend/**`; `frontend`, si cambia `frontend/**`. Los dos corren si cambia el propio `ci.yml`.
+- **`changes`**: decide qué partes cambiaron. `backend` corre si cambia `backend/**`; `frontend`, si cambia `frontend/**`; `scripts`, si cambia `scripts/**`. Los tres corren si cambia el propio `ci.yml`.
 - **`secrets`**: gitleaks sobre **todo** el historial, en cada ejecución. Tarda segundos y también detecta un secreto que se añadió y se quitó dentro del mismo PR.
 - **`backend`**: `mvnw verify` (compilación, tests unitarios y de integración con Testcontainers, y formato).
 - **`frontend`**: `pnpm install --frozen-lockfile`, `pnpm audit --audit-level high`, `format:check`, `lint`, `test` y `build`. El build usa dominios reservados `.test` (ADR 0006).
+- **`scripts`**: los tests de Pester de `scripts/` (todos los `*.Tests.ps1`), en Windows con Windows PowerShell 5.1, como se ejecutan en local. Usa Pester 3.4.0, el que trae Windows y para el que está escrita la sintaxis de los tests (`Should Be`); lo importa por versión porque la imagen del runner puede traer también Pester 5, que no la admite. Falla si falla algún test o si no encuentra ninguno. Los tests usan ficheros `.env` de prueba: no leen `infra/.env` ni necesitan secretos. En local: `Invoke-Pester .\scripts`.
 - **`image`**: si cambió el backend, construye la imagen y la escanea con Trivy. En un PR no publica nada: así un PR que rompe la imagen (por ejemplo, una actualización de Dependabot de la imagen base) falla antes de fusionarse. En push a `main`, además, la publica en GHCR.
 - **`ci-ok`**: el **único check obligatorio**. Corre siempre y falla si algún job del que depende ha fallado o se ha cancelado. Los jobs saltados por el filtro no lo bloquean, así que un PR que solo toca el frontend no espera al backend.
 

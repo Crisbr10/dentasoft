@@ -37,6 +37,7 @@ jobs:
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      scripts: ${{ steps.filter.outputs.scripts }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,6 +51,9 @@ jobs:
               - '.github/workflows/ci.yml'
             frontend:
               - 'frontend/**'
+              - '.github/workflows/ci.yml'
+            scripts:
+              - 'scripts/**'
               - '.github/workflows/ci.yml'
 
   secrets:
@@ -128,10 +132,37 @@ jobs:
           DENTASOFT_URLS_API: https://api.dentasoft.test
           DENTASOFT_URLS_AUTH: https://auth.dentasoft.test
 
+  # Pester tests of scripts/. They run on Windows PowerShell 5.1, as the scripts do locally,
+  # and with Pester 3.4.0, the version Windows ships and the one the tests' syntax targets.
+  # The runner image may also have a newer Pester, which `Invoke-Pester` would load by
+  # default, so the version is imported explicitly.
+  scripts:
+    name: scripts
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test
+        run: |
+          $ErrorActionPreference = 'Stop'
+          "Windows PowerShell $($PSVersionTable.PSVersion)"
+          if ($PSVersionTable.PSVersion.Major -ne 5) { throw 'Windows PowerShell 5.1 is required.' }
+          Import-Module Pester -RequiredVersion 3.4.0
+          $result = Invoke-Pester -Path scripts -PassThru
+          if ($result.TotalCount -eq 0) { throw 'No Pester tests were found in scripts/.' }
+          if ($result.FailedCount -gt 0) { throw "$($result.FailedCount) Pester test(s) failed." }
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, secrets, backend, frontend, image]
+    needs: [changes, secrets, backend, frontend, scripts, image]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

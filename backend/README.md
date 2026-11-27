@@ -40,7 +40,7 @@ La documentación de módulos (PlantUML y AsciiDoc) queda en `target/spring-modu
 - Lee `infra/.env` como Compose (comentarios, `export`, comillas), pero no interpreta `${VAR}` ni escapes dentro de las comillas.
 - `-MavenArgs` se añade tal cual a la línea de `cmd.exe`: un argumento con espacios va entre comillas dentro del valor.
 - Usa el puerto 8080, igual que el servicio `app` de Compose: arranca solo uno de los dos.
-- Tests (Pester 3.4, el que trae Windows): `Invoke-Pester .\scripts\run-backend.Tests.ps1`. Usan ficheros `.env` de prueba y nunca leen `infra/.env`.
+- Tests (Pester 3.4, el que trae Windows): `Invoke-Pester .\scripts\run-backend.Tests.ps1`. Usan ficheros `.env` de prueba y nunca leen `infra/.env`. La CI los ejecuta cuando cambia `scripts/` (job `scripts`, ver [docs/operaciones/integracion-continua.md](../docs/operaciones/integracion-continua.md)).
 
 ## Calidad y tests
 
