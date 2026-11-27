@@ -156,3 +156,16 @@
   - [x] Lanza `backend\mvnw.cmd spring-boot:run` con el perfil local y devuelve su código de salida
   - [x] Si falta `infra/.env` o una variable obligatoria, falla con un mensaje que dice cuál falta, sin mostrar ningún valor
   - [x] Documentado en `backend/README.md`
+
+### M00-T11 · Tests de los scripts en la CI
+
+- **Estado**: pendiente
+- **Depende de**: M00-T07, M00-T10
+- **Descripción**: los tests de Pester de `scripts/` (de momento, `run-backend.Tests.ps1`) solo se ejecutan a mano. La CI debe ejecutarlos cuando cambie algún fichero de `scripts/`, como ya hace con `backend/` y `frontend/`.
+- **Criterios de aceptación**:
+  - [ ] `.github/workflows/ci.yml` tiene un filtro `scripts` en el job `changes` (`scripts/**` y el propio `ci.yml`) y un job que ejecuta los tests de Pester de `scripts/` solo cuando ese filtro cambia
+  - [ ] El job corre en Windows con Windows PowerShell 5.1, como en local, y falla si falla algún test
+  - [ ] Los tests se ejecutan con una versión de Pester fija y compatible con la sintaxis de los tests (hoy, la 3.4 que trae Windows); si se cambia de versión, se adapta la sintaxis y se documenta cómo instalarla en local
+  - [ ] `ci-ok` tiene en cuenta el job nuevo: falla si falla, y no si se ha saltado porque no cambió `scripts/`
+  - [ ] Los tests no leen `infra/.env` ni necesitan secretos
+  - [ ] Documentado en `backend/README.md` (apartado del script) o en el README de la CI que corresponda
