@@ -23,23 +23,24 @@ pnpm api:gen               # regenera src/app/api desde el OpenAPI del backend l
 `src/app/api/` es código generado con [ng-openapi-gen](https://github.com/cyclosproject/ng-openapi-gen) a partir del OpenAPI del backend. **Va en el repositorio y no se edita a mano**. ESLint, Prettier y las revisiones de código no lo incluyen.
 
 - **Cuándo regenerarlo**: en el mismo PR que cambia un endpoint o un DTO del backend. Así el cliente nunca se desfasa de la API.
-- **Cómo**: arranca el backend con el perfil local (`cd backend; .\mvnw.cmd spring-boot:run`) y ejecuta `pnpm api:gen`. Por defecto lee `http://localhost:8080/v3/api-docs`; para leer otra URL, usa la variable `DENTASOFT_API_DOCS_URL`.
+- **Cómo**: arranca el backend con el perfil local (`cd backend; .\mvnw.cmd spring-boot:run`, o el servicio `app` de Compose, que recibe las variables de `infra/.env`: `docker compose -f compose.yml -f compose.local.yml --profile app up -d --build --wait app` desde `infra/`) y ejecuta `pnpm api:gen`. Después, para el servicio con `docker compose … stop app`. Por defecto lee `http://localhost:8080/v3/api-docs`; para leer otra URL, usa la variable `DENTASOFT_API_DOCS_URL`.
+- **Respuestas en JSON**: el backend documenta sus respuestas como `application/json` (`springdoc.default-produces-media-type`). Con `*/*`, ng-openapi-gen las pediría como `blob` y el cliente no leería el cuerpo.
 - **Sin URL en el código**: `scripts/api-gen.mjs` quita `servers` del documento antes de generar, para que no quede ninguna URL escrita. La app fija la URL base del cliente desde `config.json` con `provideApiClient()` (`src/app/core/config/api-client.ts`). `no-hardcoded-urls` también revisa el código generado. Solo ignora en él las líneas que son enteramente comentario, como los enlaces a documentación. Para decidirlo usa el parser de TypeScript, así que una línea que mezcla un comentario y código se revisa igual.
 - La configuración del generador está en `ng-openapi-gen.json`. Los ficheros que dejan de generarse se borran solos.
 
 ## Estructura
 
-| Carpeta             | Contenido                                                                               |
-| ------------------- | --------------------------------------------------------------------------------------- |
-| `src/app/core/`     | Configuración, i18n, iconos y layout base (cabecera, barra lateral y área de contenido) |
-| `src/app/shared/`   | Componentes, directivas y pipes reutilizables                                           |
-| `src/app/api/`      | Cliente generado con `pnpm api:gen` (ver «Cliente de la API»)                           |
-| `src/app/features/` | Una carpeta por módulo funcional, con carga diferida                                    |
-| `src/assets/i18n/`  | Textos (`es.json`)                                                                      |
-| `src/assets/icons/` | Iconos SVG servidos desde el propio build                                               |
-| `src/styles.scss`   | Tema de Material 3 (`mat.theme`)                                                        |
-| `src/styles/`       | Paletas generadas y tokens de diseño (`--ds-*`)                                         |
-| `scripts/`          | Generación de `config.json`, de la CSP y del cliente de la API, y sus tests             |
+| Carpeta             | Contenido                                                                              |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `src/app/core/`     | Configuración, login y sesión, clínica activa, interceptor, i18n, iconos y layout base |
+| `src/app/shared/`   | Componentes, directivas y pipes reutilizables                                          |
+| `src/app/api/`      | Cliente generado con `pnpm api:gen` (ver «Cliente de la API»)                          |
+| `src/app/features/` | Una carpeta por módulo funcional, con carga diferida                                   |
+| `src/assets/i18n/`  | Textos (`es.json`)                                                                     |
+| `src/assets/icons/` | Iconos SVG servidos desde el propio build                                              |
+| `src/styles.scss`   | Tema de Material 3 (`mat.theme`)                                                       |
+| `src/styles/`       | Paletas generadas y tokens de diseño (`--ds-*`)                                        |
+| `scripts/`          | Generación de `config.json`, de la CSP y del cliente de la API, y sus tests            |
 
 ## Configuración
 
@@ -55,6 +56,19 @@ Ninguna URL ni dominio se escribe en `src/` ([ADR 0006](../docs/adr/0006-dominio
 - **Vercel**: define las dos variables en _Settings → Environment Variables_ para **Production y también para Preview**; si no, los despliegues de vista previa fallan en el build.
 - **CI** (M00-T07): el build usará dominios reservados `.test`, por ejemplo `https://api.dentasoft.test`.
 
+## Login y sesión
+
+El login es con Keycloak (realm `dentasoft`, cliente público `dentasoft-web`), por redirección, con código y PKCE ([angular-auth-oidc-client](https://github.com/damienbod/angular-auth-oidc-client), `src/app/core/auth/`).
+
+- **Tokens en `sessionStorage`**, nunca en `localStorage`: terminan con la pestaña.
+- **Renovación con el refresh token**, sin iframes de Keycloak (`silentRenew` sin `silentRenewUrl` y sin `checkSession`), así que la CSP mantiene `frame-src 'none'`. Sin `offline_access`: la sesión termina con la de Keycloak.
+- **Cerrar sesión** cierra también la sesión de Keycloak (`end_session_endpoint`). Antes de salir, borra todo `sessionStorage` y el estado en memoria (clínica activa y `/me`).
+- **Interceptor** (`src/app/core/http/api-interceptor.ts`): añade `Authorization` solo a las peticiones cuyo origen, ya analizada la URL, es exactamente el de `apiUrl`, nunca por prefijo del texto. `X-Clinic-Id` va solo a `/api/v1/clinic/**`.
+  - Un 401 renueva el token una vez y repite la petición. Si no se puede renovar, vuelve al login y, tras él, a la misma página.
+  - Un 403 de `/api/v1/clinic/**` vuelve a leer `/me`. El backend da la misma respuesta cuando rechaza la clínica y cuando falta el rol, así que solo si la clínica ya no se puede usar (membresía terminada o clínica suspendida) se va al selector.
+- **Clínica activa** (`src/app/core/clinic/active-clinic.ts`): sale de `GET /api/v1/me`. Con una sola clínica se elige sola; con varias, el selector (`/clinica`) las muestra, incluidas las suspendidas (marcadas y sin poder elegirse), y las invitaciones pendientes, que se aceptan allí. Un `PLATFORM_ADMIN` sin clínicas ni invitaciones va a `/plataforma`. Cambiar de clínica vuelve a crear la página, así que cada pantalla lee los datos de la clínica nueva.
+- **Guardias y menú**: las guardias (`guards.ts`) y el menú por rol (`core/layout/navigation.ts`) son solo comodidad. La seguridad está en el backend, que comprueba el token, la membresía y el rol en cada petición.
+
 ## Seguridad en Vercel
 
 `vercel.json` define la reescritura de SPA a `index.html` y las cabeceras de seguridad. La reescritura excluye las rutas que acaban en una extensión de fichero del build (`.js`, `.css`, `.json`, `.svg`, `.woff2`…; la lista está en `vercel.json`), así que ninguna ruta de la app debe acabar así: un fichero que no existe, como un chunk de una versión anterior, da 404 en lugar de devolver `index.html` con la caché larga de los ficheros con hash.
@@ -63,7 +77,7 @@ Ninguna URL ni dominio se escribe en `src/` ([ADR 0006](../docs/adr/0006-dominio
 - `config.json` y la CSP del `<meta>` se generan juntos en el build. Si algún día se cambia `config.json` después del build (por ejemplo, en una imagen de contenedor), hay que regenerar también la CSP, o el navegador bloqueará los dominios nuevos.
 - `style-src` admite `'unsafe-inline'` porque Angular inyecta los estilos de los componentes en tiempo de ejecución. Los scripts no: `inlineCritical` está desactivado en `angular.json` porque genera `<link … onload="…">`, un manejador en línea que `script-src 'self'` bloquea.
 - `X-Frame-Options: DENY`, HSTS, `nosniff`, `Referrer-Policy`, `Permissions-Policy` y `Cross-Origin-Resource-Policy`.
-- **`Cross-Origin-Opener-Policy: same-origin`** funciona porque el login con Keycloak será **por redirección** (M02-T07). Un login en ventana emergente rompería con esta cabecera: no lo cambies a popup sin revisar la COOP.
+- **`Cross-Origin-Opener-Policy: same-origin`** funciona porque el login con Keycloak es **por redirección** (M02-T07). Un login en ventana emergente rompería con esta cabecera: no lo cambies a popup sin revisar la COOP.
 - **Caché**: `config.json` va con `Cache-Control: no-cache`, para que un cambio de variables y un redespliegue se vean al momento. Los ficheros con hash (`main-*`, `chunk-*`, `polyfills-*`, `styles-*` y `media/`) van con caché larga e inmutable.
 
 ## Licencias de terceros
