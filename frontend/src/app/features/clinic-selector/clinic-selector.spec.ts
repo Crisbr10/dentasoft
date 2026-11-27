@@ -169,7 +169,7 @@ describe('ClinicSelector', () => {
     fixture.detectChanges();
     http.expectOne(ME).flush({ clinics: [], invitations: [] });
 
-    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/plataforma'));
+    await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/configuracion/plataforma'));
     await fixture.whenStable();
     expect(root().textContent).not.toContain(es.clinicSelector.empty);
   });

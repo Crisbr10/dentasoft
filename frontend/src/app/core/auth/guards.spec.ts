@@ -110,7 +110,7 @@ describe('guards', () => {
       clinic.clinics.set([]);
       session.checkPlatformAdmin.mockResolvedValue(true);
 
-      expect(path(await run(clinicGuard))).toBe('/plataforma');
+      expect(path(await run(clinicGuard))).toBe('/configuracion/plataforma');
     });
 
     it('shows a user without clinics the selector and its notice', async () => {

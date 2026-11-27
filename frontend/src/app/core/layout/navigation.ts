@@ -16,7 +16,13 @@ export interface NavItem {
 
 export const NAVIGATION: readonly NavItem[] = [
   { path: '/', labelKey: 'layout.nav.home', icon: 'home', exact: true, clinicRoles: CLINIC_ROLES },
-  { path: '/plataforma', labelKey: 'layout.nav.platform', icon: 'business', platform: true },
+  {
+    path: '/configuracion',
+    labelKey: 'layout.nav.configuration',
+    icon: 'settings',
+    clinicRoles: CLINIC_ROLES,
+    platform: true,
+  },
 ];
 
 /** The entries the user may use with their role in the active clinic and their realm roles. */

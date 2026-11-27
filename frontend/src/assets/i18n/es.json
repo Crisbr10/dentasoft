@@ -7,7 +7,7 @@
     "mainNavigation": "Navegación principal",
     "nav": {
       "home": "Inicio",
-      "platform": "Plataforma"
+      "configuration": "Configuración"
     },
     "clinic": {
       "change": "Cambiar de clínica"
@@ -49,6 +49,42 @@
       "down": "El servidor responde, pero no está disponible.",
       "unreachable": "No se puede conectar con el servidor.",
       "retry": "Volver a comprobar"
+    }
+  },
+  "configuration": {
+    "title": "Configuración",
+    "menu": "Secciones de la configuración",
+    "viewOnly": "Solo lectura",
+    "loadError": "No se han podido cargar las secciones de la configuración.",
+    "retry": "Volver a intentarlo",
+    "placeholder": "Esta sección estará disponible próximamente.",
+    "sections": {
+      "CLINIC": "Clínica",
+      "USERS_AND_ROLES": "Usuarios y roles",
+      "PRACTITIONERS": "Profesionales",
+      "PLATFORM": "Plataforma"
+    },
+    "noAccess": {
+      "title": "Sin acceso",
+      "text": "No tienes permiso para ver esta sección de la configuración.",
+      "back": "Volver a la configuración"
+    }
+  },
+  "forms": {
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "discard": "Descartar cambios",
+    "invalid": "Revisa los campos marcados.",
+    "unexpected": "No se han podido guardar los cambios. Inténtalo de nuevo.",
+    "secret": {
+      "configured": "Configurado",
+      "notConfigured": "Sin configurar",
+      "changed": "Último cambio: {{date}}, por {{by}}",
+      "unknownUser": "una persona desconocida",
+      "new": "Nuevo valor",
+      "cancel": "Cancelar",
+      "change": "Cambiar",
+      "set": "Configurar"
     }
   }
 }
