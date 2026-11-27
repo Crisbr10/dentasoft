@@ -71,3 +71,12 @@
 - **Criterios de aceptación**:
   - [ ] Restauración probada al menos una vez y anotada
   - [ ] Aviso si la API o Keycloak caen más de 5 minutos
+
+### M03-T07 · Tests de extremo a extremo con Playwright
+
+- **Estado**: pendiente
+- **Depende de**: M03-T02, M02-T08
+- **Descripción**: tests de extremo a extremo con Playwright contra el stack completo (backend, frontend, Keycloak real y Mailpit) levantado con Docker Compose en la CI. El primero recorre el flujo de M02-T08: crear clínica → invitar administrador → el administrador invita a un odontólogo, aceptando cada invitación desde el email de Mailpit, con su contraseña y su OTP. Playwright es una dependencia nueva: se justifica en el PR (licencia, mantenimiento y vulnerabilidades).
+- **Criterios de aceptación**:
+  - [ ] El flujo pasa en la CI con datos de prueba inventados y secretos solo de prueba por variables de entorno
+  - [ ] Un fallo deja en la CI las trazas y capturas de Playwright como artefacto
