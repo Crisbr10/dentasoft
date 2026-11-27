@@ -5,8 +5,8 @@
 # pull request that only touches the frontend does not wait for the backend.
 #
 # Every action is pinned by commit hash, with its version in a comment. Dependabot updates
-# both. Tool images run with `docker run` are pinned by tag and digest; Dependabot does not
-# see them, so they are updated by hand (see the document above).
+# both. Tool images (run with `docker run`, and BuildKit for Buildx) are pinned by tag and
+# digest; Dependabot does not see them, so they are updated by hand (see the document above).
 
 name: CI
 
@@ -25,6 +25,7 @@ concurrency:
 env:
   GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
   TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+  BUILDKIT_IMAGE: moby/buildkit:v0.35.1@sha256:baf6138eb8c37644800c7c913fba051e840ebb9ba13eaf92d92ef9a1712d0b4c
 
 jobs:
   changes:
@@ -194,14 +195,36 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dentasoft-backend:${GITHUB_SHA}" >> "$GITHUB_ENV"
+      # Buildx keeps the layers of every stage (`mode=max`) in the GitHub Actions cache. The
+      # Maven distribution and the dependencies have a layer of their own in the Dockerfile, so
+      # a build only downloads them again when pom.xml or the wrapper changes (#144). Pull
+      # requests read the cache that `main` writes.
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+      # `load` leaves the image in Docker for Trivy and the push. No attestations, so the image
+      # is the same single manifest as with `docker build`. The build record is not uploaded
+      # as an artifact; the job summary is enough.
+      # A failed cache import only means a cold build; `ignore-error` does the same for the
+      # export, so an outage of the cache service does not fail a correct build.
       - name: Build
-        run: |
-          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dentasoft-backend:${GITHUB_SHA}"
-          echo "IMAGE=${image}" >> "$GITHUB_ENV"
-          docker build \
-            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --tag "${image}" backend
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: backend
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          tags: ${{ env.IMAGE }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=backend-image
+          cache-to: type=gha,scope=backend-image,mode=max,ignore-error=true
       # Same policy as backend/README.md: critical vulnerabilities stop the release; high ones
       # are listed for review. Temporary exceptions go in backend/.trivyignore.
       - name: Scan the image with Trivy

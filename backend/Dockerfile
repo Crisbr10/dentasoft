@@ -5,13 +5,26 @@
 
 FROM eclipse-temurin:25-jdk-noble@sha256:4ddc1a8bdaf283421df5487411aff10b797ccf1e06a339041005114c8f489b5c AS build
 WORKDIR /build
+# The Maven distribution, the plugins and the dependencies go in a layer of their own that only
+# depends on the wrapper and pom.xml, so a code change reuses it and downloads nothing. They stay
+# in the layer, not in a cache mount: the CI keeps layers between runs (docs/operaciones/
+# integracion-continua.md), but never the contents of a cache mount.
+# The layer runs the same build as below on a placeholder application, so Maven downloads exactly
+# what that build needs; `dependency:go-offline` misses some of it, such as the compiler's
+# annotation processors.
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
+RUN mkdir -p src/main/java src/test/java \
+    && echo 'class Placeholder { public static void main(String[] args) {} }' > src/main/java/Placeholder.java \
+    && echo 'class PlaceholderTests {}' > src/test/java/PlaceholderTests.java \
+    && sh ./mvnw --batch-mode --quiet package -DskipTests \
+    && rm -rf src target
 COPY src/ src/
 # Tests are not run here: `mvnw verify` runs them before any image is built (locally and in CI).
-# The cache mount keeps the Maven distribution and the dependencies between builds.
-RUN --mount=type=cache,target=/root/.m2 \
-    sh ./mvnw --batch-mode --quiet package -DskipTests \
+# The build has no network: if the layer above missed something, it fails here instead of
+# downloading it on every build.
+RUN --network=none \
+    sh ./mvnw --batch-mode --quiet --offline package -DskipTests \
     && cp target/dentasoft-*.jar application.jar \
     && java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
