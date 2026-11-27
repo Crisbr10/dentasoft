@@ -65,6 +65,7 @@ Regla: los mensajes llevan los datos justos (fecha y hora de la cita, nombre de 
 - **Criterios de aceptación**:
   - [ ] Cada cita recibe un solo recordatorio aunque haya varias réplicas
   - [ ] Respeta la zona horaria y no envía de madrugada
+- **Nota**: si el recordatorio necesita datos del profesional, `ActivePractitioners` (M02-T06) no sirve tal cual: exige un usuario con sesión iniciada y membresía en la clínica (`@PreAuthorize`). La tarea programada no tiene usuario, así que necesitará otra vía, por ejemplo un método de la API pública sin `@PreAuthorize` pensado para procesos que fijan la clínica explícitamente. Se decide en esta tarea.
 
 ### M07-T06 · Pantallas de notificaciones
 
