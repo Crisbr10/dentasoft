@@ -12,6 +12,33 @@ Spring Boot 4 sobre Java 25, monolito modular con Spring Modulith. Paquete raíz
 
 La documentación de módulos (PlantUML y AsciiDoc) queda en `target/spring-modulith-docs` tras ejecutar `ModularityTests`.
 
+### Arrancar en local con las variables de `infra/.env`
+
+`spring-boot:run` no arranca sin las contraseñas de PostgreSQL y Redis ni el secreto del cliente `dentasoft-backend` de Keycloak, que están en `infra/.env`. Con los servicios locales ya arrancados (ver `infra/README.md`), desde la raíz del repositorio:
+
+```powershell
+.\scripts\run-backend.ps1                  # arranca en http://localhost:8080 con el perfil local; Ctrl+C lo para
+.\scripts\run-backend.ps1 -ListVariables   # solo muestra qué variables pasaría (nombres, nunca valores)
+.\scripts\run-backend.ps1 -MavenArgs '-Dspring-boot.run.jvmArguments=-Xmx768m'   # argumentos para Maven
+```
+
+- Lee `infra/.env` y pasa sus variables **solo al proceso de Maven**: no las escribe en ningún fichero, no cambia el entorno de la sesión, del usuario ni de la máquina, y nunca muestra un valor.
+- Traduce los nombres de `infra/.env` a los del backend, con la misma correspondencia que el servicio `app` de `infra/compose.local.yml`:
+
+  | En `infra/.env` | Llega al backend como |
+  | --- | --- |
+  | `DENTASOFT_DB_APP_PASSWORD` | `SPRING_DATASOURCE_PASSWORD` |
+  | `DENTASOFT_DB_OWNER_PASSWORD` | `SPRING_FLYWAY_PASSWORD` |
+  | `DENTASOFT_DB_PLATFORM_PASSWORD` | `DENTASOFT_PLATFORM_DATASOURCE_PASSWORD` |
+  | `DENTASOFT_REDIS_PASSWORD` | `SPRING_DATA_REDIS_PASSWORD` |
+  | `DENTASOFT_KC_BACKEND_CLIENT_SECRET` | `DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET` |
+
+  Las variables de `infra/.env` llegan también con su propio nombre. Si se añade al servicio `app` una variable que se traduce, hay que añadirla también a `$BackendNames` en el script.
+- Una variable ya definida en el entorno tiene prioridad sobre `infra/.env`, como en Compose.
+- Si falta `infra/.env` o una de esas cinco variables, termina con error y dice cuál falta. Devuelve el código de salida de Maven.
+- Usa el puerto 8080, igual que el servicio `app` de Compose: arranca solo uno de los dos.
+- Tests (Pester 3.4, el que trae Windows): `Invoke-Pester .\scripts\run-backend.Tests.ps1`. Usan ficheros `.env` de prueba y nunca leen `infra/.env`.
+
 ## Calidad y tests
 
 - **Formato**: `verify` falla si algún fichero Java no tiene el formato de palantir-java-format. Se corrige con `spotless:apply`.
