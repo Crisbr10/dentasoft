@@ -34,10 +34,10 @@ Cada construcción de la imagen descargaba de Maven Central la distribución de 
 
 - El [`Dockerfile`](../../backend/Dockerfile) descarga Maven, los plugins y las dependencias en una capa propia que solo depende del Maven Wrapper y de `pom.xml`. Esa capa ejecuta la misma build sobre una aplicación vacía, porque `dependency:go-offline` no descarga todo (por ejemplo, los procesadores de anotaciones del compilador). La compilación del código va después y **sin red** (`--network=none`, `--offline`): si a la capa le faltara algo, la build falla en lugar de descargarlo cada vez.
 - El job `image` construye con Buildx (`docker/setup-buildx-action` y `docker/build-push-action`) y guarda las capas de todas las etapas en la caché de GitHub Actions (`type=gha`, `mode=max`, ámbito `backend-image`). Los PR leen la caché que escribe `main`; la de un PR solo la reutilizan las siguientes ejecuciones de ese PR.
-- Solo un cambio de `pom.xml` o del wrapper vuelve a descargar las dependencias, una vez por rama. Un cambio de código reutiliza la capa.
+- Un cambio de código reutiliza la capa. Vuelven a descargar las dependencias, una vez por rama: un cambio de `pom.xml` o del wrapper, una actualización de la imagen base del JDK (Dependabot) y que GitHub haya borrado la caché (tras 7 días sin usarse o al pasar de los 10 GB del repositorio; cada PR del backend guarda unos 650 MB).
 - La imagen no lleva atestaciones (`provenance` y `sbom` desactivados) y el registro de la build no se sube como artefacto: la imagen es la misma que con `docker build`.
 
-En local no cambia nada: `docker build -t dentasoft-backend:local backend` usa la caché de capas de Docker de la misma forma. Si hiciera falta forzar una descarga limpia, `docker build --no-cache`.
+En local, `docker build -t dentasoft-backend:local backend` funciona igual y usa la caché de capas de Docker de la misma forma. La diferencia con la antigua caché `--mount=type=cache` es que un cambio de `pom.xml` vuelve a descargar todas las dependencias, no solo las nuevas. Para forzar una descarga limpia: `docker build --no-cache`.
 
 ## Protección de `main`
 
