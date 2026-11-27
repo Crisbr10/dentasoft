@@ -147,12 +147,12 @@
 
 ### M00-T10 · Script para arrancar el backend en local
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T03
 - **Descripción**: `mvnw spring-boot:run` no arranca sin las contraseñas y el secreto de Keycloak de `infra/.env`, y algunas variables tienen en el backend otro nombre que en `.env`. Un script `scripts/run-backend.ps1` carga `infra/.env` solo en su proceso, traduce los nombres a los que espera el backend y lanza `mvnw spring-boot:run`.
 - **Criterios de aceptación**:
-  - [ ] `scripts/run-backend.ps1` lee `infra/.env` y fija las variables solo en el entorno de su proceso: no las escribe en ningún fichero ni en el entorno del usuario o de la máquina, y no las muestra en pantalla ni en el log
-  - [ ] Traduce las variables de `infra/.env` a los nombres que espera el backend, con la misma correspondencia que el servicio `app` de `infra/compose.local.yml` (por ejemplo, `DENTASOFT_KC_BACKEND_CLIENT_SECRET` → `DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET`)
-  - [ ] Lanza `backend\mvnw.cmd spring-boot:run` con el perfil local y devuelve su código de salida
-  - [ ] Si falta `infra/.env` o una variable obligatoria, falla con un mensaje que dice cuál falta, sin mostrar ningún valor
-  - [ ] Documentado en `backend/README.md`
+  - [x] `scripts/run-backend.ps1` lee `infra/.env` y fija las variables solo en el entorno de su proceso: no las escribe en ningún fichero ni en el entorno del usuario o de la máquina, y no las muestra en pantalla ni en el log
+  - [x] Traduce las variables de `infra/.env` a los nombres que espera el backend, con la misma correspondencia que el servicio `app` de `infra/compose.local.yml` (por ejemplo, `DENTASOFT_KC_BACKEND_CLIENT_SECRET` → `DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET`)
+  - [x] Lanza `backend\mvnw.cmd spring-boot:run` con el perfil local y devuelve su código de salida
+  - [x] Si falta `infra/.env` o una variable obligatoria, falla con un mensaje que dice cuál falta, sin mostrar ningún valor
+  - [x] Documentado en `backend/README.md`
