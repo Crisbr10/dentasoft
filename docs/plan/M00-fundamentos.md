@@ -172,12 +172,12 @@
 
 ### M00-T12 · Caché de la imagen del backend en la CI
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M00-T04, M00-T07
 - **Descripción**: el job `image` falla de forma intermitente porque Maven Central responde HTTP 429: cada build de `backend/Dockerfile` descarga otra vez la distribución de Maven y todas las dependencias, ya que la caché `--mount=type=cache` no se conserva entre ejecuciones de GitHub Actions (issue #144). El Dockerfile separa las dependencias en una capa propia y la CI guarda las capas entre ejecuciones con la caché de GitHub Actions de BuildKit (`cache-from`/`cache-to` con `type=gha`).
 - **Criterios de aceptación**:
-  - [ ] `backend/Dockerfile` descarga Maven y las dependencias en una capa que solo depende del Maven Wrapper y de `pom.xml`, antes de copiar `src/`, y compila sin acceso a la red, así que un cambio de código no vuelve a descargar nada
-  - [ ] El job `image` construye con Buildx y guarda las capas de todas las etapas en la caché de GitHub Actions; un PR reutiliza la caché de `main`
-  - [ ] Con la caché disponible y sin cambios en `pom.xml`, el job `image` no descarga nada de Maven Central
-  - [ ] La imagen resultante es la misma que antes: etiquetas, escaneo con Trivy y publicación en GHCR sin cambios, y `docker build -t dentasoft-backend:local backend` sigue funcionando en local
-  - [ ] Documentado en `docs/operaciones/integracion-continua.md`
+  - [x] `backend/Dockerfile` descarga Maven y las dependencias en una capa que solo depende del Maven Wrapper y de `pom.xml`, antes de copiar `src/`, y compila sin acceso a la red, así que un cambio de código no vuelve a descargar nada
+  - [x] El job `image` construye con Buildx y guarda las capas de todas las etapas en la caché de GitHub Actions; un PR reutiliza la caché de `main`
+  - [x] Con la caché disponible y sin cambios en `pom.xml`, el job `image` no descarga nada de Maven Central
+  - [x] La imagen resultante es la misma que antes: etiquetas, escaneo con Trivy y publicación en GHCR sin cambios, y `docker build -t dentasoft-backend:local backend` sigue funcionando en local
+  - [x] Documentado en `docs/operaciones/integracion-continua.md`
