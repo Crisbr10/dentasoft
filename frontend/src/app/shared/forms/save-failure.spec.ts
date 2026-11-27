@@ -61,6 +61,22 @@ describe('toSaveFailure', () => {
     });
   });
 
+  it('still puts the other fields on their controls when one is not in the form', () => {
+    const edited = form();
+
+    toSaveFailure(
+      edited,
+      response(400, {
+        errors: [
+          { field: 'timeZone', message: 'No existe.' },
+          { field: 'name', message: 'El nombre es obligatorio.' },
+        ],
+      }),
+    );
+
+    expect(edited.controls.name.errors).toEqual({ server: 'El nombre es obligatorio.' });
+  });
+
   it('shows the explanation of a conflict, such as a version conflict', () => {
     const failure = toSaveFailure(
       form(),

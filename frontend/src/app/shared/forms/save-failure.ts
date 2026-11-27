@@ -38,8 +38,9 @@ export function toSaveFailure(form: AbstractControl, error: unknown): SaveFailur
   ) as Problem;
   if (error.status === 400 && Array.isArray(problem.errors) && problem.errors.length > 0) {
     const fields = problem.errors as InvalidField[];
-    const placed = fields.every((field) => placeOnControl(form, field));
-    if (placed) {
+    // Every field gets its message, even after one the form does not have.
+    const placed = fields.map((field) => placeOnControl(form, field));
+    if (placed.every(Boolean)) {
       return { kind: 'validation' };
     }
   }

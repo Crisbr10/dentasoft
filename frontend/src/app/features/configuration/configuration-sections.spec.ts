@@ -106,6 +106,20 @@ describe('ConfigurationSections', () => {
     expect(sections.accessTo('CLINIC')).toBe('VIEW');
   });
 
+  it('shows no section of the previous clinic while those of the new one are read', async () => {
+    const first = sections.ensureLoaded();
+    (await expectRequest(CLINIC_SECTIONS)).flush([{ section: 'CLINIC', access: 'EDIT' }]);
+    await first;
+
+    clinicId.set('b');
+
+    expect(sections.visible()).toEqual([]);
+    expect(sections.accessTo('CLINIC')).toBeNull();
+    const second = sections.ensureLoaded();
+    (await expectRequest(CLINIC_SECTIONS)).flush([]);
+    await second;
+  });
+
   it('says when the read failed and tries again on the next call', async () => {
     const failing = sections.ensureLoaded();
     (await expectRequest(CLINIC_SECTIONS)).flush(null, { status: 500, statusText: 'Error' });

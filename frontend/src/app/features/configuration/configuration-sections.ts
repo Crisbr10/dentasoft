@@ -70,9 +70,10 @@ export class ConfigurationSections {
   /** The last read failed; the index page offers to try again. */
   readonly failed = signal(false);
 
-  /** The sections the user sees, in menu order. */
+  /** The sections the user sees in the active clinic, in menu order; none while they are read. */
   readonly visible = computed<readonly VisibleEntry[]>(() => {
-    const sections = this.state()?.sections ?? [];
+    const state = this.state();
+    const sections = state?.clinicId === this.clinic.id() ? state.sections : [];
     return SECTIONS.flatMap((entry) => {
       const access = sections.find((section) => section.section === entry.id)?.access;
       return access ? [{ ...entry, access }] : [];
