@@ -9,10 +9,12 @@
 
 | Tabla | Campos principales |
 | --- | --- |
-| `appointment` | `tenant_id`, `patient_id`, `practitioner_id`, `treatment_room_id`, `starts_at`, `ends_at`, `status`, `reason`, `plan_item_id` (opcional), `notes` |
+| `appointment` | `tenant_id`, `patient_id`, `practitioner_role_id`, `treatment_room_id`, `starts_at`, `ends_at`, `status`, `reason`, `plan_item_id` (opcional), `notes` |
 | `appointment_status_history` | `tenant_id`, `appointment_id`, `from_status`, `to_status`, `changed_at`, `changed_by` |
-| `availability` | `tenant_id`, `practitioner_id`, día de la semana, franjas, vigencia |
-| `schedule_block` | `tenant_id`, `practitioner_id` o `treatment_room_id`, intervalo, motivo (vacaciones, formación…) |
+| `availability` | `tenant_id`, `practitioner_role_id`, día de la semana, franjas, vigencia |
+| `schedule_block` | `tenant_id`, `practitioner_role_id` o `treatment_room_id`, intervalo, motivo (vacaciones, formación…) |
+
+`practitioner_role_id` apunta a la ficha del profesional en la clínica (`practitioner_role`, M02-T06, ADR 0017). Las citas nuevas solo se dan con profesionales activos (`ActivePractitioners` de `identity`); las ya dadas conservan el suyo aunque se desactive.
 
 Estados: `programada` → `confirmada` → `en_sala` → `en_curso` → `finalizada`; además `no_presentada` y `cancelada`.
 

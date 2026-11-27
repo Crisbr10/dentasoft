@@ -3,6 +3,7 @@ package es.crisbr.dentasoft.identity.internal;
 import es.crisbr.dentasoft.identity.ClinicRole;
 import es.crisbr.dentasoft.identity.persistence.ClinicMembership;
 import es.crisbr.dentasoft.identity.persistence.ClinicMembershipRepository;
+import es.crisbr.dentasoft.identity.persistence.PractitionerRoleRepository;
 import es.crisbr.dentasoft.shared.CurrentUser;
 import es.crisbr.dentasoft.shared.PageLimits;
 import java.sql.SQLException;
@@ -30,6 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
  * memberships ({@link ClinicMembershipRepository#lockActiveWithRole}), then check that the user making the change is
  * still one of them. Two administrators demoting each other at the same time therefore run one after the other, and
  * the second, no longer an administrator, is refused: the clinic always keeps one.
+ *
+ * <p>A change of role or a deactivation also deactivates the user's practitioner record when the membership no
+ * longer allows it ({@link PractitionerRoles#followMembership}), in the same transaction.
  */
 @Service
 @PreAuthorize("hasRole('ADMIN_CLINICA')")
@@ -41,10 +45,13 @@ class ClinicMemberships {
     private static final String UNIQUE_VIOLATION = "23505";
 
     private final ClinicMembershipRepository memberships;
+    private final PractitionerRoleRepository practitioners;
     private final JdbcClient jdbc;
 
-    ClinicMemberships(ClinicMembershipRepository memberships, JdbcClient jdbc) {
+    ClinicMemberships(
+            ClinicMembershipRepository memberships, PractitionerRoleRepository practitioners, JdbcClient jdbc) {
         this.memberships = memberships;
+        this.practitioners = practitioners;
         this.jdbc = jdbc;
     }
 
@@ -131,6 +138,10 @@ class ClinicMemberships {
             requireAnotherAdmin(admins, membership);
         }
         membership.setRole(role);
+        // The membership first: its row lock waits for a creation or activation of the record that holds it (FOR
+        // SHARE), and only then is the record looked up, so a record committed meanwhile is seen and deactivated.
+        flush();
+        PractitionerRoles.followMembership(practitioners, membership);
         flush();
         return membership;
     }
@@ -158,6 +169,10 @@ class ClinicMemberships {
         requireVersion(membership, version);
         requireAnotherAdmin(admins, membership);
         membership.deactivate();
+        // The membership first: its row lock waits for a creation or activation of the record that holds it (FOR
+        // SHARE), and only then is the record looked up, so a record committed meanwhile is seen and deactivated.
+        flush();
+        PractitionerRoles.followMembership(practitioners, membership);
         flush();
         return membership;
     }

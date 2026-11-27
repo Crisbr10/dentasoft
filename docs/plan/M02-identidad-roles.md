@@ -29,7 +29,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 | --- | --- |
 | `user_account` | `id`, `keycloak_user_id`, `email`, `full_name`, `status` (global, sin `tenant_id`) |
 | `clinic_membership` | `tenant_id`, `user_id`, `role`, `active` |
-| `practitioner` | `tenant_id`, `user_id`, `license_number` (nº de colegiado), `specialty`, `agenda_color` |
+| `practitioner_role` | `tenant_id`, `user_id` (opcional: un colaborador externo no tiene cuenta), `display_name`, `specialty` (área clínica), `license_province` y `license_number` (nº de colegiado), `agenda_color`, `status` (FHIR PractitionerRole, ADR 0017) |
 
 ## Tareas
 
@@ -124,12 +124,17 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T06 · Profesionales
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T05
 - **Descripción**: ficha de profesional (número de colegiado, especialidad, color en la agenda) enlazada al usuario.
 - **Criterios de aceptación**:
-  - [ ] CRUD con test de aislamiento
-  - [ ] Un profesional desactivado no aparece para nuevas citas
+  - [x] CRUD con test de aislamiento
+  - [x] Un profesional desactivado no aparece para nuevas citas
+- **Notas** (decisiones en el ADR 0017):
+  - **Modelo**: tabla `practitioner_role` (FHIR PractitionerRole), una ficha por clínica, con `display_name` escrito por la clínica. En los textos visibles el campo se llama «área clínica», no «especialidad».
+  - **Endpoints**: bajo `/api/v1/clinic/practitioner-roles`. Los gestiona solo `ADMIN_CLINICA` y los lee cualquier rol de la clínica.
+  - **Usuario**: opcional, para colaboradores externos sin cuenta. Si se enlaza, debe ser `ODONTOLOGO` o `HIGIENISTA` de la clínica, y no cambia una vez fijado. Desactivar la membresía, o quitarle el rol clínico, desactiva la ficha.
+  - **Para M06**: `ActivePractitioners` (`list`, `requireActive` con bloqueo `FOR SHARE`, `describe`). Exige un usuario: los procesos sin usuario (M07) tendrán que decidir cómo usarlo.
 
 ### M02-T07 · Login y sesión en el frontend
 
@@ -165,7 +170,7 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 - **Estado**: pendiente
 - **Depende de**: M02-T09
-- **Descripción**: preferencias de cada usuario (idioma de la interfaz, vista de agenda por defecto, profesional o gabinete por defecto) guardadas en el backend y aplicadas al iniciar sesión.
+- **Descripción**: preferencias de cada usuario (idioma de la interfaz, vista de agenda por defecto, profesional o gabinete por defecto) guardadas en el backend y aplicadas al iniciar sesión. El odontólogo también cambia aquí el color de su propia ficha de profesional en la agenda (de M02-T06 solo la gestiona `ADMIN_CLINICA`).
 - **Criterios de aceptación**:
   - [ ] Las preferencias siguen al usuario en cualquier navegador
   - [ ] Valores por defecto de la clínica cuando el usuario no ha elegido

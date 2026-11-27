@@ -20,6 +20,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0014](0014-validacion-de-tokens-y-limite-antes-de-autenticar.md) | Validación de tokens de Keycloak y límite por IP antes de autenticar | Aceptada |
 | [0015](0015-roles-de-clinica-en-base-de-datos.md) | Roles de clínica en la base de datos y usuarios aislados por usuario | Aceptada |
 | [0016](0016-admin-api-de-keycloak-desde-el-backend.md) | Admin API de Keycloak desde el backend e invitaciones | Aceptada |
+| [0017](0017-fichas-de-profesional-por-clinica.md) | Fichas de profesional por clínica (FHIR PractitionerRole) | Aceptada |
 
 ## Plantilla
 

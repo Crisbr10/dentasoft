@@ -19,7 +19,7 @@ Leyenda: **E** = ve y edita · **V** = solo ve · — = no ve la sección.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Clínica | Datos generales y fiscales (los fiscales, solo lectura: los corrige la plataforma, M01-T11), logo, horario, zona horaria, idioma, gabinetes | — | E | V | V | V | V | M01-T06, M01-T10, M05-T06 |
 | Usuarios y roles | Invitar, cambiar rol, desactivar | — | E | — | — | — | — | M02-T05, M02-T08 |
-| Profesionales | Colegiado, especialidad, color en agenda | — | E | V (el suyo: E color) | V | V | — | M02-T06 |
+| Profesionales | Colegiado, área clínica, color en agenda | — | E | V | V | V | V (1) | M02-T06 |
 | Agenda | Duración de cita por defecto, horarios de profesionales, festivos y cierres | — | E | V | V | E (festivos y bloqueos) | — | M06-T03 |
 | Comunicaciones | Email y WhatsApp: activación, remitente, credenciales, tipos de mensaje, recordatorios, horario permitido, plantillas, prueba de envío | — | E | — | — | V | — | M07-T07 |
 | Catálogo de tratamientos | Tratamientos, precios, duración, ámbito | — | E | V | V | V | E (precios) | M08-T03 |
@@ -27,8 +27,10 @@ Leyenda: **E** = ve y edita · **V** = solo ve · — = no ve la sección.
 | Consentimientos y firma | Plantillas de consentimiento, tablets emparejadas | — | E | V (plantillas) | — | V (tablets) | — | M12-T03, M12-T07 |
 | Privacidad y RGPD | Textos legales, finalidades de consentimiento, plazo de conservación, exportación de datos | — | E | — | — | — | — | M04-T07 |
 | Seguridad y auditoría | Registro de auditoría consultable, sesiones activas de usuarios | — | E | — | — | — | — | M01-T09 |
-| Preferencias personales | Idioma, vista de agenda por defecto, profesional o gabinete por defecto | E | E | E | E | E | E | M02-T10 |
+| Preferencias personales | Idioma, vista de agenda por defecto, profesional o gabinete por defecto; el odontólogo, también el color de su ficha en la agenda | E | E | E | E | E | E | M02-T10 |
 | Plataforma | Clínicas, proveedor de email común, app de Meta y webhook, plantillas por defecto, funciones activables por clínica | E | — | — | — | — | — | M01-T05, M07-T07 |
+
+(1) FACTURACION ve los profesionales porque los necesita en presupuestos y facturas (M11).
 
 `PLATFORM_ADMIN` nunca ve datos clínicos ni la configuración interna de una clínica salvo que la clínica le dé acceso de soporte (fuera del MVP).
 
