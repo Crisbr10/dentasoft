@@ -153,7 +153,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           "Windows PowerShell $($PSVersionTable.PSVersion)"
-          if ($PSVersionTable.PSVersion.Major -ne 5) { throw 'Windows PowerShell 5.1 is required.' }
+          $version = $PSVersionTable.PSVersion
+          if ($version.Major -ne 5 -or $version.Minor -ne 1) { throw 'Windows PowerShell 5.1 is required.' }
           Import-Module Pester -RequiredVersion 3.4.0
           $result = Invoke-Pester -Path scripts -PassThru
           if ($result.TotalCount -eq 0) { throw 'No Pester tests were found in scripts/.' }
