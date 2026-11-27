@@ -76,6 +76,16 @@ describe('configuration area', () => {
       expect(ensureLoaded).toHaveBeenCalled();
     });
 
+    it('sends the user to the «sin acceso» page when the retry finds no section', async () => {
+      visible.set([]);
+      const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+      const page = root(await render(ConfigurationIndex));
+
+      (page.querySelector('button') as HTMLButtonElement).click();
+
+      await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith('/configuracion/sin-acceso'));
+    });
+
     it('keeps the message when reading them fails again', async () => {
       ensureLoaded.mockRejectedValue(new Error('offline'));
       const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl');

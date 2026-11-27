@@ -66,6 +66,8 @@ export class ConfigurationSections {
     sections: readonly VisibleSection[];
   } | null>(null);
   private loading: { clinicId: string | null; promise: Promise<void> } | null = null;
+  /** Counts the reads: only the latest one may change the state. */
+  private reads = 0;
 
   /** The last read failed; the index page offers to try again. */
   readonly failed = signal(false);
@@ -103,16 +105,22 @@ export class ConfigurationSections {
   }
 
   private async load(clinicId: string | null): Promise<void> {
+    const read = ++this.reads;
     try {
       const platformAdmin = await this.session.checkPlatformAdmin();
       const [clinic, platform] = await Promise.all([
         clinicId ? this.api.invoke(clinicSections) : Promise.resolve([]),
         platformAdmin ? this.api.invoke(platformSections) : Promise.resolve([]),
       ]);
-      this.state.set({ clinicId, sections: [...clinic, ...platform] });
-      this.failed.set(false);
+      if (read === this.reads) {
+        this.state.set({ clinicId, sections: [...clinic, ...platform] });
+        this.failed.set(false);
+      }
     } catch (error) {
-      this.failed.set(true);
+      // A read for a clinic that is no longer active says nothing about the current one.
+      if (read === this.reads) {
+        this.failed.set(true);
+      }
       throw error;
     }
   }

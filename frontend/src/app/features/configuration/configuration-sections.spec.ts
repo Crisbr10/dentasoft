@@ -120,6 +120,24 @@ describe('ConfigurationSections', () => {
     await second;
   });
 
+  it('keeps the sections of the new clinic when the read of the previous one ends later', async () => {
+    const first = sections.ensureLoaded();
+    await new Promise((resolve) => setTimeout(resolve));
+    clinicId.set('b');
+    const second = sections.ensureLoaded();
+    await new Promise((resolve) => setTimeout(resolve));
+
+    const [previous, current] = http.match(CLINIC_SECTIONS);
+    expect(current).toBeDefined();
+    current.flush([{ section: 'CLINIC', access: 'VIEW' }]);
+    await second;
+    previous.flush(null, { status: 500, statusText: 'Error' });
+    await expect(first).rejects.toBeTruthy();
+
+    expect(sections.accessTo('CLINIC')).toBe('VIEW');
+    expect(sections.failed()).toBe(false);
+  });
+
   it('says when the read failed and tries again on the next call', async () => {
     const failing = sections.ensureLoaded();
     (await expectRequest(CLINIC_SECTIONS)).flush(null, { status: 500, statusText: 'Error' });

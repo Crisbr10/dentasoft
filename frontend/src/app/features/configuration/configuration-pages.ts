@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { CONFIGURATION_ROUTE } from '../../core/auth/routes';
+import { CONFIGURATION_ROUTE, NO_ACCESS_ROUTE } from '../../core/auth/routes';
 import { ConfigurationSections } from './configuration-sections';
 
 /**
@@ -33,9 +33,9 @@ export class ConfigurationIndex {
     try {
       await this.sections.ensureLoaded();
       const first = this.sections.visible()[0];
-      if (first) {
-        await this.router.navigateByUrl(`${CONFIGURATION_ROUTE}/${first.path}`);
-      }
+      await this.router.navigateByUrl(
+        first ? `${CONFIGURATION_ROUTE}/${first.path}` : NO_ACCESS_ROUTE,
+      );
     } catch {
       // Still failing: the message stays.
     } finally {
