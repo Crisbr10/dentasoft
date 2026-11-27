@@ -138,14 +138,14 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T07 · Login y sesión en el frontend
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T03, M00-T05
 - **Descripción**: `angular-auth-oidc-client` con código + PKCE y renovación de token, interceptor que añade `Authorization` y `X-Clinic-Id` solo a la API, selector de clínica tras el login, guardias por rol y menú según permisos.
 - **Criterios de aceptación**:
-  - [ ] Cerrar sesión cierra también la sesión de Keycloak
-  - [ ] Los tokens no se guardan en `localStorage`
-  - [ ] Renovación del token con refresh token, sin iframes de Keycloak (`silentRenew` sin iframe y sin `checkSession`), para no abrir `frame-src` en la CSP; si hiciera falta un iframe, se documenta y se añade el origen de Keycloak solo a `frame-src`
-  - [ ] Cambiar de clínica recarga los datos de la nueva clínica
+  - [x] Cerrar sesión cierra también la sesión de Keycloak
+  - [x] Los tokens no se guardan en `localStorage`
+  - [x] Renovación del token con refresh token, sin iframes de Keycloak (`silentRenew` sin iframe y sin `checkSession`), para no abrir `frame-src` en la CSP; si hiciera falta un iframe, se documenta y se añade el origen de Keycloak solo a `frame-src`
+  - [x] Cambiar de clínica recarga los datos de la nueva clínica
 
 ### M02-T08 · Pantallas de administración
 
