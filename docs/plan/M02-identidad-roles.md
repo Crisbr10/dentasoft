@@ -158,13 +158,18 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T09 · Apartado de Configuración
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T07, M01-T06
 - **Descripción**: marco del apartado de Configuración (ver `configuracion.md`): ruta `/configuracion` con menú de secciones filtrado por rol, guardias por sección, patrón común de formulario (guardar, descartar, validación del servidor) y componente para secretos de solo escritura. En el backend, endpoint que devuelve las secciones visibles para el usuario y auditoría de cambios de configuración.
 - **Criterios de aceptación**:
-  - [ ] Cada rol ve exactamente las secciones de la matriz de `configuracion.md` (test por rol)
-  - [ ] Acceder por URL a una sección no permitida → página de «sin acceso» y 403 en la API
-  - [ ] Las rutas de las secciones Clínica (con los gabinetes), Usuarios y roles y Profesionales quedan creadas en el apartado; sus pantallas las añaden M01-T10 y M02-T08
+  - [x] Cada rol ve exactamente las secciones de la matriz de `configuracion.md` (test por rol)
+  - [x] Acceder por URL a una sección no permitida → página de «sin acceso» y 403 en la API
+  - [x] Las rutas de las secciones Clínica (con los gabinetes), Usuarios y roles y Profesionales quedan creadas en el apartado; sus pantallas las añaden M01-T10 y M02-T08
+- **Notas**:
+  - **Catálogo**: `ConfigurationSection` (raíz de `identity`) con la matriz de `configuracion.md` para las secciones que existen; cada tarea que añade una sección añade su fila y la de `ConfigurationSectionTests`.
+  - **Endpoints**: `GET /api/v1/clinic/configuration/sections` (rol de la clínica activa) y `GET /api/v1/platform/configuration/sections` (`PLATFORM_ADMIN`, sin clínica).
+  - **Frontend**: `/configuracion` con una ruta por sección y `/configuracion/sin-acceso`; `/plataforma` redirige a `/configuracion/plataforma`. Patrón de formulario y campo de secretos en `src/app/shared/forms/`.
+  - **Secretos**: solo «configurado» o «sin configurar», con cuándo y quién lo cambió; nunca ningún carácter del valor.
 
 ### M02-T10 · Preferencias personales
 
