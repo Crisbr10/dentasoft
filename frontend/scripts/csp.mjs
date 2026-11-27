@@ -27,6 +27,8 @@ export function buildMetaCsp({ apiUrl, authUrl }) {
     "img-src 'self' data:",
     "font-src 'self'",
     `connect-src 'self' ${origins.join(' ')}`,
+    // The token is renewed with the refresh token, never in a Keycloak iframe (M02-T07).
+    "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
