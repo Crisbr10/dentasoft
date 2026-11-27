@@ -207,6 +207,8 @@ jobs:
       # `load` leaves the image in Docker for Trivy and the push. No attestations, so the image
       # is the same single manifest as with `docker build`. The build record is not uploaded
       # as an artifact; the job summary is enough.
+      # A failed cache import only means a cold build; `ignore-error` does the same for the
+      # export, so an outage of the cache service does not fail a correct build.
       - name: Build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
@@ -222,7 +224,7 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=backend-image
-          cache-to: type=gha,scope=backend-image,mode=max
+          cache-to: type=gha,scope=backend-image,mode=max,ignore-error=true
       # Same policy as backend/README.md: critical vulnerabilities stop the release; high ones
       # are listed for review. Temporary exceptions go in backend/.trivyignore.
       - name: Scan the image with Trivy
