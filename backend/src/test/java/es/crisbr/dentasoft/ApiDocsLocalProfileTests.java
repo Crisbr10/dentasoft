@@ -44,6 +44,20 @@ class ApiDocsLocalProfileTests {
                 .isEqualTo("http://localhost:8080");
     }
 
+    /**
+     * Responses are documented as JSON, not {@code *}{@code /*}: the frontend generator (pnpm api:gen) reads any other
+     * media type as a binary blob, so the generated client would not parse the body (M02-T07).
+     */
+    @Test
+    void responsesAreDocumentedAsJson() {
+        assertThat(mvc.get().uri("/v3/api-docs"))
+                .hasStatusOk()
+                .bodyJson()
+                .extractingPath("$.paths['/api/v1/me'].get.responses['200'].content")
+                .asMap()
+                .containsOnlyKeys("application/json");
+    }
+
     @Test
     void localProfileProvidesLocalhostUrls(@Autowired DentasoftUrls urls) {
         assertThat(urls)
