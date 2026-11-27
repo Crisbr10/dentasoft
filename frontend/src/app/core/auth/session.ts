@@ -88,6 +88,14 @@ export class Session {
    */
   logout(): void {
     let redirected = false;
+    // No end-session URL (no session left) or Keycloak unreachable: never stay signed in here.
+    const logoutHere = () => {
+      if (!redirected) {
+        this.oidc.logoffLocal();
+        this.forget();
+        this.oidc.authorize();
+      }
+    };
     this.oidc
       .logoff(undefined, {
         urlHandler: (url) => {
@@ -96,16 +104,7 @@ export class Session {
           this.location.assign(url);
         },
       })
-      .subscribe({
-        complete: () => {
-          // No end-session URL (no session left): log out here and show the login.
-          if (!redirected) {
-            this.oidc.logoffLocal();
-            this.forget();
-            this.oidc.authorize();
-          }
-        },
-      });
+      .subscribe({ complete: logoutHere, error: logoutHere });
   }
 
   /**

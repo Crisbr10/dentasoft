@@ -94,6 +94,18 @@ describe('Session', () => {
       expect(oidc.authorize).not.toHaveBeenCalled();
     });
 
+    it('logs out locally and shows the login when Keycloak cannot be reached', () => {
+      sessionStorage.setItem('dentasoft.activeClinicId', 'clinic-a');
+      oidc.logoff.mockReturnValue(throwError(() => new Error('well-known unavailable')));
+
+      session.logout();
+
+      expect(oidc.logoffLocal).toHaveBeenCalledTimes(1);
+      expect(clinic.clear).toHaveBeenCalledTimes(1);
+      expect(sessionStorage.getItem('dentasoft.activeClinicId')).toBeNull();
+      expect(oidc.authorize).toHaveBeenCalledTimes(1);
+    });
+
     it('logs out locally and shows the login when Keycloak has no session left', () => {
       sessionStorage.setItem('dentasoft.activeClinicId', 'clinic-a');
       oidc.logoff.mockReturnValue(of(null));

@@ -2,6 +2,7 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import {
   DestroyRef,
   EnvironmentProviders,
+  Injector,
   inject,
   makeEnvironmentProviders,
   provideAppInitializer,
@@ -10,6 +11,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EventTypes, OidcSecurityService, PublicEventsService } from 'angular-auth-oidc-client';
 import { filter, firstValueFrom } from 'rxjs';
 
+import { RuntimeConfigStore } from '../config/runtime-config';
 import { apiInterceptor } from '../http/api-interceptor';
 import { provideOidc } from './oidc-config';
 import { Session } from './session';
@@ -27,12 +29,17 @@ export function provideAuthentication(): EnvironmentProviders {
     provideOidc(),
     provideAppInitializer(async () => {
       const oidc = inject(OidcSecurityService);
-      const session = inject(Session);
-      inject(PublicEventsService)
-        .registerForEvents()
+      const injector = inject(Injector);
+      const events = inject(PublicEventsService).registerForEvents();
+      const destroyRef = inject(DestroyRef);
+      // Angular starts every initializer in the same tick, so config.json may still be on its
+      // way. Session needs the API client, whose URL comes from it: create Session only after.
+      await inject(RuntimeConfigStore).load();
+      const session = injector.get(Session);
+      events
         .pipe(
           filter((event) => event.type === EventTypes.SilentRenewFailed),
-          takeUntilDestroyed(inject(DestroyRef)),
+          takeUntilDestroyed(destroyRef),
         )
         .subscribe(() => session.expired());
       try {
