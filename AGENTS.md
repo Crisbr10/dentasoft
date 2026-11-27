@@ -49,6 +49,7 @@ cd infra; docker compose -f compose.yml -f compose.local.yml up -d --wait
 cd backend; .\mvnw.cmd verify          # compila, pasa todos los tests y comprueba el formato
 cd backend; .\mvnw.cmd spotless:apply   # corrige el formato Java (palantir-java-format)
 cd backend; .\mvnw.cmd spring-boot:run  # arranca en http://localhost:8080
+.\scripts\run-backend.ps1               # lo mismo, con las variables de infra/.env (sin mostrarlas; ver backend/README.md)
 
 # Frontend
 cd frontend; pnpm install; pnpm start   # http://localhost:4200
