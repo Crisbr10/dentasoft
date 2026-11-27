@@ -21,3 +21,15 @@
 .shell__content {
   padding: var(--ds-space-4);
 }
+
+.shell__spacer {
+  flex: 1 1 auto;
+}
+
+.shell__clinic {
+  font-weight: 500;
+}
+
+.shell__user {
+  font-size: 0.875rem;
+}

@@ -7,19 +7,21 @@
   >
     <nav [attr.aria-label]="'layout.mainNavigation' | transloco">
       <mat-nav-list>
-        <a
-          mat-list-item
-          routerLink="/"
-          routerLinkActive
-          ariaCurrentWhenActive="page"
-          #home="routerLinkActive"
-          [routerLinkActiveOptions]="{ exact: true }"
-          [activated]="home.isActive"
-          (click)="closeOnHandset(sidenav)"
-        >
-          <mat-icon matListItemIcon svgIcon="home" />
-          <span matListItemTitle>{{ 'layout.nav.home' | transloco }}</span>
-        </a>
+        @for (item of navigation(); track item.path) {
+          <a
+            mat-list-item
+            [routerLink]="item.path"
+            routerLinkActive
+            ariaCurrentWhenActive="page"
+            #link="routerLinkActive"
+            [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+            [activated]="link.isActive"
+            (click)="closeOnHandset(sidenav)"
+          >
+            <mat-icon matListItemIcon [svgIcon]="item.icon" />
+            <span matListItemTitle>{{ item.labelKey | transloco }}</span>
+          </a>
+        }
       </mat-nav-list>
     </nav>
   </mat-sidenav>
@@ -29,6 +31,7 @@
       <button
         mat-icon-button
         type="button"
+        class="shell__toggle"
         [attr.aria-label]="'layout.toggleMenu' | transloco"
         [attr.aria-expanded]="sidenav.opened"
         (click)="sidenav.toggle()"
@@ -36,10 +39,31 @@
         <mat-icon svgIcon="menu" />
       </button>
       <span class="shell__brand">{{ 'app.name' | transloco }}</span>
+
+      <span class="shell__spacer"></span>
+
+      @if (clinic.current(); as current) {
+        <span class="shell__clinic">{{ current.name }}</span>
+      }
+      @if (clinic.clinics().length > 1 || clinic.invitations().length > 0) {
+        <a mat-button class="shell__change-clinic" [routerLink]="selectorRoute">
+          <mat-icon svgIcon="swap" />
+          {{ 'layout.clinic.change' | transloco }}
+        </a>
+      }
+      @if (session.userName(); as name) {
+        <span class="shell__user">{{ name }}</span>
+      }
+      <button mat-button type="button" class="shell__logout" (click)="logout()">
+        <mat-icon svgIcon="logout" />
+        {{ 'layout.logout' | transloco }}
+      </button>
     </mat-toolbar>
 
     <main class="shell__content">
-      <router-outlet />
+      @for (key of contentKey(); track key) {
+        <router-outlet />
+      }
     </main>
   </mat-sidenav-content>
 </mat-sidenav-container>

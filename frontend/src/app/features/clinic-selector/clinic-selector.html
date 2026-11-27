@@ -1,0 +1,87 @@
+<h1 class="selector__title">{{ 'clinicSelector.title' | transloco }}</h1>
+
+@switch (state()) {
+  @case ('loading') {
+    <p class="selector__status" role="status">
+      <mat-spinner diameter="20" aria-hidden="true" />
+      <span>{{ 'clinicSelector.loading' | transloco }}</span>
+    </p>
+  }
+  @case ('error') {
+    <p class="selector__status" role="alert">{{ 'clinicSelector.loadError' | transloco }}</p>
+    <button mat-button type="button" (click)="load()">
+      {{ 'clinicSelector.retry' | transloco }}
+    </button>
+  }
+  @default {
+    @if (clinic.clinics().length > 0) {
+      <section class="selector__section">
+        <h2>{{ 'clinicSelector.clinics' | transloco }}</h2>
+        <mat-list role="list">
+          @for (item of clinic.clinics(); track item.clinicId) {
+            <mat-list-item
+              role="listitem"
+              class="selector__clinic"
+              [attr.data-clinic]="item.clinicId"
+            >
+              <span matListItemTitle>{{ item.name }}</span>
+              <span matListItemLine>{{ 'roles.' + item.role | transloco }}</span>
+              <span matListItemMeta class="selector__actions">
+                @if (item.suspended) {
+                  <mat-chip-set [attr.aria-label]="'clinicSelector.suspendedHint' | transloco">
+                    <mat-chip class="selector__suspended" disabled>
+                      {{ 'clinicSelector.suspended' | transloco }}
+                    </mat-chip>
+                  </mat-chip-set>
+                } @else if (item.clinicId === clinic.id()) {
+                  <span class="selector__current">{{ 'clinicSelector.current' | transloco }}</span>
+                } @else {
+                  <button mat-flat-button type="button" (click)="choose(item.clinicId)">
+                    {{ 'clinicSelector.choose' | transloco }}
+                  </button>
+                }
+              </span>
+            </mat-list-item>
+          }
+        </mat-list>
+      </section>
+    }
+
+    @if (clinic.invitations().length > 0) {
+      <section class="selector__section">
+        <h2>{{ 'clinicSelector.invitations' | transloco }}</h2>
+        <mat-list role="list">
+          @for (invitation of clinic.invitations(); track invitation.id) {
+            <mat-list-item
+              role="listitem"
+              class="selector__invitation"
+              [attr.data-invitation]="invitation.id"
+            >
+              <span matListItemTitle>{{ invitation.name }}</span>
+              <span matListItemLine>{{ 'roles.' + invitation.role | transloco }}</span>
+              <span matListItemMeta class="selector__actions">
+                <button
+                  mat-stroked-button
+                  type="button"
+                  [disabled]="accepting() !== null"
+                  (click)="accept(invitation.id)"
+                >
+                  {{ 'clinicSelector.accept' | transloco }}
+                </button>
+              </span>
+            </mat-list-item>
+            @if (acceptFailed() === invitation.id) {
+              <p class="selector__error" role="alert">
+                {{ 'clinicSelector.acceptError' | transloco }}
+              </p>
+            }
+          }
+        </mat-list>
+      </section>
+    }
+
+    @if (clinic.clinics().length === 0 && clinic.invitations().length === 0) {
+      <p class="selector__empty" role="status">{{ 'clinicSelector.empty' | transloco }}</p>
+    }
+  }
+}

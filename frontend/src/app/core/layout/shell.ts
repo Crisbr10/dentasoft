@@ -1,5 +1,5 @@
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,7 +10,16 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { map } from 'rxjs';
 
-/** Base layout: header, side navigation and content area. */
+import { Session } from '../auth/session';
+import { ActiveClinic } from '../clinic/active-clinic';
+import { CLINIC_SELECTOR_ROUTE } from '../http/api-interceptor';
+import { NAVIGATION, visibleNavigation } from './navigation';
+
+/**
+ * Base layout: header with the active clinic and the logout, side navigation according to the
+ * user's roles, and content area. The content is created again when the active clinic changes,
+ * so no page keeps the data of the previous clinic.
+ */
 @Component({
   selector: 'app-shell',
   imports: [
@@ -29,6 +38,17 @@ import { map } from 'rxjs';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Shell {
+  protected readonly clinic = inject(ActiveClinic);
+  protected readonly session = inject(Session);
+  protected readonly selectorRoute = CLINIC_SELECTOR_ROUTE;
+
+  protected readonly navigation = computed(() =>
+    visibleNavigation(NAVIGATION, this.clinic.role(), this.session.isPlatformAdmin()),
+  );
+
+  /** One key per clinic: @for creates the outlet again when it changes. */
+  protected readonly contentKey = computed(() => [this.clinic.id() ?? 'none']);
+
   protected readonly isHandset = toSignal(
     inject(BreakpointObserver)
       .observe(Breakpoints.Handset)
@@ -41,5 +61,9 @@ export class Shell {
     if (this.isHandset()) {
       void sidenav.close();
     }
+  }
+
+  protected logout(): void {
+    this.session.logout();
   }
 }

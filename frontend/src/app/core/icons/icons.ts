@@ -6,7 +6,16 @@ import { DomSanitizer } from '@angular/platform-browser';
  * SVG icons served from the build (src/assets/icons), never from an external domain.
  * They come from Material Icons (Apache 2.0). To add one, copy its SVG there and add its name here.
  */
-export const ICONS = ['menu', 'home', 'check-circle', 'error', 'refresh'] as const;
+export const ICONS = [
+  'menu',
+  'home',
+  'check-circle',
+  'error',
+  'refresh',
+  'logout',
+  'swap',
+  'business',
+] as const;
 
 export function provideIcons(): EnvironmentProviders {
   return provideAppInitializer(() => {
