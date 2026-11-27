@@ -5,7 +5,7 @@
 $script = Join-Path $PSScriptRoot 'run-backend.ps1'
 . $script
 
-$secretValues = @('app-pw-123', 'owner-pw-456', 'platform-pw-789', 'redis-pw-000', 'kc-secret-abc')
+$secretValues = @('app-pw-123', 'owner-pw-456', 'platform-pw-789', 'redis-pw-000', 'kc-secret-abc', 's3-secret-xyz')
 
 function New-TestEnvFile([string[]] $Lines) {
   $dir = Join-Path ([System.IO.Path]::GetTempPath()) ('run-backend-tests-' + [guid]::NewGuid())
@@ -24,7 +24,13 @@ function Get-CompleteEnvLines {
     "DENTASOFT_DB_PLATFORM_PASSWORD='platform-pw-789'",
     'DENTASOFT_REDIS_PASSWORD=redis-pw-000 # comentario al final',
     'export DENTASOFT_KC_BACKEND_CLIENT_SECRET=kc-secret-abc',
-    'POSTGRES_IMAGE=pgvector/pgvector:pg18'
+    'DENTASOFT_S3_REGION=us-east-1',
+    'DENTASOFT_S3_BUCKET=dentasoft-docs',
+    'DENTASOFT_S3_ACCESS_KEY=s3-access',
+    'DENTASOFT_S3_SECRET_KEY=s3-secret-xyz',
+    'POSTGRES_IMAGE=pgvector/pgvector:pg18',
+    'KC_BOOTSTRAP_ADMIN_PASSWORD=kc-admin-pw',
+    'DENTASOFT_URLS_APP=https://app.dentasoft.test'
   )
 }
 
@@ -38,7 +44,27 @@ Describe 'Read-DotEnvFile' {
       $values['DENTASOFT_DB_PLATFORM_PASSWORD'] | Should Be 'platform-pw-789'
       $values['DENTASOFT_REDIS_PASSWORD'] | Should Be 'redis-pw-000'
       $values['DENTASOFT_KC_BACKEND_CLIENT_SECRET'] | Should Be 'kc-secret-abc'
-      $values.Count | Should Be 6
+      $values.Count | Should Be 12
+    } finally { Remove-Item -Recurse -Force (Split-Path $file) }
+  }
+
+  It 'quita las comillas aunque detras haya un comentario, como Compose' {
+    $file = New-TestEnvFile @('A="con-comillas" # comentario', 'B="pegado"#comentario', "C='simple'   # otro")
+    try {
+      $values = Read-DotEnvFile $file
+      $values['A'] | Should Be 'con-comillas'
+      $values['B'] | Should Be 'pegado'
+      $values['C'] | Should Be 'simple'
+    } finally { Remove-Item -Recurse -Force (Split-Path $file) }
+  }
+
+  It 'falla sin mostrar el valor si unas comillas no se cierran o llevan algo detras' {
+    $file = New-TestEnvFile @('A="sin-cerrar-pw', 'B="valor-pw" basura')
+    try {
+      $message = ''
+      try { Read-DotEnvFile $file | Out-Null } catch { $message = $_.Exception.Message }
+      $message | Should Match 'linea 1'
+      $message | Should Not Match 'sin-cerrar-pw'
     } finally { Remove-Item -Recurse -Force (Split-Path $file) }
   }
 
@@ -76,9 +102,20 @@ Describe 'Get-BackendEnvironment' {
       $result['SPRING_FLYWAY_PASSWORD'] | Should Be 'owner-pw-456'
       $result['DENTASOFT_PLATFORM_DATASOURCE_PASSWORD'] | Should Be 'platform-pw-789'
       $result['SPRING_DATA_REDIS_PASSWORD'] | Should Be 'redis-pw-000'
-      # Las de infra/.env se pasan tambien con su propio nombre.
-      $result['DENTASOFT_KC_BACKEND_CLIENT_SECRET'] | Should Be 'kc-secret-abc'
-      $result['POSTGRES_IMAGE'] | Should Be 'pgvector/pgvector:pg18'
+      $result['DENTASOFT_S3_SECRET_KEY'] | Should Be 's3-secret-xyz'
+      $result['DENTASOFT_S3_BUCKET'] | Should Be 'dentasoft-docs'
+    } finally { Remove-Item -Recurse -Force (Split-Path $file) }
+  }
+
+  It 'pasa solo lo que el servicio app recibe de infra/.env, ni otros secretos ni otras URLs' {
+    $file = New-TestEnvFile (Get-CompleteEnvLines)
+    try {
+      $result = Get-BackendEnvironment (Read-DotEnvFile $file) @{}
+      $result.Count | Should Be 9
+      $result.Contains('KC_BOOTSTRAP_ADMIN_PASSWORD') | Should Be $false
+      $result.Contains('POSTGRES_IMAGE') | Should Be $false
+      $result.Contains('DENTASOFT_URLS_APP') | Should Be $false
+      $result.Contains('DENTASOFT_KC_BACKEND_CLIENT_SECRET') | Should Be $false
     } finally { Remove-Item -Recurse -Force (Split-Path $file) }
   }
 
@@ -87,8 +124,10 @@ Describe 'Get-BackendEnvironment' {
     try {
       $existing = @{ 'SPRING_DATASOURCE_PASSWORD' = 'ya-definida'; 'DENTASOFT_REDIS_PASSWORD' = 'tambien' }
       $result = Get-BackendEnvironment (Read-DotEnvFile $file) $existing
+      # La del backend ya esta en el entorno: el proceso hijo la hereda tal cual.
       $result.Contains('SPRING_DATASOURCE_PASSWORD') | Should Be $false
-      $result.Contains('DENTASOFT_REDIS_PASSWORD') | Should Be $false
+      # La de infra/.env esta en el entorno: se traduce con el valor del entorno.
+      $result['SPRING_DATA_REDIS_PASSWORD'] | Should Be 'tambien'
       $result['SPRING_FLYWAY_PASSWORD'] | Should Be 'owner-pw-456'
     } finally { Remove-Item -Recurse -Force (Split-Path $file) }
   }
@@ -102,6 +141,7 @@ Describe 'Get-BackendEnvironment' {
       $message | Should Match 'DENTASOFT_DB_PLATFORM_PASSWORD'
       $message | Should Match 'DENTASOFT_REDIS_PASSWORD'
       $message | Should Match 'DENTASOFT_KC_BACKEND_CLIENT_SECRET'
+      $message | Should Match 'DENTASOFT_S3_SECRET_KEY'
       $message | Should Not Match 'DENTASOFT_DB_APP_PASSWORD'
       $message | Should Not Match 'app-pw-123'
     } finally { Remove-Item -Recurse -Force (Split-Path $file) }
@@ -149,6 +189,31 @@ Describe 'run-backend.ps1 -ListVariables' {
       $output | Should Match 'DENTASOFT_KC_BACKEND_CLIENT_SECRET'
       $output | Should Not Match 'app-pw-123'
     } finally { Remove-Item -Recurse -Force (Split-Path $file) }
+  }
+
+  It 'lanza mvnw.cmd del backend con las variables, devuelve su codigo de salida y no muestra valores' {
+    # Repositorio falso con un mvnw.cmd que solo dice que variables recibe (nunca sus valores).
+    $root = Join-Path ([System.IO.Path]::GetTempPath()) ('run-backend-launch-' + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path (Join-Path $root 'scripts'), (Join-Path $root 'infra'), (Join-Path $root 'backend') | Out-Null
+    Copy-Item $script (Join-Path $root 'scripts\run-backend.ps1')
+    [System.IO.File]::WriteAllLines((Join-Path $root 'infra\.env'), (Get-CompleteEnvLines))
+    [System.IO.File]::WriteAllLines((Join-Path $root 'backend\mvnw.cmd'), @(
+      '@echo off',
+      'echo args=%*',
+      'if defined DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET echo secret-received',
+      'if defined SPRING_DATASOURCE_PASSWORD echo datasource-received',
+      'if defined KC_BOOTSTRAP_ADMIN_PASSWORD echo extra-secret-passed',
+      'exit /b 7'
+    ))
+    try {
+      $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\run-backend.ps1') -MavenArgs '-Dx=1' 2>&1 | Out-String
+      $LASTEXITCODE | Should Be 7
+      $output | Should Match 'args=spring-boot:run -Dx=1'
+      $output | Should Match 'secret-received'
+      $output | Should Match 'datasource-received'
+      $output | Should Not Match 'extra-secret-passed'
+      foreach ($value in $secretValues) { $output | Should Not Match ([regex]::Escape($value)) }
+    } finally { Remove-Item -Recurse -Force $root }
   }
 
   It 'no deja ninguna variable en el entorno de quien lo ejecuta' {

@@ -32,10 +32,13 @@ La documentación de módulos (PlantUML y AsciiDoc) queda en `target/spring-modu
   | `DENTASOFT_DB_PLATFORM_PASSWORD` | `DENTASOFT_PLATFORM_DATASOURCE_PASSWORD` |
   | `DENTASOFT_REDIS_PASSWORD` | `SPRING_DATA_REDIS_PASSWORD` |
   | `DENTASOFT_KC_BACKEND_CLIENT_SECRET` | `DENTASOFT_KEYCLOAK_ADMIN_CLIENT_SECRET` |
+  | `DENTASOFT_S3_REGION`, `DENTASOFT_S3_BUCKET`, `DENTASOFT_S3_ACCESS_KEY`, `DENTASOFT_S3_SECRET_KEY` | con el mismo nombre |
 
-  Las variables de `infra/.env` llegan también con su propio nombre. Si se añade al servicio `app` una variable que se traduce, hay que añadirla también a `$BackendNames` en el script.
+  Solo pasa esas nueve, las mismas que el servicio `app` recibe de `infra/.env`: ni los demás secretos (Keycloak, PostgreSQL) ni las URLs, que el perfil `local` ya fija. Si el servicio `app` cambia, hay que cambiar también `$BackendNames` en el script.
 - Una variable ya definida en el entorno tiene prioridad sobre `infra/.env`, como en Compose.
-- Si falta `infra/.env` o una de esas cinco variables, termina con error y dice cuál falta. Devuelve el código de salida de Maven.
+- Si falta `infra/.env` o una de esas nueve variables, termina con error y dice cuál falta. Devuelve el código de salida de Maven.
+- Lee `infra/.env` como Compose (comentarios, `export`, comillas), pero no interpreta `${VAR}` ni escapes dentro de las comillas.
+- `-MavenArgs` se añade tal cual a la línea de `cmd.exe`: un argumento con espacios va entre comillas dentro del valor.
 - Usa el puerto 8080, igual que el servicio `app` de Compose: arranca solo uno de los dos.
 - Tests (Pester 3.4, el que trae Windows): `Invoke-Pester .\scripts\run-backend.Tests.ps1`. Usan ficheros `.env` de prueba y nunca leen `infra/.env`.
 
