@@ -163,10 +163,16 @@ describe('guards', () => {
       expect(await run(platformAdminGuard)).toBe(true);
     });
 
-    it.each(CLINIC_ROLES)('sends %s to the home page', async (role) => {
-      clinic.role.set(role);
+    it.each(CLINIC_ROLES)(
+      'decides by the realm role, never by the clinic role %s',
+      async (role) => {
+        clinic.role.set(role);
 
-      expect(path(await run(platformAdminGuard))).toBe('/');
-    });
+        session.checkPlatformAdmin.mockResolvedValue(false);
+        expect(path(await run(platformAdminGuard))).toBe('/');
+        session.checkPlatformAdmin.mockResolvedValue(true);
+        expect(await run(platformAdminGuard)).toBe(true);
+      },
+    );
   });
 });

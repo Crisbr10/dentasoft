@@ -12,7 +12,7 @@ import { map } from 'rxjs';
 
 import { Session } from '../auth/session';
 import { ActiveClinic } from '../clinic/active-clinic';
-import { CLINIC_SELECTOR_ROUTE } from '../http/api-interceptor';
+import { CLINIC_SELECTOR_ROUTE } from '../auth/routes';
 import { NAVIGATION, visibleNavigation } from './navigation';
 
 /**

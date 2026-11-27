@@ -21,8 +21,8 @@ export const AUTH_INTERCEPTORS: HttpInterceptorFn[] = [apiInterceptor];
 
 /**
  * Login with Keycloak. At startup it finishes a login that comes back from Keycloak (the code
- * in the URL) or restores the session of this tab; if the refresh token is refused later, the
- * session has ended and the user goes back to the login.
+ * in the URL) or restores the session of this tab; if Keycloak refuses the refresh token later,
+ * the session has ended and the user goes back to the login.
  */
 export function provideAuthentication(): EnvironmentProviders {
   return makeEnvironmentProviders([
@@ -41,7 +41,7 @@ export function provideAuthentication(): EnvironmentProviders {
           filter((event) => event.type === EventTypes.SilentRenewFailed),
           takeUntilDestroyed(destroyRef),
         )
-        .subscribe(() => session.expired());
+        .subscribe(() => session.renewalFailed());
       try {
         await firstValueFrom(oidc.checkAuth());
       } catch (error) {

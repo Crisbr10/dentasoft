@@ -6,7 +6,13 @@ import { BehaviorSubject, Subject, firstValueFrom, of, throwError } from 'rxjs';
 
 import { ActiveClinic } from '../clinic/active-clinic';
 import { BROWSER_LOCATION } from './oidc-config';
-import { RETURN_URL_KEY, Session, hasPlatformAdmin, isAppPath } from './session';
+import {
+  RETURN_URL_KEY,
+  Session,
+  SessionUnavailableError,
+  hasPlatformAdmin,
+  isAppPath,
+} from './session';
 
 // Built from parts: scripts/no-hardcoded-urls.test.mjs refuses literal URLs starting with "//".
 const PROTOCOL_RELATIVE = `/${'/'}evil.test`;
@@ -41,11 +47,13 @@ describe('Session', () => {
     logoffLocal: ReturnType<typeof vi.fn>;
     authorize: ReturnType<typeof vi.fn>;
     forceRefreshSession: ReturnType<typeof vi.fn>;
+    getRefreshToken: ReturnType<typeof vi.fn>;
     getPayloadFromAccessToken: ReturnType<typeof vi.fn>;
     isAuthenticated$: BehaviorSubject<{ isAuthenticated: boolean }>;
     userData: ReturnType<typeof signal>;
   };
-  let clinic: { clear: ReturnType<typeof vi.fn> };
+  let clinic: { clear: ReturnType<typeof vi.fn>; revalidate: ReturnType<typeof vi.fn> };
+  let router: { url: string; navigateByUrl: ReturnType<typeof vi.fn> };
   let location: { origin: string; assign: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
@@ -55,20 +63,23 @@ describe('Session', () => {
       logoffLocal: vi.fn(),
       authorize: vi.fn(),
       forceRefreshSession: vi.fn(),
+      // The library deletes the tokens when Keycloak refuses the refresh token.
+      getRefreshToken: vi.fn(() => of('')),
       getPayloadFromAccessToken: vi.fn(() => of({ realm_access: { roles: [] } })),
       isAuthenticated$: new BehaviorSubject<{ isAuthenticated: boolean }>({
         isAuthenticated: true,
       }),
       userData: signal({ userData: { name: 'Ana Prueba' }, allUserData: [] }),
     };
-    clinic = { clear: vi.fn() };
+    clinic = { clear: vi.fn(), revalidate: vi.fn() };
+    router = { url: '/pacientes/42', navigateByUrl: vi.fn(() => Promise.resolve(true)) };
     location = { origin: 'https://app.dentasoft.test', assign: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         { provide: OidcSecurityService, useValue: oidc },
         { provide: ActiveClinic, useValue: clinic },
         { provide: BROWSER_LOCATION, useValue: location },
-        { provide: Router, useValue: { url: '/pacientes/42' } },
+        { provide: Router, useValue: router },
       ],
     });
     session = TestBed.inject(Session);
@@ -173,10 +184,18 @@ describe('Session', () => {
       expect(oidc.forceRefreshSession).toHaveBeenCalledTimes(1);
     });
 
-    it('is null when the refresh token is refused', async () => {
+    it('is null when Keycloak refuses the refresh token: the session has ended', async () => {
       oidc.forceRefreshSession.mockReturnValue(throwError(() => new Error('invalid_grant')));
 
       await expect(firstValueFrom(session.renew())).resolves.toBeNull();
+    });
+
+    it('fails without ending the session when Keycloak cannot be reached', async () => {
+      oidc.forceRefreshSession.mockReturnValue(throwError(() => new Error('offline')));
+      oidc.getRefreshToken.mockReturnValue(of('refresh-token'));
+
+      await expect(firstValueFrom(session.renew())).rejects.toBeInstanceOf(SessionUnavailableError);
+      expect(oidc.authorize).not.toHaveBeenCalled();
     });
 
     it('asks again after an earlier renewal has ended', async () => {
@@ -186,6 +205,72 @@ describe('Session', () => {
       await firstValueFrom(session.renew());
 
       expect(oidc.forceRefreshSession).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('renewalFailed', () => {
+    it('goes to the login when the background renewal was refused', () => {
+      session.renewalFailed();
+
+      expect(oidc.logoffLocal).toHaveBeenCalledTimes(1);
+      expect(oidc.authorize).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the session when the renewal failed for the network: it is tried again', () => {
+      oidc.getRefreshToken.mockReturnValue(of('refresh-token'));
+
+      session.renewalFailed();
+
+      expect(oidc.logoffLocal).not.toHaveBeenCalled();
+      expect(oidc.authorize).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('clinicRefused', () => {
+    it('goes to the clinic selector when the clinic can no longer be used', async () => {
+      clinic.revalidate.mockResolvedValue(false);
+
+      await session.clinicRefused();
+
+      expect(router.navigateByUrl).toHaveBeenCalledWith('/clinica');
+    });
+
+    it('stays on the page when the clinic is still usable: the role lacks the permission', async () => {
+      clinic.revalidate.mockResolvedValue(true);
+
+      await session.clinicRefused();
+
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it('checks /me and navigates once for requests refused together', async () => {
+      clinic.revalidate.mockResolvedValue(false);
+
+      await Promise.all([
+        session.clinicRefused(),
+        session.clinicRefused(),
+        session.clinicRefused(),
+      ]);
+
+      expect(clinic.revalidate).toHaveBeenCalledTimes(1);
+      expect(router.navigateByUrl).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not navigate when /me cannot be read: a 401 already goes to the login', async () => {
+      clinic.revalidate.mockRejectedValue(new Error('401'));
+
+      await session.clinicRefused();
+
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+    });
+
+    it('checks again after an earlier check has ended', async () => {
+      clinic.revalidate.mockResolvedValue(true);
+
+      await session.clinicRefused();
+      await session.clinicRefused();
+
+      expect(clinic.revalidate).toHaveBeenCalledTimes(2);
     });
   });
 

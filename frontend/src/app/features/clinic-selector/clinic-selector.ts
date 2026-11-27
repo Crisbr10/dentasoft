@@ -7,7 +7,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { PLATFORM_ROUTE, withoutClinics } from '../../core/auth/guards';
+import { withoutClinics } from '../../core/auth/guards';
+import { PLATFORM_ROUTE } from '../../core/auth/routes';
 import { Session } from '../../core/auth/session';
 import { ActiveClinic } from '../../core/clinic/active-clinic';
 
@@ -54,7 +55,9 @@ export class ClinicSelector implements OnInit {
       this.state.set('error');
       return;
     }
-    if (withoutClinics(this.clinic) && (await this.session.checkPlatformAdmin())) {
+    // If the token cannot be read, the page shows the notice instead of loading for ever.
+    const platformAdmin = await this.session.checkPlatformAdmin().catch(() => false);
+    if (withoutClinics(this.clinic) && platformAdmin) {
       await this.router.navigateByUrl(PLATFORM_ROUTE);
       return;
     }

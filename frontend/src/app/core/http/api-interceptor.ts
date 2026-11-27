@@ -1,9 +1,8 @@
 import { DOCUMENT } from '@angular/common';
 import { HttpErrorResponse, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { OidcSecurityService } from 'angular-auth-oidc-client';
-import { switchMap, take, throwError, catchError } from 'rxjs';
+import { Observable, catchError, of, switchMap, take, throwError } from 'rxjs';
 
 import { Session } from '../auth/session';
 import { ActiveClinic } from '../clinic/active-clinic';
@@ -13,8 +12,6 @@ import { RuntimeConfigStore } from '../config/runtime-config';
 export const CLINIC_HEADER = 'X-Clinic-Id';
 
 export const CLINIC_API = '/api/v1/clinic';
-
-export const CLINIC_SELECTOR_ROUTE = '/clinica';
 
 /**
  * The path of a request inside the API, or null when it does not go to the API. The URL is
@@ -48,9 +45,13 @@ export function isClinicApi(path: string): boolean {
 
 /**
  * Adds the access token to the API's requests only, and the active clinic to the clinic API's
- * only. A 401 renews the token once and repeats the request; if it cannot be renewed, the user
- * goes back to the login. A 403 from the clinic API checks /me again and, if the clinic can no
- * longer be used, goes to the clinic selector; otherwise it is a role the user lacks.
+ * only.
+ *
+ * - A 401 renews the token once and repeats the request. If Keycloak refuses the renewal, or
+ *   the repeated request is refused again, the session has ended and the user goes back to the
+ *   login. If Keycloak cannot be reached, the error reaches the page and the session goes on.
+ * - A 403 from the clinic API checks /me again and, if the clinic can no longer be used, goes
+ *   to the clinic selector; otherwise it is a role the user lacks.
  */
 export const apiInterceptor: HttpInterceptorFn = (request, next) => {
   // config.json itself is read through HttpClient, before there is any API URL.
@@ -62,35 +63,52 @@ export const apiInterceptor: HttpInterceptorFn = (request, next) => {
   const oidc = inject(OidcSecurityService);
   const session = inject(Session);
   const clinic = inject(ActiveClinic);
-  const router = inject(Router);
   const clinicApi = isClinicApi(path);
   const send = (token: string) => next(withHeaders(request, token, clinicApi ? clinic.id() : null));
+  const onForbidden = (error: unknown) => {
+    if (isStatus(error, 403) && clinicApi) {
+      void session.clinicRefused();
+    }
+    return throwError(() => error);
+  };
 
   return oidc.getAccessToken().pipe(
     take(1),
     switchMap((token) => send(token)),
     catchError((error: unknown) => {
-      if (error instanceof HttpErrorResponse && error.status === 401) {
-        return session.renew().pipe(
-          switchMap((token) => {
-            if (token) {
-              return send(token);
-            }
+      if (!isStatus(error, 401)) {
+        return onForbidden(error);
+      }
+      const renewal: Observable<string | null | undefined> = session.renew();
+      return renewal.pipe(
+        // Keycloak unreachable (undefined): the page gets the original 401, the session stays.
+        catchError(() => of(undefined)),
+        switchMap((token) => {
+          if (token === undefined) {
+            return throwError(() => error);
+          }
+          if (token === null) {
             session.expired();
             return throwError(() => error);
-          }),
-        );
-      }
-      if (error instanceof HttpErrorResponse && error.status === 403 && clinicApi) {
-        void clinic.revalidate().then(
-          (usable) => usable || router.navigateByUrl(CLINIC_SELECTOR_ROUTE),
-          () => router.navigateByUrl(CLINIC_SELECTOR_ROUTE),
-        );
-      }
-      return throwError(() => error);
+          }
+          return send(token).pipe(
+            catchError((retryError: unknown) => {
+              if (isStatus(retryError, 401)) {
+                session.expired();
+                return throwError(() => retryError);
+              }
+              return onForbidden(retryError);
+            }),
+          );
+        }),
+      );
     }),
   );
 };
+
+function isStatus(error: unknown, status: number): error is HttpErrorResponse {
+  return error instanceof HttpErrorResponse && error.status === status;
+}
 
 function withHeaders(
   request: HttpRequest<unknown>,

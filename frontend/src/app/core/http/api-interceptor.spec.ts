@@ -7,11 +7,10 @@ import {
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
 import { OidcSecurityService } from 'angular-auth-oidc-client';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 
-import { Session } from '../auth/session';
+import { Session, SessionUnavailableError } from '../auth/session';
 import { ActiveClinic } from '../clinic/active-clinic';
 import { RuntimeConfigStore } from '../config/runtime-config';
 import { CLINIC_HEADER, apiInterceptor, apiPath } from './api-interceptor';
@@ -51,17 +50,16 @@ describe('apiPath', () => {
 describe('apiInterceptor', () => {
   let http: HttpClient;
   let backend: HttpTestingController;
-  let session: { renew: ReturnType<typeof vi.fn>; expired: ReturnType<typeof vi.fn> };
-  let clinic: {
-    id: ReturnType<typeof signal<string | null>>;
-    revalidate: ReturnType<typeof vi.fn>;
+  let session: {
+    renew: ReturnType<typeof vi.fn>;
+    expired: ReturnType<typeof vi.fn>;
+    clinicRefused: ReturnType<typeof vi.fn>;
   };
-  let router: { navigateByUrl: ReturnType<typeof vi.fn> };
+  let clinic: { id: ReturnType<typeof signal<string | null>> };
 
   beforeEach(() => {
-    session = { renew: vi.fn(), expired: vi.fn() };
-    clinic = { id: signal<string | null>('clinic-a'), revalidate: vi.fn() };
-    router = { navigateByUrl: vi.fn() };
+    session = { renew: vi.fn(), expired: vi.fn(), clinicRefused: vi.fn(() => Promise.resolve()) };
+    clinic = { id: signal<string | null>('clinic-a') };
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([apiInterceptor])),
@@ -73,7 +71,6 @@ describe('apiInterceptor', () => {
         { provide: OidcSecurityService, useValue: { getAccessToken: () => of('token-1') } },
         { provide: Session, useValue: session },
         { provide: ActiveClinic, useValue: clinic },
-        { provide: Router, useValue: router },
       ],
     });
     http = TestBed.inject(HttpClient);
@@ -157,7 +154,7 @@ describe('apiInterceptor', () => {
     expect(session.expired).toHaveBeenCalledTimes(1);
   });
 
-  it('does not renew again when the repeated request is also refused', async () => {
+  it('goes back to the login, without renewing again, when the repeated request is also refused', async () => {
     session.renew.mockReturnValue(of('token-2'));
     const response = get(`${API}/api/v1/me`);
     backend.expectOne(`${API}/api/v1/me`).flush(null, { status: 401, statusText: 'Unauthorized' });
@@ -165,6 +162,31 @@ describe('apiInterceptor', () => {
 
     await expect(response).rejects.toMatchObject({ status: 401 });
     expect(session.renew).toHaveBeenCalledTimes(1);
+    expect(session.expired).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the session when Keycloak cannot be reached to renew the token', async () => {
+    session.renew.mockReturnValue(throwError(() => new SessionUnavailableError()));
+    const response = get(`${API}/api/v1/me`);
+    backend.expectOne(`${API}/api/v1/me`).flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    await expect(response).rejects.toMatchObject({ status: 401 });
+    expect(session.expired).not.toHaveBeenCalled();
+  });
+
+  it('checks the clinic when the repeated request is refused by the clinic API', async () => {
+    session.renew.mockReturnValue(of('token-2'));
+    const response = get(`${API}/api/v1/clinic/users`);
+    backend
+      .expectOne(`${API}/api/v1/clinic/users`)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+    backend
+      .expectOne(`${API}/api/v1/clinic/users`)
+      .flush(null, { status: 403, statusText: 'Forbidden' });
+
+    await expect(response).rejects.toMatchObject({ status: 403 });
+    expect(session.clinicRefused).toHaveBeenCalledTimes(1);
+    expect(session.expired).not.toHaveBeenCalled();
   });
 
   it('leaves a 401 from another server alone', async () => {
@@ -176,27 +198,14 @@ describe('apiInterceptor', () => {
     expect(session.renew).not.toHaveBeenCalled();
   });
 
-  it('sends the user to the clinic selector when the clinic API refuses the clinic', async () => {
-    clinic.revalidate.mockResolvedValue(false);
+  it('checks the clinic when the clinic API refuses it', async () => {
     const response = get(`${API}/api/v1/clinic/practitioner-roles`);
     backend
       .expectOne(`${API}/api/v1/clinic/practitioner-roles`)
       .flush(null, { status: 403, statusText: 'Forbidden' });
 
     await expect(response).rejects.toMatchObject({ status: 403 });
-    await vi.waitFor(() => expect(router.navigateByUrl).toHaveBeenCalledWith('/clinica'));
-  });
-
-  it('stays on the page when the clinic is still usable: the role lacks the permission', async () => {
-    clinic.revalidate.mockResolvedValue(true);
-    const response = get(`${API}/api/v1/clinic/users`);
-    backend
-      .expectOne(`${API}/api/v1/clinic/users`)
-      .flush(null, { status: 403, statusText: 'Forbidden' });
-
-    await expect(response).rejects.toMatchObject({ status: 403 });
-    expect(clinic.revalidate).toHaveBeenCalledTimes(1);
-    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(session.clinicRefused).toHaveBeenCalledTimes(1);
   });
 
   it('does not check the clinic after a 403 outside the clinic API', async () => {
@@ -206,6 +215,6 @@ describe('apiInterceptor', () => {
       .flush(null, { status: 403, statusText: 'Forbidden' });
 
     await expect(response).rejects.toMatchObject({ status: 403 });
-    expect(clinic.revalidate).not.toHaveBeenCalled();
+    expect(session.clinicRefused).not.toHaveBeenCalled();
   });
 });

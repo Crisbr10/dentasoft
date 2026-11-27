@@ -8,10 +8,8 @@ import { OidcSecurityService } from 'angular-auth-oidc-client';
 import { map, take } from 'rxjs';
 
 import { ActiveClinic, ClinicRole } from '../clinic/active-clinic';
-import { CLINIC_SELECTOR_ROUTE } from '../http/api-interceptor';
+import { CLINIC_SELECTOR_ROUTE, PLATFORM_ROUTE } from './routes';
 import { Session } from './session';
-
-export const PLATFORM_ROUTE = '/plataforma';
 
 /** Signed in, or off to the Keycloak login; after it, back to the page the user asked for. */
 export const sessionGuard: CanActivateFn = (_route, state) => {
