@@ -86,5 +86,8 @@
       "change": "Cambiar",
       "set": "Configurar"
     }
+  },
+  "dialogs": {
+    "cancel": "Cancelar"
   }
 }

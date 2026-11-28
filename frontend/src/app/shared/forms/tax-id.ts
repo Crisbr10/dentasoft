@@ -9,6 +9,8 @@ import { AbstractControl, ValidationErrors } from '@angular/forms';
  * What Java's `Character.isWhitespace` or `Character.isSpaceChar` count as space, plus the dash:
  * the characters `TaxIds.normalize` removes.
  */
+// The information separators U+001C–U+001F are whitespace for Java, so they are removed too.
+// eslint-disable-next-line no-control-regex
 const REMOVED = /[-\t\n\v\f\r\u001C-\u001F\p{Zs}\p{Zl}\p{Zp}]/gu;
 
 const DNI = /^[0-9]{8}[A-Z]$/;

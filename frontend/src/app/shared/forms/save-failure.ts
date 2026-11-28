@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { AbstractControl } from '@angular/forms';
+import { AbstractControl, FormGroup } from '@angular/forms';
 
 /**
  * Why saving a form failed, as the form shows it:
@@ -45,6 +45,15 @@ export function toSaveFailure(form: AbstractControl, error: unknown): SaveFailur
     }
   }
   return { kind: 'problem', title: text(problem.title), detail: text(problem.detail) };
+}
+
+/**
+ * Reads a failed action that is not a form (suspending a clinic, resending an invitation…): the
+ * server's ProblemDetail, or `unexpected` for the network and 5xx. Field errors, which an action
+ * has no controls for, are shown as the ProblemDetail.
+ */
+export function toActionFailure(error: unknown): SaveFailure {
+  return toSaveFailure(new FormGroup({}), error);
 }
 
 /** `hours[0].opens` from Spring is `hours.0.opens` for Angular forms. */

@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { map, startWith, switchMap } from 'rxjs';
 
+import { FailureMessage } from './failure-message';
 import { SaveFailure } from './save-failure';
 
 /**
@@ -15,26 +16,9 @@ import { SaveFailure } from './save-failure';
  */
 @Component({
   selector: 'app-form-actions',
-  imports: [MatButtonModule, TranslocoPipe],
+  imports: [FailureMessage, MatButtonModule, TranslocoPipe],
   template: `
-    @if (failure(); as failure) {
-      <div class="form-actions__failure" role="alert">
-        @switch (failure.kind) {
-          @case ('validation') {
-            <p>{{ 'forms.invalid' | transloco }}</p>
-          }
-          @case ('problem') {
-            @if (failure.title) {
-              <p class="form-actions__title">{{ failure.title }}</p>
-            }
-            <p>{{ failure.detail ?? ('forms.unexpected' | transloco) }}</p>
-          }
-          @default {
-            <p>{{ 'forms.unexpected' | transloco }}</p>
-          }
-        }
-      </div>
-    }
+    <app-failure-message [failure]="failure()" />
     <div class="form-actions__buttons">
       <button
         mat-stroked-button
@@ -61,10 +45,6 @@ import { SaveFailure } from './save-failure';
       display: flex;
       justify-content: flex-end;
       gap: 8px;
-    }
-
-    .form-actions__title {
-      font-weight: 500;
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
