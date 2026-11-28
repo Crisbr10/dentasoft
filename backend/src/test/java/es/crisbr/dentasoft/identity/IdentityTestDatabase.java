@@ -132,6 +132,21 @@ public final class IdentityTestDatabase {
         }
     }
 
+    /** The id of {@code user}'s membership of {@code clinic}, empty if there is none. */
+    public static Optional<UUID> membershipId(UUID clinic, UUID user) throws SQLException {
+        try (Connection connection = connectAsOwner()) {
+            setSession(connection, "app.tenant_id", clinic);
+            try (PreparedStatement statement = connection.prepareStatement(
+                    "SELECT id FROM clinic_membership WHERE tenant_id = ? AND user_id = ?")) {
+                statement.setObject(1, clinic);
+                statement.setObject(2, user);
+                try (ResultSet result = statement.executeQuery()) {
+                    return result.next() ? Optional.of(result.getObject(1, UUID.class)) : Optional.empty();
+                }
+            }
+        }
+    }
+
     /** Makes {@code user}'s membership of {@code clinic} active or inactive. */
     public static void setMembershipActive(UUID clinic, UUID user, boolean active) throws SQLException {
         try (Connection connection = connectAsOwner()) {

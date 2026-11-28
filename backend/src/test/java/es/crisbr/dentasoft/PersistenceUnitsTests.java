@@ -31,6 +31,7 @@ class PersistenceUnitsTests {
     private static final String PLATFORM_PACKAGE = "es.crisbr.dentasoft.platform.";
 
     private static final Set<String> PLATFORM_ENTITIES = Set.of(
+            "es.crisbr.dentasoft.platform.persistence.PlatformAdminMembership",
             "es.crisbr.dentasoft.platform.persistence.PlatformAuditRecord",
             "es.crisbr.dentasoft.platform.persistence.PlatformClinic",
             "es.crisbr.dentasoft.platform.persistence.PlatformClinicSettings");
@@ -57,7 +58,7 @@ class PersistenceUnitsTests {
     private DataSource platformDataSource;
 
     @Test
-    void thePlatformUnitMapsOnlyTheClinicAndItsInitialSettings() {
+    void thePlatformUnitMapsOnlyThePlatformEntities() {
         assertThat(names(platformUnit)).containsExactlyInAnyOrderElementsOf(PLATFORM_ENTITIES);
         assertThat(entities(platformUnit))
                 .as("clinic data (TenantScopedEntity) in the platform unit")

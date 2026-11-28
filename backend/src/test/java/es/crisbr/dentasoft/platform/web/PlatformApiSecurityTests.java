@@ -46,6 +46,9 @@ class PlatformApiSecurityTests {
                 "POST " + CLINIC + "/suspension",
                 "POST " + CLINIC + "/reactivation",
                 "PUT " + CLINIC + "/fiscal-data",
+                "POST " + CLINIC + "/admin-invitation",
+                "POST " + CLINIC + "/admin-invitation/resend",
+                "POST " + CLINIC + "/admin-invitation/cancellation",
                 "GET /api/v1/platform",
                 "GET /api/v1/platform/does-not-exist",
                 "OPTIONS /api/v1/platform/clinics"
@@ -66,6 +69,9 @@ class PlatformApiSecurityTests {
                 "POST " + CLINIC + "/suspension",
                 "POST " + CLINIC + "/reactivation",
                 "PUT " + CLINIC + "/fiscal-data",
+                "POST " + CLINIC + "/admin-invitation",
+                "POST " + CLINIC + "/admin-invitation/resend",
+                "POST " + CLINIC + "/admin-invitation/cancellation",
                 "GET /api/v1/platform/does-not-exist"
             })
     void deniesAUserWithoutTheRole(String request) throws SQLException {
