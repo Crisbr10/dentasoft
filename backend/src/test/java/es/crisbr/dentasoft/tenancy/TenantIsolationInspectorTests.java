@@ -162,6 +162,31 @@ class TenantIsolationInspectorTests {
                         "restrictive_allowed: unexpected policy platform_select");
     }
 
+    /** A restrictive policy is accepted only when declared restrictive, and a permissive one never as restrictive. */
+    @Test
+    void acceptsARestrictivePolicyOnlyAsDeclared() throws SQLException {
+        isolatedTable("restrictive");
+        execute("CREATE POLICY platform_only ON guard_probe.restrictive AS RESTRICTIVE FOR SELECT"
+                + " TO dentasoft_platform USING (true)");
+        isolatedTable("permissive");
+        execute("CREATE POLICY platform_only ON guard_probe.permissive FOR SELECT TO dentasoft_platform USING (true)");
+        isolatedTable("restrictive_for_app");
+        execute("CREATE POLICY platform_only ON guard_probe.restrictive_for_app AS RESTRICTIVE FOR SELECT"
+                + " TO dentasoft_app USING (true)");
+        Set<AllowedPolicy> allowed = Set.of("restrictive", "permissive").stream()
+                .map(table ->
+                        new AllowedPolicy(table, "platform_only", "dentasoft_platform", "SELECT", "true", null, true))
+                .collect(Collectors.toSet());
+
+        TenantIsolationInspector inspector =
+                new TenantIsolationInspector(connection, SCHEMA, Map.of(), Set.of(), allowed);
+
+        assertThat(inspector.problems())
+                .containsExactlyInAnyOrder(
+                        "permissive: unexpected policy platform_only",
+                        "restrictive_for_app: unexpected policy platform_only");
+    }
+
     @Test
     void neverAllowsAPolicyForEveryRoleOrTheApplicationRole() {
         assertThatIllegalArgumentException()

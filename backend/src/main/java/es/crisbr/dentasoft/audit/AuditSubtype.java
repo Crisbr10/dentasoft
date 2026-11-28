@@ -5,5 +5,11 @@ public enum AuditSubtype {
     CLINIC_SUSPENDED,
     CLINIC_REACTIVATED,
     /** The platform corrected the clinic's legal name or tax identifier (M01-T11); the values are not recorded. */
-    CLINIC_FISCAL_DATA_CORRECTED
+    CLINIC_FISCAL_DATA_CORRECTED,
+    /** The platform invited the clinic's first administrator (M02-T11), or the same person again after cancelling. */
+    FIRST_ADMIN_INVITED,
+    /** The platform sent the first administrator's invitation email again; the membership does not change. */
+    FIRST_ADMIN_INVITATION_RESENT,
+    /** The platform cancelled the first administrator's pending invitation. */
+    FIRST_ADMIN_INVITATION_CANCELLED
 }

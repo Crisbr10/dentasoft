@@ -3,14 +3,12 @@ package es.crisbr.dentasoft.identity.internal;
 import es.crisbr.dentasoft.identity.ClinicRole;
 import es.crisbr.dentasoft.identity.internal.keycloak.KeycloakAdmin;
 import es.crisbr.dentasoft.identity.internal.keycloak.KeycloakAdminException;
-import es.crisbr.dentasoft.identity.internal.keycloak.KeycloakConflictException;
 import es.crisbr.dentasoft.identity.internal.keycloak.KeycloakUnavailableException;
 import es.crisbr.dentasoft.identity.internal.keycloak.KeycloakUser;
 import es.crisbr.dentasoft.identity.persistence.ClinicMembership;
 import es.crisbr.dentasoft.shared.Logging;
 import es.crisbr.dentasoft.shared.Quotas;
 import es.crisbr.dentasoft.tenancy.TenantContext;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -41,9 +39,9 @@ import org.springframework.stereotype.Service;
 public class ClinicUsers {
 
     /** Invitations and resends a clinic may send per day. */
-    static final int INVITATIONS_PER_DAY = 20;
+    static final int INVITATIONS_PER_DAY = Invitees.INVITATIONS_PER_DAY;
 
-    static final String INVITATION_QUOTA = "invitation";
+    static final String INVITATION_QUOTA = Invitees.INVITATION_QUOTA;
 
     private static final Logger log = LoggerFactory.getLogger(ClinicUsers.class);
 
@@ -122,7 +120,7 @@ public class ClinicUsers {
     public void invite(Invitation invitation) {
         UUID clinic = TenantContext.current();
         requireInvitationQuota(clinic);
-        Optional<Invitee> invitee = findOrCreate(invitation);
+        Optional<Invitees.Invitee> invitee = findOrCreate(invitation);
         if (invitee.isEmpty()) {
             log.info("Invitation to clinic {} not sent: the email belongs to a user outside the clinic users", clinic);
             return;
@@ -198,32 +196,13 @@ public class ClinicUsers {
     }
 
     private void requireInvitationQuota(UUID clinic) {
-        Quotas.Decision decision =
-                quotas.tryAcquire(INVITATION_QUOTA, clinic.toString(), INVITATIONS_PER_DAY, Duration.ofDays(1));
-        if (!decision.allowed()) {
-            log.info("Clinic {} reached its limit of invitations", clinic);
-            throw new InvitationLimitExceededException(decision.retryAfter());
-        }
+        Invitees.requireQuota(quotas, clinic);
     }
 
-    /** The Keycloak user to invite, and whether they still have to set up their account. */
-    private record Invitee(UUID id, boolean pendingSetup) {}
-
     /** The person's Keycloak user, found or created; empty if the email belongs to a user Dentasoft cannot see. */
-    private Optional<Invitee> findOrCreate(Invitation invitation) {
+    private Optional<Invitees.Invitee> findOrCreate(Invitation invitation) {
         try {
-            Optional<KeycloakUser> existing = keycloak.findUserByEmail(invitation.email());
-            if (existing.isEmpty()) {
-                try {
-                    UUID created =
-                            keycloak.createUser(invitation.email(), invitation.firstName(), invitation.lastName());
-                    return Optional.of(new Invitee(created, true));
-                } catch (KeycloakConflictException taken) {
-                    // Created meanwhile by another request, or a user outside clinic-users: look again.
-                    existing = keycloak.findUserByEmail(invitation.email());
-                }
-            }
-            return existing.map(user -> new Invitee(user.id(), user.invitationPending()));
+            return Invitees.findOrCreate(keycloak, invitation.email(), invitation.firstName(), invitation.lastName());
         } catch (KeycloakUnavailableException | KeycloakAdminException failure) {
             throw unavailable(failure);
         }

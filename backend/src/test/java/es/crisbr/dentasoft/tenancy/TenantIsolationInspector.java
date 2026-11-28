@@ -36,9 +36,11 @@ final class TenantIsolationInspector {
     private final Map<String, String> userIsolatedTables;
 
     /**
-     * A policy allowed next to {@code tenant_isolation}, compared in full. It must name a single role that is neither
-     * {@code PUBLIC} nor the application role: PostgreSQL ORs permissive policies, so a policy that reached the
-     * application role would widen what it sees.
+     * A policy allowed next to {@code tenant_isolation}, compared in full, whether it is permissive or restrictive
+     * included. It must name a single role that is neither {@code PUBLIC} nor the application role: PostgreSQL ORs
+     * permissive policies, so a policy that reached the application role would widen what it sees. A restrictive policy
+     * (ANDed with the permissive ones) only narrows what its role sees, but is declared all the same, so it cannot
+     * disappear unnoticed.
      *
      * @param using the {@code USING} expression as PostgreSQL prints it, {@code null} for an INSERT policy
      * @param withCheck the {@code WITH CHECK} expression as PostgreSQL prints it, {@code null} for a SELECT policy
@@ -49,12 +51,24 @@ final class TenantIsolationInspector {
             String role,
             String command,
             @Nullable String using,
-            @Nullable String withCheck) {
+            @Nullable String withCheck,
+            boolean restrictive) {
 
         AllowedPolicy {
             if (role.equals("public") || role.equals(TestPostgresConfiguration.APP_USER)) {
                 throw new IllegalArgumentException(table + "." + name + ": cannot be allowed for role " + role);
             }
+        }
+
+        /** A permissive policy. */
+        AllowedPolicy(
+                String table,
+                String name,
+                String role,
+                String command,
+                @Nullable String using,
+                @Nullable String withCheck) {
+            this(table, name, role, command, using, withCheck, false);
         }
     }
 
@@ -286,10 +300,23 @@ final class TenantIsolationInspector {
     }
 
     private boolean isAllowed(String table, String name, List<Object> roles, ResultSet policy) throws SQLException {
-        if (!"PERMISSIVE".equals(policy.getString("permissive")) || roles.size() != 1) {
+        if (roles.size() != 1) {
             return false;
         }
+        boolean restrictive = "RESTRICTIVE".equals(policy.getString("permissive"));
         String role = (String) roles.getFirst();
+        if (restrictive) {
+            return !role.equals("public")
+                    && !role.equals(TestPostgresConfiguration.APP_USER)
+                    && allowedPolicies.contains(new AllowedPolicy(
+                            table,
+                            name,
+                            role,
+                            policy.getString("cmd"),
+                            policy.getString("qual"),
+                            policy.getString("with_check"),
+                            true));
+        }
         if (role.equals(TestPostgresConfiguration.APP_USER)) {
             return switch (policy.getString("cmd")) {
                 case "SELECT" ->

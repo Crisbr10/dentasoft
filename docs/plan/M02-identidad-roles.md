@@ -182,11 +182,15 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 ### M02-T11 · Invitación del primer administrador de una clínica
 
-- **Estado**: pendiente
+- **Estado**: hecho
 - **Depende de**: M02-T05, M01-T05
 - **Descripción**: una clínica recién creada no tiene miembros, y V010 exige que quien invita sea un `ADMIN_CLINICA` aceptado de la clínica, así que nadie puede invitar a su primer administrador. `PLATFORM_ADMIN` lo invita desde `/api/v1/platform/clinics/{id}/...`, y puede reenviar o cancelar esa invitación. El módulo `platform` lo pide a través de la API pública de `identity`, nunca de sus clases internas ni de `KeycloakAdmin`. Migración nueva y ADR 0018 con el diseño de permisos (con qué rol de base de datos se crea la membresía, sin abrir la política `invited_insert`).
 - **Criterios de aceptación**:
-  - [ ] Solo `PLATFORM_ADMIN`, y solo mientras la clínica no tenga ningún `ADMIN_CLINICA`. La base de datos impone esta regla, no solo el servicio: dos peticiones a la vez no crean dos «primeros» administradores (test de concurrencia)
-  - [ ] Cuentan las invitaciones pendientes: si ya hay una invitación pendiente de administrador, la plataforma no puede crear otra; tiene que reenviarla o cancelarla
-  - [ ] Cada invitación, reenvío y cancelación queda en `audit_log` con actor `PLATFORM`
-  - [ ] Test de integración del backend del flujo completo: crear clínica → invitar administrador → aceptar → el administrador invita a un odontólogo
+  - [x] Solo `PLATFORM_ADMIN`, y solo mientras la clínica no tenga ningún `ADMIN_CLINICA`. La base de datos impone esta regla, no solo el servicio: dos peticiones a la vez no crean dos «primeros» administradores (test de concurrencia)
+  - [x] Cuentan las invitaciones pendientes: si ya hay una invitación pendiente de administrador, la plataforma no puede crear otra; tiene que reenviarla o cancelarla
+  - [x] Cada invitación, reenvío y cancelación queda en `audit_log` con actor `PLATFORM`
+  - [x] Test de integración del backend del flujo completo: crear clínica → invitar administrador → aceptar → el administrador invita a un odontólogo
+- **Notas**:
+  - **Permisos**: V013 y ADR 0018. `dentasoft_platform` crea la cuenta y la membresía pendiente, la cancela o la reactiva; nunca escribe `accepted_at` ni `role`. El trigger `platform_first_admin` bloquea la clínica y rechaza un segundo administrador activo, aceptado o pendiente, y la cancelación de las invitaciones de una clínica que ya tiene administrador. Las políticas restrictivas `platform_without_clinic` y `platform_insert_check` impiden que `tenant_isolation` y `user_isolation` amplíen lo que puede hacer la plataforma.
+  - **Endpoints**: `GET /api/v1/platform/clinics/{id}/admin-invitation` (estado `NONE`, `PENDING` o `ACCEPTED`, con `invitedAt` y `acceptedAt`; sin nombre ni email), `POST /api/v1/platform/clinics/{id}/admin-invitation` (202), `…/admin-invitation/resend` (202) y `…/admin-invitation/cancellation` (204). 409 si la clínica ya tiene administrador o invitación pendiente; 404 si no hay invitación pendiente.
+  - **Keycloak**: a través de `identity.FirstAdminInvitees`, con la misma cuota diaria de invitaciones de la clínica.

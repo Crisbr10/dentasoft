@@ -41,6 +41,9 @@ class RowLevelSecurityGuardTests {
     private static final String CURRENT_CLINIC =
             "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid";
 
+    /** "No active clinic", as PostgreSQL prints it in a policy expression. */
+    private static final String NO_CLINIC = "(NULLIF(current_setting('app.tenant_id'::text, true), ''::text) IS NULL)";
+
     /**
      * Tables whose policy compares a column other than {@code tenant_id}. Every entry needs a reason: {@code clinic} is
      * the tenant itself, so its rows are isolated by {@code id}.
@@ -52,6 +55,12 @@ class RowLevelSecurityGuardTests {
      * (ADR 0011, V002) lists, creates and changes the status of every clinic, and creates their initial settings, as
      * {@code dentasoft_platform} only. It also records what it does in {@code audit_log}, under the affected clinic,
      * but only as itself and only about that clinic, creating or changing it (V004). No DELETE policy, and none on any other table.
+     *
+     * <p>It also invites the first administrator of a clinic (V013, ADR 0018): it creates the person's account in its
+     * own name, sees the {@code ADMIN_CLINICA} memberships, creates a pending one and cancels or reactivates it while
+     * it is pending, and records it in {@code audit_log} under the membership's own clinic. Restrictive policies
+     * keep it there even if {@code app.tenant_id} or {@code app.user_id} would let {@code tenant_isolation} or
+     * {@code user_isolation} through: it works without an active clinic, and only creates invited accounts.
      */
     private static final Set<AllowedPolicy> ALLOWED_POLICIES = Set.of(
             new AllowedPolicy("clinic", "platform_select", PLATFORM_USER, "SELECT", "true", null),
@@ -64,8 +73,57 @@ class RowLevelSecurityGuardTests {
                     PLATFORM_USER,
                     "INSERT",
                     null,
-                    "((actor_type = 'PLATFORM'::text) AND (entity_type = 'CLINIC'::text) AND (entity_id = tenant_id)"
-                            + " AND (action = ANY (ARRAY['CREATE'::text, 'UPDATE'::text])))"));
+                    "((actor_type = 'PLATFORM'::text) AND (action = ANY (ARRAY['CREATE'::text, 'UPDATE'::text]))"
+                            + " AND (((entity_type = 'CLINIC'::text) AND (entity_id = tenant_id))"
+                            + " OR ((entity_type = 'CLINIC_MEMBERSHIP'::text) AND (EXISTS ( SELECT 1\n"
+                            + "   FROM clinic_membership m\n"
+                            + "  WHERE ((m.id = audit_log.entity_id) AND (m.tenant_id = audit_log.tenant_id)))))))"),
+            new AllowedPolicy(
+                    "user_account",
+                    "platform_insert",
+                    PLATFORM_USER,
+                    "INSERT",
+                    null,
+                    "(((status)::text = 'ACTIVE'::text) AND (created_by = " + CURRENT_USER
+                            + ") AND (updated_by = created_by))"),
+            new AllowedPolicy(
+                    "clinic_membership",
+                    "platform_select",
+                    PLATFORM_USER,
+                    "SELECT",
+                    "((role)::text = 'ADMIN_CLINICA'::text)",
+                    null),
+            new AllowedPolicy(
+                    "clinic_membership",
+                    "platform_insert",
+                    PLATFORM_USER,
+                    "INSERT",
+                    null,
+                    "(((role)::text = 'ADMIN_CLINICA'::text) AND active AND (accepted_at IS NULL) AND (created_by = "
+                            + CURRENT_USER + ") AND (updated_by = created_by) AND (user_id <> " + CURRENT_USER
+                            + "))"),
+            new AllowedPolicy(
+                    "clinic_membership",
+                    "platform_update",
+                    PLATFORM_USER,
+                    "UPDATE",
+                    "(((role)::text = 'ADMIN_CLINICA'::text) AND (accepted_at IS NULL))",
+                    "(((role)::text = 'ADMIN_CLINICA'::text) AND (accepted_at IS NULL) AND (updated_by = "
+                            + CURRENT_USER + ") AND (user_id <> " + CURRENT_USER + "))"),
+            new AllowedPolicy(
+                    "clinic_membership", "platform_without_clinic", PLATFORM_USER, "ALL", NO_CLINIC, NO_CLINIC, true),
+            new AllowedPolicy(
+                    "user_account", "platform_without_clinic", PLATFORM_USER, "ALL", NO_CLINIC, NO_CLINIC, true),
+            new AllowedPolicy("audit_log", "platform_without_clinic", PLATFORM_USER, "ALL", NO_CLINIC, NO_CLINIC, true),
+            new AllowedPolicy(
+                    "user_account",
+                    "platform_insert_check",
+                    PLATFORM_USER,
+                    "INSERT",
+                    null,
+                    "(((status)::text = 'ACTIVE'::text) AND (created_by = " + CURRENT_USER
+                            + ") AND (updated_by = created_by))",
+                    true));
 
     /**
      * Tables whose rows belong to a user instead of a clinic, isolated by {@code app.user_id} with

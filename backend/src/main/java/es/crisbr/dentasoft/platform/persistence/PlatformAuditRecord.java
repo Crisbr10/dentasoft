@@ -25,7 +25,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code occurred_at} is not mapped: the database's clock sets it, and the platform may not. The platform has no
  * active clinic, so it names the affected clinic itself in {@code tenant_id}; its policy only
- * lets it write {@link AuditActorType#PLATFORM} entries. Not a {@code BaseEntity}: an entry is never updated, so it
+ * lets it write {@link AuditActorType#PLATFORM} entries, about that clinic or about one of its administrators'
+ * memberships (V013). Not a {@code BaseEntity}: an entry is never updated, so it
  * has no {@code updated_*} columns and no version. The clinic's own entries are written by the audit module.
  */
 @Entity(name = "PlatformAuditRecord")
@@ -79,10 +80,16 @@ public class PlatformAuditRecord {
         entityId = clinicId;
     }
 
-    private PlatformAuditRecord(UUID clinicId, AuditAction action, @Nullable AuditDetails details) {
+    private PlatformAuditRecord(
+            UUID clinicId,
+            AuditEntityType entityType,
+            UUID entityId,
+            AuditAction action,
+            @Nullable AuditDetails details) {
         this.clinicId = clinicId;
         this.action = action;
-        this.entityId = clinicId;
+        this.entityType = entityType;
+        this.entityId = entityId;
         this.actorId = CurrentUser.id().orElse(null);
         this.requestId = RequestId.serverGenerated().orElse(null);
         this.details = details == null ? null : details.toJson();
@@ -90,7 +97,24 @@ public class PlatformAuditRecord {
 
     /** {@code action} done by the platform to clinic {@code clinicId}, recorded under that clinic. */
     public static PlatformAuditRecord ofClinic(UUID clinicId, AuditAction action, @Nullable AuditDetails details) {
-        return new PlatformAuditRecord(clinicId, action, details);
+        return new PlatformAuditRecord(clinicId, AuditEntityType.CLINIC, clinicId, action, details);
+    }
+
+    /**
+     * {@code action} done by the platform to membership {@code membershipId} of clinic {@code clinicId} (the first
+     * administrator's, M02-T11), recorded under that clinic. PostgreSQL checks that the membership is the clinic's.
+     */
+    public static PlatformAuditRecord ofMembership(
+            UUID clinicId, UUID membershipId, AuditAction action, @Nullable AuditDetails details) {
+        return new PlatformAuditRecord(clinicId, AuditEntityType.CLINIC_MEMBERSHIP, membershipId, action, details);
+    }
+
+    public AuditEntityType getEntityType() {
+        return entityType;
+    }
+
+    public UUID getEntityId() {
+        return entityId;
     }
 
     public @Nullable UUID getId() {
