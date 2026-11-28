@@ -1,0 +1,116 @@
+.clinic-users__loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clinic-users__invite {
+  margin-block-start: 32px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--mat-sys-outline-variant);
+}
+
+.clinic-users__notice:empty {
+  margin: 0;
+}
+
+// Responsive table (Modern Web Guidance), as in the platform screen: the wrapper scrolls, can be
+// reached with the keyboard and adapts to its own width; the person stays visible as row header.
+.clinic-users__table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  container-type: inline-size;
+}
+
+.clinic-users__table {
+  inline-size: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+
+  caption {
+    text-align: start;
+    font: var(--mat-sys-title-small);
+    padding-block-end: 8px;
+  }
+
+  th,
+  td {
+    padding: 8px 12px;
+    text-align: start;
+    border-block-end: 1px solid var(--mat-sys-outline-variant);
+    white-space: nowrap;
+  }
+
+  thead th {
+    font: var(--mat-sys-label-large);
+  }
+
+  tbody th {
+    position: sticky;
+    inset-inline-start: 0;
+    background: var(--mat-sys-surface);
+    font-weight: 500;
+  }
+}
+
+.clinic-users__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.clinic-users__role {
+  inline-size: 14rem;
+}
+
+.clinic-users__self {
+  white-space: normal;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// The status is always written; the colour only adds to it.
+.clinic-users__status[data-status='PENDING'] {
+  color: var(--mat-sys-tertiary);
+}
+
+.clinic-users__status[data-status='INACTIVE'] {
+  color: var(--mat-sys-error);
+}
+
+@container (width < 720px) {
+  .clinic-users__table {
+    &,
+    thead,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+
+    thead {
+      display: none;
+    }
+
+    tr {
+      margin-block-end: 16px;
+      border: 1px solid var(--mat-sys-outline-variant);
+    }
+
+    th,
+    td {
+      white-space: normal;
+    }
+
+    tbody th {
+      position: static;
+    }
+
+    // The column headers are hidden: each cell says what it is.
+    td[data-label]::before {
+      content: attr(data-label) ': ';
+      font-weight: 500;
+    }
+  }
+}

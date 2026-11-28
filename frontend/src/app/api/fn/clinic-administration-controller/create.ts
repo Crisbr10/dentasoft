@@ -7,14 +7,14 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { ClinicDetails } from '../../models/clinic-details';
 import { CreateClinicRequest } from '../../models/create-clinic-request';
+import { PlatformClinicDetails } from '../../models/platform-clinic-details';
 
 export interface Create$Params {
       body: CreateClinicRequest
 }
 
-export function create(http: HttpClient, rootUrl: string, params: Create$Params, context?: HttpContext): Observable<StrictHttpResponse<ClinicDetails>> {
+export function create(http: HttpClient, rootUrl: string, params: Create$Params, context?: HttpContext): Observable<StrictHttpResponse<PlatformClinicDetails>> {
   const rb = new RequestBuilder(rootUrl, create.PATH, 'post');
   if (params) {
     rb.body(params.body, 'application/json');
@@ -25,7 +25,7 @@ export function create(http: HttpClient, rootUrl: string, params: Create$Params,
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<ClinicDetails>;
+      return r as StrictHttpResponse<PlatformClinicDetails>;
     })
   );
 }

@@ -5,6 +5,7 @@ import es.crisbr.dentasoft.tenancy.persistence.Clinic;
 import es.crisbr.dentasoft.tenancy.persistence.ClinicRepository;
 import es.crisbr.dentasoft.tenancy.persistence.ClinicSettings;
 import es.crisbr.dentasoft.tenancy.persistence.ClinicSettingsRepository;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -77,6 +78,7 @@ public class ClinicConfiguration {
     }
 
     /** The clinic as its configuration API returns it. */
+    @Schema(name = "ClinicConfigurationDetails")
     public record ClinicDetails(
             UUID id, String name, String legalName, String taxId, String timezone, String locale, long version) {
 

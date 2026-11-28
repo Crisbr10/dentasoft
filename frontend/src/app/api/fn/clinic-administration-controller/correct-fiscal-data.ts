@@ -7,15 +7,15 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { ClinicDetails } from '../../models/clinic-details';
 import { CorrectFiscalDataRequest } from '../../models/correct-fiscal-data-request';
+import { PlatformClinicDetails } from '../../models/platform-clinic-details';
 
 export interface CorrectFiscalData$Params {
   id: string;
       body: CorrectFiscalDataRequest
 }
 
-export function correctFiscalData(http: HttpClient, rootUrl: string, params: CorrectFiscalData$Params, context?: HttpContext): Observable<StrictHttpResponse<ClinicDetails>> {
+export function correctFiscalData(http: HttpClient, rootUrl: string, params: CorrectFiscalData$Params, context?: HttpContext): Observable<StrictHttpResponse<PlatformClinicDetails>> {
   const rb = new RequestBuilder(rootUrl, correctFiscalData.PATH, 'put');
   if (params) {
     rb.path('id', params.id, {});
@@ -27,7 +27,7 @@ export function correctFiscalData(http: HttpClient, rootUrl: string, params: Cor
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<ClinicDetails>;
+      return r as StrictHttpResponse<PlatformClinicDetails>;
     })
   );
 }

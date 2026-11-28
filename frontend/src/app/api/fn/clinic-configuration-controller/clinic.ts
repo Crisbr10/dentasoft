@@ -7,12 +7,12 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { ClinicDetails } from '../../models/clinic-details';
+import { ClinicConfigurationDetails } from '../../models/clinic-configuration-details';
 
 export interface Clinic$Params {
 }
 
-export function clinic(http: HttpClient, rootUrl: string, params?: Clinic$Params, context?: HttpContext): Observable<StrictHttpResponse<ClinicDetails>> {
+export function clinic(http: HttpClient, rootUrl: string, params?: Clinic$Params, context?: HttpContext): Observable<StrictHttpResponse<ClinicConfigurationDetails>> {
   const rb = new RequestBuilder(rootUrl, clinic.PATH, 'get');
   if (params) {
   }
@@ -22,7 +22,7 @@ export function clinic(http: HttpClient, rootUrl: string, params?: Clinic$Params
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<ClinicDetails>;
+      return r as StrictHttpResponse<ClinicConfigurationDetails>;
     })
   );
 }

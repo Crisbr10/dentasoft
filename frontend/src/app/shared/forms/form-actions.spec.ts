@@ -15,6 +15,7 @@ import { SaveFailure } from './save-failure';
         [form]="form"
         [saving]="saving()"
         [failure]="failure()"
+        [saveKey]="saveKey()"
         (save)="saved = saved + 1"
         (discard)="form.reset({ name: 'Clínica Norte' })"
       />
@@ -26,6 +27,7 @@ class Host {
   readonly form = new FormGroup({ name: new FormControl('Clínica Norte') });
   readonly saving = signal(false);
   readonly failure = signal<SaveFailure | null>(null);
+  readonly saveKey = signal<string | undefined>(undefined);
   saved = 0;
 }
 
@@ -56,6 +58,15 @@ describe('FormActions', () => {
   it('offers nothing to save or discard while nothing changed', () => {
     expect(button('save').disabled).toBe(true);
     expect(button('discard').disabled).toBe(true);
+  });
+
+  it('labels the save button with the default text, or with the one the form gives', async () => {
+    expect(button('save').textContent?.trim()).toBe(es.forms.save);
+
+    fixture.componentInstance.saveKey.set('dialogs.cancel');
+    await fixture.whenStable();
+
+    expect(button('save').textContent?.trim()).toBe(es.dialogs.cancel);
   });
 
   it('saves the changes', async () => {

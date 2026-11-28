@@ -1,0 +1,152 @@
+<h2>{{ 'clinicUsers.title' | transloco }}</h2>
+<p>{{ 'clinicUsers.intro' | transloco }}</p>
+
+<section class="clinic-users__list">
+  @if (loading()) {
+    <p class="clinic-users__loading" role="status">
+      <mat-spinner diameter="20" aria-hidden="true" />
+      <span>{{ 'clinicUsers.list.loading' | transloco }}</span>
+    </p>
+  } @else if (loadFailed()) {
+    <p role="alert">{{ 'clinicUsers.list.loadError' | transloco }}</p>
+    <button mat-stroked-button type="button" (click)="load(pageIndex())">
+      <mat-icon svgIcon="refresh" />
+      {{ 'clinicUsers.list.retry' | transloco }}
+    </button>
+  }
+
+  @if (page(); as page) {
+    @if (page.content.length > 0) {
+      <div
+        class="clinic-users__table-wrapper"
+        tabindex="0"
+        role="region"
+        [attr.aria-labelledby]="'clinic-users-caption'"
+      >
+        <table class="clinic-users__table">
+          <caption id="clinic-users-caption">
+            {{
+              'clinicUsers.list.caption' | transloco
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th [attr.scope]="'col'">{{ 'clinicUsers.list.person' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'clinicUsers.list.email' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'clinicUsers.list.role' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'clinicUsers.list.status' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'clinicUsers.list.actions' | transloco }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (user of page.content; track user.id) {
+              <tr [attr.data-user]="user.id">
+                <th [attr.scope]="'row'" tabindex="-1">
+                  @if (isSelf(user)) {
+                    {{ 'clinicUsers.list.you' | transloco: { name: name(user) } }}
+                  } @else {
+                    {{ name(user) }}
+                  }
+                </th>
+                <td [attr.data-label]="'clinicUsers.list.email' | transloco">
+                  {{ user.profile?.email }}
+                </td>
+                <td [attr.data-label]="'clinicUsers.list.role' | transloco">
+                  {{ 'roles.' + user.role | transloco }}
+                </td>
+                <td [attr.data-label]="'clinicUsers.list.status' | transloco">
+                  <span class="clinic-users__status" [attr.data-status]="status(user)">
+                    {{ 'clinicUsers.status.' + status(user) | transloco }}
+                  </span>
+                </td>
+                <td>
+                  <div
+                    class="clinic-users__actions"
+                    role="group"
+                    [attr.aria-label]="
+                      'clinicUsers.actions.group' | transloco: { name: name(user) }
+                    "
+                  >
+                    @if (status(user) === 'PENDING') {
+                      <button
+                        mat-button
+                        type="button"
+                        class="clinic-users__resend"
+                        [disabled]="busy() !== null"
+                        (click)="resend(user)"
+                      >
+                        {{ 'clinicUsers.actions.resend' | transloco }}
+                      </button>
+                    }
+                    @if (isSelf(user)) {
+                      <span class="clinic-users__self">
+                        {{ 'clinicUsers.actions.self' | transloco }}
+                      </span>
+                    } @else if (user.active) {
+                      <mat-form-field class="clinic-users__role" [subscriptSizing]="'dynamic'">
+                        <mat-label>{{ 'clinicUsers.actions.newRole' | transloco }}</mat-label>
+                        <mat-select
+                          [value]="choice(user)"
+                          [disabled]="busy() !== null"
+                          (valueChange)="choose(user, $event)"
+                        >
+                          @for (role of roles; track role) {
+                            <mat-option [value]="role">{{
+                              'roles.' + role | transloco
+                            }}</mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        class="clinic-users__apply-role"
+                        [disabled]="busy() !== null || choice(user) === user.role"
+                        (click)="applyRole(user)"
+                      >
+                        {{ 'clinicUsers.actions.applyRole' | transloco }}
+                      </button>
+                      <button
+                        mat-button
+                        type="button"
+                        class="clinic-users__deactivate"
+                        [disabled]="busy() !== null"
+                        (click)="deactivateUser(user)"
+                      >
+                        {{ 'clinicUsers.actions.deactivate' | transloco }}
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <mat-paginator
+        [attr.aria-label]="'clinicUsers.list.paginator' | transloco"
+        [length]="page.page.totalElements"
+        [pageIndex]="page.page.number"
+        [pageSize]="pageSize"
+        [hidePageSize]="true"
+        [disabled]="loading()"
+        (page)="changePage($event)"
+      />
+    } @else {
+      <p class="clinic-users__empty" role="status">{{ 'clinicUsers.list.empty' | transloco }}</p>
+    }
+  }
+
+  <div class="clinic-users__outcome">
+    <app-failure-message [failure]="failure()" />
+    <p class="clinic-users__notice" role="status">
+      @if (notice(); as notice) {
+        {{ 'clinicUsers.notices.' + notice.key | transloco: notice.params }}
+      }
+    </p>
+  </div>
+</section>
+
+<section class="clinic-users__invite">
+  <app-invite-user-form (sent)="invited()" />
+</section>

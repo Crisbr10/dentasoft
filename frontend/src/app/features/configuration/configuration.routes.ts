@@ -8,8 +8,9 @@ import { SECTIONS, SectionEntry, SectionId } from './configuration-sections';
 /** The screens of each section; those still to come show a placeholder. */
 const SCREENS: Record<SectionId, NonNullable<Route['loadComponent']>> = {
   CLINIC: () => SectionPlaceholder, // M01-T10
-  USERS_AND_ROLES: () => SectionPlaceholder, // M02-T08
-  PRACTITIONERS: () => SectionPlaceholder, // M02-T08
+  USERS_AND_ROLES: () => import('../clinic-users/clinic-users-home').then((m) => m.ClinicUsersHome),
+  PRACTITIONERS: () =>
+    import('../practitioners/practitioners-home').then((m) => m.PractitionersHome),
   PLATFORM: () => import('../platform/platform-home').then((m) => m.PlatformHome),
 };
 

@@ -25,8 +25,8 @@ export type { ResendInvitation$Params as ResendInvitation$Params } from './fn/cl
 export { resendInvitation as resendInvitation } from './fn/clinic-users-controller/resend-invitation';
 export type { Deactivate$Params as Deactivate$Params } from './fn/clinic-users-controller/deactivate';
 export { deactivate as deactivate } from './fn/clinic-users-controller/deactivate';
-export type { Invite$Params as Invite$Params } from './fn/clinic-users-controller/invite';
-export { invite as invite } from './fn/clinic-users-controller/invite';
+export type { Invite1$Params as Invite1$Params } from './fn/clinic-users-controller/invite-1';
+export { invite1 as invite1 } from './fn/clinic-users-controller/invite-1';
 export type { List3$Params as List3$Params } from './fn/clinic-users-controller/list-3';
 export { list3 as list3 } from './fn/clinic-users-controller/list-3';
 export type { Get$Params as Get$Params } from './fn/practitioner-roles-controller/get';
@@ -57,6 +57,14 @@ export type { Week$Params as Week$Params } from './fn/opening-hours-controller/w
 export { week as week } from './fn/opening-hours-controller/week';
 export type { ReplaceWeek$Params as ReplaceWeek$Params } from './fn/opening-hours-controller/replace-week';
 export { replaceWeek as replaceWeek } from './fn/opening-hours-controller/replace-week';
+export type { Status$Params as Status$Params } from './fn/first-admin-invitation-controller/status';
+export { status as status } from './fn/first-admin-invitation-controller/status';
+export type { Invite$Params as Invite$Params } from './fn/first-admin-invitation-controller/invite';
+export { invite as invite } from './fn/first-admin-invitation-controller/invite';
+export type { Resend$Params as Resend$Params } from './fn/first-admin-invitation-controller/resend';
+export { resend as resend } from './fn/first-admin-invitation-controller/resend';
+export type { Cancel$Params as Cancel$Params } from './fn/first-admin-invitation-controller/cancel';
+export { cancel as cancel } from './fn/first-admin-invitation-controller/cancel';
 export type { Accept$Params as Accept$Params } from './fn/me-controller/accept';
 export { accept as accept } from './fn/me-controller/accept';
 export type { Me$Params as Me$Params } from './fn/me-controller/me';
