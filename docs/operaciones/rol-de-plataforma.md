@@ -2,7 +2,7 @@
 
 La administración de clínicas de la plataforma (M01-T05) se conecta a PostgreSQL con el rol `dentasoft_platform` (ver [ADR 0011](../adr/0011-rol-de-plataforma-en-base-de-datos.md)). El rol lo crea el superusuario **una vez por entorno y antes de desplegar la versión con la migración V002**. Si no existe, V002 falla y la aplicación no arranca.
 
-Los permisos sobre las tablas y las políticas no se crean a mano: los aplica V002, que ejecuta Flyway como `dentasoft_owner`.
+Los permisos sobre las tablas y las políticas no se crean a mano: los aplican V002, V004 y V013, que ejecuta Flyway como `dentasoft_owner`.
 
 ## Local
 

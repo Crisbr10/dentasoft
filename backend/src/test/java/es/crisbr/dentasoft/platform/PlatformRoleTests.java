@@ -14,6 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -66,7 +67,35 @@ class PlatformRoleTests {
             "audit_log.entity_id: INSERT",
             "audit_log.outcome: INSERT",
             "audit_log.request_id: INSERT",
-            "audit_log.details: INSERT");
+            "audit_log.details: INSERT",
+            // The first administrator of a clinic (V013, ADR 0018).
+            "user_account.id: INSERT",
+            "user_account.status: INSERT",
+            "user_account.created_at: INSERT",
+            "user_account.created_by: INSERT",
+            "user_account.updated_at: INSERT",
+            "user_account.updated_by: INSERT",
+            "clinic_membership.id: SELECT",
+            "clinic_membership.tenant_id: SELECT",
+            "clinic_membership.user_id: SELECT",
+            "clinic_membership.role: SELECT",
+            "clinic_membership.active: SELECT",
+            "clinic_membership.accepted_at: SELECT",
+            "clinic_membership.version: SELECT",
+            "clinic_membership.id: INSERT",
+            "clinic_membership.tenant_id: INSERT",
+            "clinic_membership.user_id: INSERT",
+            "clinic_membership.role: INSERT",
+            "clinic_membership.active: INSERT",
+            "clinic_membership.created_at: INSERT",
+            "clinic_membership.created_by: INSERT",
+            "clinic_membership.updated_at: INSERT",
+            "clinic_membership.updated_by: INSERT",
+            "clinic_membership.version: INSERT",
+            "clinic_membership.active: UPDATE",
+            "clinic_membership.updated_at: UPDATE",
+            "clinic_membership.updated_by: UPDATE",
+            "clinic_membership.version: UPDATE");
 
     @Test
     void isAnOrdinaryRoleThatDoesNotBypassRowLevelSecurity() throws SQLException {
@@ -139,14 +168,20 @@ class PlatformRoleTests {
         assertThat(privileges).containsExactlyInAnyOrderElementsOf(EXPECTED_PRIVILEGES);
     }
 
-    /** The schema's own functions ({@code enable_tenant_isolation}…), not the extensions' ({@code vector}). */
+    /**
+     * The schema's own functions ({@code enable_tenant_isolation}…), not the extensions' ({@code vector}): none but
+     * {@code create_invited_user_account}, which runs as the caller (V008) and so under the platform's own policy on
+     * {@code user_account} (V013).
+     */
     @Test
-    void cannotExecuteTheSchemaFunctions() throws SQLException {
-        assertThat(count(
-                        "SELECT count(*) FROM pg_proc p WHERE p.proowner = (SELECT oid FROM pg_roles WHERE rolname = ?)"
+    void canExecuteOnlyTheInvitedAccountFunction() throws SQLException {
+        assertThat(names(
+                        "SELECT p.proname FROM pg_proc p WHERE p.proowner = (SELECT oid FROM pg_roles WHERE rolname = ?)"
                                 + " AND has_function_privilege(?, p.oid, 'EXECUTE')",
                         TestPostgresConfiguration.OWNER_USER,
                         PLATFORM_USER))
+                .containsExactly("create_invited_user_account");
+        assertThat(count("SELECT count(*) FROM pg_proc WHERE proname = 'create_invited_user_account' AND prosecdef"))
                 .isZero();
         assertThat(count("SELECT count(*) FROM pg_proc WHERE proname = 'enable_tenant_isolation'"))
                 .isEqualTo(1);
@@ -169,7 +204,23 @@ class PlatformRoleTests {
                 "TRUNCATE clinic",
                 "SELECT * FROM tenancy_test_record",
                 "SELECT * FROM flyway_schema_history",
-                "CREATE TABLE platform_probe (id int)"
+                "CREATE TABLE platform_probe (id int)",
+                // Memberships (V013): never accepting, changing the role or reading other columns.
+                "UPDATE clinic_membership SET accepted_at = now()",
+                "UPDATE clinic_membership SET role = 'ODONTOLOGO'",
+                "UPDATE clinic_membership SET user_id = gen_random_uuid()",
+                "UPDATE clinic_membership SET tenant_id = gen_random_uuid()",
+                "SELECT created_by FROM clinic_membership",
+                "SELECT * FROM clinic_membership",
+                "DELETE FROM clinic_membership",
+                "INSERT INTO clinic_membership (id, tenant_id, user_id, role, accepted_at, created_at, updated_at)"
+                        + " VALUES (gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), 'ADMIN_CLINICA', now(),"
+                        + " now(), now())",
+                // Accounts: creating them only.
+                "SELECT id FROM user_account",
+                "UPDATE user_account SET status = 'DISABLED'",
+                "DELETE FROM user_account",
+                "SELECT * FROM practitioner_role"
             })
     void isRefusedEverythingElse(String sql) throws SQLException {
         try (Connection connection = connectAsPlatform()) {
@@ -263,6 +314,22 @@ class PlatformRoleTests {
                 return result.getLong(1);
             }
         }
+    }
+
+    private static List<String> names(String sql, String... parameters) throws SQLException {
+        List<String> names = new ArrayList<>();
+        try (Connection connection = connectAsApplication();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            for (int i = 0; i < parameters.length; i++) {
+                statement.setString(i + 1, parameters[i]);
+            }
+            try (ResultSet result = statement.executeQuery()) {
+                while (result.next()) {
+                    names.add(result.getString(1));
+                }
+            }
+        }
+        return names;
     }
 
     private static void execute(Connection connection, String sql) throws SQLException {

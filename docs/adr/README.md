@@ -21,6 +21,7 @@ Cada decisión importante se documenta en un fichero numerado. Un ADR aceptado n
 | [0015](0015-roles-de-clinica-en-base-de-datos.md) | Roles de clínica en la base de datos y usuarios aislados por usuario | Aceptada |
 | [0016](0016-admin-api-de-keycloak-desde-el-backend.md) | Admin API de Keycloak desde el backend e invitaciones | Aceptada |
 | [0017](0017-fichas-de-profesional-por-clinica.md) | Fichas de profesional por clínica (FHIR PractitionerRole) | Aceptada |
+| [0018](0018-invitacion-del-primer-administrador.md) | Invitación del primer administrador de una clínica por la plataforma | Aceptada |
 
 ## Plantilla
 
