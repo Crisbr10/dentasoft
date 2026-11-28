@@ -9,7 +9,8 @@ import { SECTIONS, SectionEntry, SectionId } from './configuration-sections';
 const SCREENS: Record<SectionId, NonNullable<Route['loadComponent']>> = {
   CLINIC: () => SectionPlaceholder, // M01-T10
   USERS_AND_ROLES: () => import('../clinic-users/clinic-users-home').then((m) => m.ClinicUsersHome),
-  PRACTITIONERS: () => SectionPlaceholder, // M02-T08
+  PRACTITIONERS: () =>
+    import('../practitioners/practitioners-home').then((m) => m.PractitionersHome),
   PLATFORM: () => import('../platform/platform-home').then((m) => m.PlatformHome),
 };
 

@@ -1,0 +1,176 @@
+<h2>{{ 'practitioners.title' | transloco }}</h2>
+<p>{{ 'practitioners.intro' | transloco }}</p>
+
+<section class="practitioners__list">
+  <mat-button-toggle-group
+    class="practitioners__filter"
+    [attr.aria-label]="'practitioners.filter.label' | transloco"
+    [hideSingleSelectionIndicator]="true"
+    [value]="status()"
+    [disabled]="loading()"
+    (change)="filter($event.value)"
+  >
+    @for (option of statuses; track option) {
+      <mat-button-toggle [value]="option">{{
+        'practitioners.filter.' + option | transloco
+      }}</mat-button-toggle>
+    }
+  </mat-button-toggle-group>
+
+  @if (loading()) {
+    <p class="practitioners__loading" role="status">
+      <mat-spinner diameter="20" aria-hidden="true" />
+      <span>{{ 'practitioners.list.loading' | transloco }}</span>
+    </p>
+  } @else if (loadFailed()) {
+    <p role="alert">{{ 'practitioners.list.loadError' | transloco }}</p>
+    <button mat-stroked-button type="button" (click)="load(pageIndex())">
+      <mat-icon svgIcon="refresh" />
+      {{ 'practitioners.list.retry' | transloco }}
+    </button>
+  }
+
+  @if (page(); as page) {
+    @if (page.content.length > 0) {
+      <div
+        class="practitioners__table-wrapper"
+        tabindex="0"
+        role="region"
+        [attr.aria-labelledby]="'practitioners-caption'"
+      >
+        <table class="practitioners__table">
+          <caption id="practitioners-caption">
+            {{
+              'practitioners.list.caption' | transloco
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th [attr.scope]="'col'">{{ 'practitioners.list.name' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'practitioners.list.area' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'practitioners.list.license' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'practitioners.list.color' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'practitioners.list.status' | transloco }}</th>
+              @if (canEdit()) {
+                <th [attr.scope]="'col'">{{ 'practitioners.list.actions' | transloco }}</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (practitioner of page.content; track practitioner.id) {
+              <tr [attr.data-practitioner]="practitioner.id">
+                <th [attr.scope]="'row'" tabindex="-1">{{ practitioner.displayName }}</th>
+                <td [attr.data-label]="'practitioners.list.area' | transloco">
+                  {{ 'practitioners.areas.' + practitioner.specialty | transloco }}
+                </td>
+                <td [attr.data-label]="'practitioners.list.license' | transloco">
+                  @if (practitioner.licenseNumber && practitioner.licenseProvince) {
+                    {{
+                      'practitioners.list.licenseValue'
+                        | transloco
+                          : {
+                              number: practitioner.licenseNumber,
+                              province:
+                                'practitioners.provinces.' + practitioner.licenseProvince
+                                | transloco,
+                            }
+                    }}
+                  } @else {
+                    {{ 'practitioners.list.noLicense' | transloco }}
+                  }
+                </td>
+                <td [attr.data-label]="'practitioners.list.color' | transloco">
+                  <span class="practitioners__color">
+                    <span
+                      class="practitioners__swatch"
+                      aria-hidden="true"
+                      [style.background-color]="practitioner.agendaColor"
+                    ></span>
+                    <span class="practitioners__color-value">{{ practitioner.agendaColor }}</span>
+                  </span>
+                </td>
+                <td [attr.data-label]="'practitioners.list.status' | transloco">
+                  <span class="practitioners__status" [attr.data-status]="practitioner.status">
+                    {{ 'practitioners.status.' + practitioner.status | transloco }}
+                  </span>
+                </td>
+                @if (canEdit()) {
+                  <td>
+                    <div
+                      class="practitioners__actions"
+                      role="group"
+                      [attr.aria-label]="
+                        'practitioners.actions.group'
+                          | transloco: { name: practitioner.displayName }
+                      "
+                    >
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        [disabled]="busy() !== null"
+                        (click)="edit(practitioner)"
+                      >
+                        {{ 'practitioners.actions.edit' | transloco }}
+                      </button>
+                      @if (practitioner.status === 'ACTIVE') {
+                        <button
+                          mat-button
+                          type="button"
+                          [disabled]="busy() !== null"
+                          (click)="deactivateOne(practitioner)"
+                        >
+                          {{ 'practitioners.actions.deactivate' | transloco }}
+                        </button>
+                      } @else {
+                        <button
+                          mat-button
+                          type="button"
+                          [disabled]="busy() !== null"
+                          (click)="activateOne(practitioner)"
+                        >
+                          {{ 'practitioners.actions.activate' | transloco }}
+                        </button>
+                      }
+                    </div>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <mat-paginator
+        [attr.aria-label]="'practitioners.list.paginator' | transloco"
+        [length]="page.page.totalElements"
+        [pageIndex]="page.page.number"
+        [pageSize]="pageSize"
+        [hidePageSize]="true"
+        [disabled]="loading()"
+        (page)="changePage($event)"
+      />
+    } @else {
+      <p class="practitioners__empty" role="status">
+        {{ 'practitioners.list.empty' | transloco }}
+      </p>
+    }
+  }
+
+  <div class="practitioners__outcome">
+    <app-failure-message [failure]="failure()" />
+    <p class="practitioners__notice" role="status">
+      @if (notice(); as notice) {
+        {{ 'practitioners.notices.' + notice.key | transloco: { name: notice.name } }}
+      }
+    </p>
+  </div>
+</section>
+
+@if (canEdit()) {
+  <section class="practitioners__form">
+    <app-practitioner-form
+      [practitioner]="editing()"
+      (saved)="saved($event)"
+      (cancelled)="cancelEdit()"
+    />
+  </section>
+}
