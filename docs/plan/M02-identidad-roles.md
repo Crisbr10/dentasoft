@@ -192,5 +192,5 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
   - [ ] Test de integración del backend del flujo completo: crear clínica → invitar administrador → aceptar → el administrador invita a un odontólogo
 - **Notas**:
   - **Permisos**: V013 y ADR 0018. `dentasoft_platform` crea la cuenta y la membresía pendiente, la cancela o la reactiva; nunca escribe `accepted_at` ni `role`. El trigger `platform_first_admin` bloquea la clínica y rechaza un segundo administrador activo, aceptado o pendiente.
-  - **Endpoints**: `POST /api/v1/platform/clinics/{id}/admin-invitation` (202), `…/admin-invitation/resend` (202) y `…/admin-invitation/cancellation` (204). 409 si la clínica ya tiene administrador o invitación pendiente; 404 si no hay invitación pendiente.
+  - **Endpoints**: `GET /api/v1/platform/clinics/{id}/admin-invitation` (estado `NONE`, `PENDING` o `ACCEPTED`, con `invitedAt` y `acceptedAt`; sin nombre ni email), `POST /api/v1/platform/clinics/{id}/admin-invitation` (202), `…/admin-invitation/resend` (202) y `…/admin-invitation/cancellation` (204). 409 si la clínica ya tiene administrador o invitación pendiente; 404 si no hay invitación pendiente.
   - **Keycloak**: a través de `identity.FirstAdminInvitees`, con la misma cuota diaria de invitaciones de la clínica.

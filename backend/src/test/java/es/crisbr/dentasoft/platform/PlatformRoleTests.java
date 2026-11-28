@@ -81,6 +81,7 @@ class PlatformRoleTests {
             "clinic_membership.role: SELECT",
             "clinic_membership.active: SELECT",
             "clinic_membership.accepted_at: SELECT",
+            "clinic_membership.updated_at: SELECT",
             "clinic_membership.version: SELECT",
             "clinic_membership.id: INSERT",
             "clinic_membership.tenant_id: INSERT",

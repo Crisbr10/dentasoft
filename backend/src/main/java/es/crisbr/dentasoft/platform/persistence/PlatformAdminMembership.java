@@ -30,8 +30,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
  *
  * <ul>
  *   <li>{@code tenant_id}, {@code user_id} and {@code role} are written once; {@code accepted_at} is only read;
- *   <li>the audit columns are written and never read: their {@code SELECT} is {@code NULL} instead of the column, which
- *       the platform may not select. Their getters are therefore absent;
+ *   <li>the audit columns are written and never read, except {@code updated_at}: their {@code SELECT} is {@code NULL}
+ *       instead of the column, which the platform may not select. Their getters are therefore absent;
  *   <li>an update writes {@code active}, {@code updated_at}, {@code updated_by} and {@code version}, nothing else.
  * </ul>
  */
@@ -75,8 +75,8 @@ public class PlatformAdminMembership {
     @Column(name = "created_by", updatable = false)
     private @Nullable UUID createdBy;
 
+    /** Read too: for a pending invitation, when it was sent (V013). */
     @LastModifiedDate
-    @ColumnTransformer(read = "NULL")
     @Column(name = "updated_at", nullable = false)
     private @Nullable Instant updatedAt;
 
@@ -120,6 +120,19 @@ public class PlatformAdminMembership {
     /** Whether its user has accepted the invitation: then the platform can no longer change it. */
     public boolean isAccepted() {
         return acceptedAt != null;
+    }
+
+    /** When its user accepted the invitation; {@code null} while it is pending. */
+    public @Nullable OffsetDateTime getAcceptedAt() {
+        return acceptedAt;
+    }
+
+    /**
+     * When it last changed. For an active, pending membership that is when the invitation was sent (created or made
+     * active again): nothing else changes a pending membership, and resending the email does not.
+     */
+    public @Nullable Instant getUpdatedAt() {
+        return updatedAt;
     }
 
     public @Nullable Long getVersion() {

@@ -10,7 +10,8 @@
 -- - create the invited person's account, active and in its own name (created_by = app.user_id), like V010 does for
 --   an administrator; it cannot read, change or delete accounts;
 -- - see the ADMIN_CLINICA memberships of every clinic, only the columns it needs (who is the administrator, and
---   whether they accepted), so it knows whether a clinic has one and can resend or cancel the invitation;
+--   whether and when they were invited and accepted), so it knows whether a clinic has one, shows the invitation's
+--   state and can resend or cancel it;
 -- - create a pending ADMIN_CLINICA membership, only while the clinic has no active ADMIN_CLINICA, accepted or pending
 --   (the trigger below). Two invitations at the same time run one after the other, and the second fails;
 -- - cancel a pending invitation, or make a cancelled one active again, changing only active and the audit columns.
@@ -40,8 +41,11 @@ CREATE POLICY platform_insert ON user_account
 
 GRANT EXECUTE ON FUNCTION create_invited_user_account(uuid) TO dentasoft_platform;
 
--- The administrators of each clinic: only these columns, and only their rows.
-GRANT SELECT (id, tenant_id, user_id, role, active, accepted_at, version) ON clinic_membership TO dentasoft_platform;
+-- The administrators of each clinic: only these columns, and only their rows. updated_at is when a pending invitation
+-- was sent (created or reactivated: resending does not change it), which the platform shows; accepted_at, when it was
+-- accepted.
+GRANT SELECT (id, tenant_id, user_id, role, active, accepted_at, updated_at, version)
+    ON clinic_membership TO dentasoft_platform;
 
 CREATE POLICY platform_select ON clinic_membership
     FOR SELECT

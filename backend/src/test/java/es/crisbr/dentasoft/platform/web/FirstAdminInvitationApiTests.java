@@ -16,8 +16,10 @@ import es.crisbr.dentasoft.shared.ApiSecurity;
 import es.crisbr.dentasoft.tenancy.TenancyTestDatabase;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -115,6 +117,12 @@ class FirstAdminInvitationApiTests {
                 .orElseThrow()
                 .id();
         assertThat(membership(clinic, dentistId)).contains("ODONTOLOGO/true");
+
+        MvcTestResult accepted = status(clinic);
+        assertThat(accepted).hasStatusOk();
+        assertThat(accepted).bodyJson().extractingPath("$.status").isEqualTo("ACCEPTED");
+        assertThat(accepted).bodyJson().extractingPath("$.acceptedAt").isNotNull();
+        assertThat(accepted).bodyJson().extractingPath("$.invitedAt").isNull();
 
         // Once the clinic has its administrator, the platform is out of it.
         assertThat(inviteAdmin(clinic, "otra@clinica-nueva.test")).hasStatus(HttpStatus.CONFLICT);
@@ -243,7 +251,75 @@ class FirstAdminInvitationApiTests {
                                 .content(invitationBody("directora@clinica-a.test")),
                         CLINIC_ADMIN))
                 .hasStatus(HttpStatus.FORBIDDEN);
+        assertThat(user(mvc.get().uri(CLINICS + "/" + CLINIC_A + "/admin-invitation"), CLINIC_ADMIN))
+                .hasStatus(HttpStatus.FORBIDDEN);
         assertThat(keycloak.requests()).isEmpty();
+    }
+
+    @Test
+    void theStatusIsNoneUntilAnInvitationThenPendingWithItsDateAndNoneAgainOnceCancelled() {
+        assertStatus(status(CLINIC_A), "NONE");
+
+        Instant before = Instant.now().minusSeconds(5);
+        inviteAdmin(CLINIC_A, "directora@clinica-a.test");
+        MvcTestResult pending = status(CLINIC_A);
+        assertStatus(pending, "PENDING");
+        Instant invitedAt = Instant.parse(JsonPath.read(body(pending), "$.invitedAt"));
+        assertThat(invitedAt).isBetween(before, Instant.now().plusSeconds(5));
+        assertThat(pending).bodyJson().extractingPath("$.acceptedAt").isNull();
+
+        // Resending changes nothing in the membership, so the date stays the invitation's.
+        platform(post(CLINICS + "/" + CLINIC_A + "/admin-invitation/resend"));
+        assertThat(Instant.parse(JsonPath.read(body(status(CLINIC_A)), "$.invitedAt")))
+                .isEqualTo(invitedAt);
+
+        platform(post(CLINICS + "/" + CLINIC_A + "/admin-invitation/cancellation"));
+        assertStatus(status(CLINIC_A), "NONE");
+    }
+
+    /** The answer never says who was invited: only the state and the dates. */
+    @Test
+    void theStatusNeverNamesThePerson() {
+        inviteAdmin(CLINIC_A, "directora@clinica-a.test");
+        UUID admin =
+                keycloak.userByEmail("directora@clinica-a.test").orElseThrow().id();
+
+        String body = body(status(CLINIC_A));
+
+        Map<String, Object> fields = JsonPath.read(body, "$");
+        assertThat(fields).containsOnlyKeys("status", "invitedAt", "acceptedAt");
+        assertThat(body)
+                .doesNotContain("directora")
+                .doesNotContain("Directora")
+                .doesNotContain("Pruebas")
+                .doesNotContain(admin.toString());
+    }
+
+    @Test
+    void theStatusOfAnUnknownClinicIsNotFound() {
+        assertThat(status(UUID.fromString("0190a6e8-0000-7000-8000-0000000000aa")))
+                .hasStatus(HttpStatus.NOT_FOUND);
+    }
+
+    /** An administrator added by hand (a seed) counts as accepted, as one who accepted an invitation. */
+    @Test
+    void aClinicWithAnAcceptedAdministratorIsAccepted() throws SQLException {
+        IdentityTestDatabase.insertUser(CLINIC_ADMIN);
+        IdentityTestDatabase.insertMembership(CLINIC_A, CLINIC_ADMIN, ClinicRole.ADMIN_CLINICA, true);
+
+        MvcTestResult accepted = status(CLINIC_A);
+
+        assertStatus(accepted, "ACCEPTED");
+        assertThat(accepted).bodyJson().extractingPath("$.acceptedAt").isNotNull();
+    }
+
+    private MvcTestResult status(UUID clinic) {
+        return platform(mvc.get().uri(CLINICS + "/" + clinic + "/admin-invitation"));
+    }
+
+    private static void assertStatus(MvcTestResult result, String status) {
+        assertThat(result).hasStatusOk();
+        assertThat(result).bodyJson().extractingPath("$.status").isEqualTo(status);
     }
 
     @Test

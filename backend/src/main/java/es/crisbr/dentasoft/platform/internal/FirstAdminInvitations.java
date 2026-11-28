@@ -2,8 +2,10 @@ package es.crisbr.dentasoft.platform.internal;
 
 import es.crisbr.dentasoft.identity.FirstAdminInvitees;
 import es.crisbr.dentasoft.identity.FirstAdminInvitees.Invitee;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +30,25 @@ public class FirstAdminInvitations {
         this.invitees = invitees;
     }
 
+    /** Whether the clinic has an administrator, accepted or invited. */
+    public enum AdminInvitationState {
+        /** No administrator and no pending invitation: the platform may invite one. */
+        NONE,
+        /** An invitation the person has not accepted yet: the platform may resend or cancel it. */
+        PENDING,
+        /** The clinic has an administrator, who invites everyone else: the platform is out of it. */
+        ACCEPTED
+    }
+
+    /**
+     * What the platform sees of the invitation: never who it was sent to. {@code invitedAt} is set while it is pending
+     * ({@code updated_at}, V013); {@code acceptedAt}, once accepted.
+     */
+    public record AdminInvitationStatus(
+            AdminInvitationState status,
+            @Nullable Instant invitedAt,
+            @Nullable Instant acceptedAt) {}
+
     /** What the platform administrator types; already validated by the web layer. */
     public record NewAdministrator(String email, String firstName, String lastName) {
 
@@ -36,6 +57,15 @@ public class FirstAdminInvitations {
         public String toString() {
             return "NewAdministrator[…]";
         }
+    }
+
+    /**
+     * Whether the clinic has an administrator, a pending invitation or neither, and when; never who it is.
+     *
+     * @throws ClinicNotFoundException 404 if there is no such clinic
+     */
+    public AdminInvitationStatus status(UUID clinicId) {
+        return memberships.status(clinicId);
     }
 
     /**

@@ -3,13 +3,19 @@ package es.crisbr.dentasoft.platform.internal;
 import es.crisbr.dentasoft.audit.AuditAction;
 import es.crisbr.dentasoft.audit.AuditDetails;
 import es.crisbr.dentasoft.audit.AuditSubtype;
+import es.crisbr.dentasoft.platform.internal.FirstAdminInvitations.AdminInvitationState;
+import es.crisbr.dentasoft.platform.internal.FirstAdminInvitations.AdminInvitationStatus;
 import es.crisbr.dentasoft.platform.persistence.PlatformAdminMembership;
 import es.crisbr.dentasoft.platform.persistence.PlatformAdminMemberships;
 import es.crisbr.dentasoft.platform.persistence.PlatformAuditRecord;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinics;
 import es.crisbr.dentasoft.tenancy.TenantContext;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -94,6 +100,31 @@ class FirstAdminMemberships {
                 clinicId, id, action, AuditDetails.of(AuditSubtype.FIRST_ADMIN_INVITED)));
         memberships.flush();
         return id;
+    }
+
+    /**
+     * Whether the clinic has an administrator: accepted (when), a pending invitation (when it was sent) or none. A
+     * cancelled invitation counts as none. With several accepted administrators, the date is the first acceptance.
+     *
+     * @throws ClinicNotFoundException if there is no clinic with {@code clinicId}
+     */
+    @Transactional(value = PlatformPersistenceConfiguration.TRANSACTION_MANAGER, readOnly = true)
+    AdminInvitationStatus status(UUID clinicId) {
+        List<PlatformAdminMembership> active = adminsOf(clinicId).stream()
+                .filter(PlatformAdminMembership::isActive)
+                .toList();
+        Optional<Instant> firstAcceptance = active.stream()
+                .map(PlatformAdminMembership::getAcceptedAt)
+                .filter(Objects::nonNull)
+                .map(OffsetDateTime::toInstant)
+                .min(Comparator.naturalOrder());
+        if (firstAcceptance.isPresent()) {
+            return new AdminInvitationStatus(AdminInvitationState.ACCEPTED, null, firstAcceptance.get());
+        }
+        return active.stream()
+                .findFirst()
+                .map(pending -> new AdminInvitationStatus(AdminInvitationState.PENDING, pending.getUpdatedAt(), null))
+                .orElse(new AdminInvitationStatus(AdminInvitationState.NONE, null, null));
     }
 
     /**

@@ -1,9 +1,11 @@
 package es.crisbr.dentasoft.platform.web;
 
 import es.crisbr.dentasoft.platform.internal.FirstAdminInvitations;
+import es.crisbr.dentasoft.platform.internal.FirstAdminInvitations.AdminInvitationStatus;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,6 +26,12 @@ class FirstAdminInvitationController {
 
     FirstAdminInvitationController(FirstAdminInvitations invitations) {
         this.invitations = invitations;
+    }
+
+    /** NONE, PENDING (with when it was sent) or ACCEPTED (with when): never the person's name or email. */
+    @GetMapping
+    AdminInvitationStatus status(@PathVariable UUID id) {
+        return invitations.status(id);
     }
 
     /**
