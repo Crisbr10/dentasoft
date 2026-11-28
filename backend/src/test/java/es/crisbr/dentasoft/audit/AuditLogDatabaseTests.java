@@ -22,12 +22,12 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * {@code audit_log} at the database (V004): the application may only insert, under its active clinic, and neither
- * the clinic, the time nor the details are its to choose; nobody, not even the owner, may change or delete an entry;
+ * {@code audit_log} at the database (V004, V014): the application may insert and read only under its active clinic,
+ * and neither the clinic, the time nor the details are its to choose; nobody, not even the owner, may change or delete an entry;
  * and the platform may only record what it does to a clinic.
  *
  * <p>Not a {@code TenantIsolationTest}: that template stores and changes rows through JPA and checks that another
- * clinic cannot update or delete them, and here nobody can read, update or delete at all. These tests cover the same
+ * clinic cannot update or delete them, and here nobody can update or delete at all. These tests cover the same
  * ground for an insert-only table. No clinic rows are needed: the log has no foreign key to {@code clinic}.
  */
 @IntegrationTest
@@ -98,14 +98,30 @@ class AuditLogDatabaseTests {
         }
     }
 
+    /** V014: an administrator consults the log of the active clinic (M01-T09), and Row Level Security hides the rest. */
     @Test
-    void theApplicationCannotReadChangeOrDeleteEntries() throws SQLException {
+    void theApplicationReadsOnlyTheEntriesOfItsActiveClinic() throws SQLException {
+        UUID entity = UUID.randomUUID();
+        try (Connection connection = connectAsApplication()) {
+            setSessionClinic(connection, clinicA);
+            insert(connection, "SYSTEM", "READ", "CLINIC", entity);
+            assertThat(countEntries(connection, entity)).isOne();
+
+            setSessionClinic(connection, clinicB);
+            assertThat(countEntries(connection, entity)).isZero();
+        }
+        try (Connection connection = connectAsApplication()) {
+            assertThat(countEntries(connection, entity)).isZero();
+        }
+    }
+
+    @Test
+    void theApplicationCannotChangeOrDeleteEntries() throws SQLException {
         UUID entity = UUID.randomUUID();
         try (Connection connection = connectAsApplication()) {
             setSessionClinic(connection, clinicA);
             insert(connection, "SYSTEM", "READ", "CLINIC", entity);
 
-            assertRejected(connection, INSUFFICIENT_PRIVILEGE, "SELECT count(*) FROM audit_log");
             assertRejected(connection, INSUFFICIENT_PRIVILEGE, "UPDATE audit_log SET outcome = 'DENIED'");
             assertRejected(connection, INSUFFICIENT_PRIVILEGE, "DELETE FROM audit_log");
             assertRejected(connection, INSUFFICIENT_PRIVILEGE, "TRUNCATE audit_log");
@@ -186,6 +202,17 @@ class AuditLogDatabaseTests {
         }
         try (Connection connection = connectAsPlatform()) {
             assertFails(CHECK_VIOLATION, () -> insertWithDetails(connection, clinicA, "\"texto libre\""));
+        }
+    }
+
+    private static long countEntries(Connection connection, UUID entity) throws SQLException {
+        try (PreparedStatement statement =
+                connection.prepareStatement("SELECT count(*) FROM audit_log WHERE entity_id = ?")) {
+            statement.setObject(1, entity);
+            try (ResultSet rows = statement.executeQuery()) {
+                rows.next();
+                return rows.getLong(1);
+            }
         }
     }
 
