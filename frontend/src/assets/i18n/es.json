@@ -37,8 +37,89 @@
     "empty": "Todavía no perteneces a ninguna clínica. Pide a quien administra tu clínica que te invite."
   },
   "platform": {
-    "title": "Administración de la plataforma",
-    "intro": "Desde aquí se darán de alta y se gestionarán las clínicas."
+    "title": "Clínicas",
+    "intro": "Da de alta las clínicas, suspéndelas o reactívalas, corrige sus datos fiscales e invita a su primer administrador.",
+    "list": {
+      "caption": "Clínicas dadas de alta",
+      "name": "Nombre",
+      "taxId": "CIF o NIF",
+      "status": "Estado",
+      "actions": "Acciones",
+      "manage": "Gestionar",
+      "manageLabel": "Gestionar {{name}}",
+      "loading": "Cargando las clínicas…",
+      "loadError": "No se han podido cargar las clínicas.",
+      "retry": "Volver a intentarlo",
+      "empty": "Todavía no hay ninguna clínica dada de alta."
+    },
+    "status": {
+      "ACTIVE": "Activa",
+      "SUSPENDED": "Suspendida"
+    },
+    "paginator": {
+      "label": "Páginas de clínicas",
+      "itemsPerPage": "Clínicas por página",
+      "first": "Primera página",
+      "previous": "Página anterior",
+      "next": "Página siguiente",
+      "last": "Última página",
+      "range": "{{start}}–{{end}} de {{total}}",
+      "empty": "0 de 0"
+    },
+    "fields": {
+      "name": "Nombre comercial",
+      "legalName": "Razón social",
+      "taxId": "CIF, NIF o NIE",
+      "email": "Email",
+      "firstName": "Nombre",
+      "lastName": "Apellidos"
+    },
+    "errors": {
+      "required": "Este campo es obligatorio.",
+      "maxlength": "Escribe como máximo {{max}} caracteres.",
+      "email": "Escribe un email válido.",
+      "taxId": "No es un CIF, NIF o NIE válido: revisa el formato y la letra o el dígito de control."
+    },
+    "create": {
+      "title": "Nueva clínica",
+      "intro": "La zona horaria y el idioma se configuran después, en la propia clínica."
+    },
+    "panel": {
+      "status": "Estado: {{status}}",
+      "suspend": "Suspender",
+      "reactivate": "Reactivar",
+      "suspending": "Suspendiendo…",
+      "reactivating": "Reactivando…",
+      "suspendConfirm": {
+        "title": "¿Suspender la clínica?",
+        "message": "Nadie de {{name}} podrá trabajar en ella hasta que la reactives.",
+        "confirm": "Suspender"
+      },
+      "suspended": "La clínica está suspendida.",
+      "reactivated": "La clínica vuelve a estar activa."
+    },
+    "fiscal": {
+      "title": "Datos fiscales",
+      "saved": "Datos fiscales corregidos."
+    },
+    "admin": {
+      "title": "Primer administrador",
+      "loading": "Consultando la invitación…",
+      "retry": "Volver a intentarlo",
+      "none": "Todavía no se ha invitado a ningún administrador. Indica a quién invitar:",
+      "pending": "Invitación enviada el {{date}}. Pendiente de aceptar.",
+      "accepted": "El administrador aceptó la invitación el {{date}}.",
+      "resend": "Reenviar",
+      "cancel": "Cancelar invitación",
+      "cancelConfirm": {
+        "title": "¿Cancelar la invitación?",
+        "message": "La invitación dejará de ser válida. Después podrás invitar a otra persona.",
+        "confirm": "Cancelar invitación"
+      },
+      "invited": "Invitación enviada.",
+      "resent": "Invitación reenviada.",
+      "cancelled": "Invitación cancelada."
+    }
   },
   "home": {
     "title": "Inicio",

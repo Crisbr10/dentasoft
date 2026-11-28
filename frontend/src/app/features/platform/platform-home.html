@@ -1,0 +1,96 @@
+<h2>{{ 'platform.title' | transloco }}</h2>
+<p>{{ 'platform.intro' | transloco }}</p>
+
+<section class="platform__clinics">
+  @if (loading()) {
+    <p class="platform__status" role="status">
+      <mat-spinner diameter="20" aria-hidden="true" />
+      <span>{{ 'platform.list.loading' | transloco }}</span>
+    </p>
+  } @else if (loadFailed()) {
+    <p role="alert">{{ 'platform.list.loadError' | transloco }}</p>
+    <button mat-stroked-button type="button" (click)="load(pageIndex())">
+      <mat-icon svgIcon="refresh" />
+      {{ 'platform.list.retry' | transloco }}
+    </button>
+  }
+
+  @if (page(); as page) {
+    @if (page.content.length > 0) {
+      <div
+        class="platform__table-wrapper"
+        tabindex="0"
+        role="region"
+        [attr.aria-labelledby]="'platform-clinics-caption'"
+      >
+        <table class="platform__table">
+          <caption id="platform-clinics-caption">
+            {{
+              'platform.list.caption' | transloco
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th [attr.scope]="'col'">{{ 'platform.list.name' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'platform.list.taxId' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'platform.list.status' | transloco }}</th>
+              <th [attr.scope]="'col'">{{ 'platform.list.actions' | transloco }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (clinic of page.content; track clinic.id) {
+              <tr
+                [attr.data-clinic]="clinic.id"
+                [attr.aria-current]="clinic.id === selected()?.id ? 'true' : null"
+              >
+                <th [attr.scope]="'row'">{{ clinic.name }}</th>
+                <td [attr.data-label]="'platform.list.taxId' | transloco">{{ clinic.taxId }}</td>
+                <td [attr.data-label]="'platform.list.status' | transloco">
+                  <span class="platform__state" [attr.data-status]="clinic.status">
+                    {{ 'platform.status.' + clinic.status | transloco }}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    mat-button
+                    type="button"
+                    class="platform__manage"
+                    [attr.aria-label]="
+                      'platform.list.manageLabel' | transloco: { name: clinic.name }
+                    "
+                    (click)="select(clinic)"
+                  >
+                    {{ 'platform.list.manage' | transloco }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <mat-paginator
+        [attr.aria-label]="'platform.paginator.label' | transloco"
+        [length]="page.page.totalElements"
+        [pageIndex]="page.page.number"
+        [pageSize]="pageSize"
+        [hidePageSize]="true"
+        [disabled]="loading()"
+        (page)="changePage($event)"
+      />
+    } @else {
+      <p class="platform__empty" role="status">{{ 'platform.list.empty' | transloco }}</p>
+    }
+  }
+</section>
+
+@if (selected(); as clinic) {
+  @for (current of [clinic]; track current.id) {
+    <section class="platform__panel">
+      <app-clinic-panel [clinic]="current" (changed)="changed($event)" />
+    </section>
+  }
+}
+
+<section class="platform__new">
+  <app-new-clinic-form (created)="created($event)" />
+</section>

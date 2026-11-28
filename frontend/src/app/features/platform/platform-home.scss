@@ -1,0 +1,96 @@
+.platform__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.platform__panel,
+.platform__new {
+  margin-block-start: 32px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--mat-sys-outline-variant);
+}
+
+// Responsive table (Modern Web Guidance): the wrapper scrolls, can be reached with the keyboard
+// and adapts to its own width; the clinic name stays visible as the row header.
+.platform__table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  container-type: inline-size;
+}
+
+.platform__table {
+  inline-size: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+
+  caption {
+    text-align: start;
+    font: var(--mat-sys-title-small);
+    padding-block-end: 8px;
+  }
+
+  th,
+  td {
+    padding: 8px 12px;
+    text-align: start;
+    border-block-end: 1px solid var(--mat-sys-outline-variant);
+    white-space: nowrap;
+  }
+
+  thead th {
+    font: var(--mat-sys-label-large);
+  }
+
+  tbody th {
+    position: sticky;
+    inset-inline-start: 0;
+    background: var(--mat-sys-surface);
+    font-weight: 500;
+  }
+
+  tr[aria-current='true'] > * {
+    background: var(--mat-sys-secondary-container);
+  }
+}
+
+.platform__state[data-status='SUSPENDED'] {
+  color: var(--mat-sys-error);
+}
+
+@container (width < 600px) {
+  .platform__table {
+    &,
+    thead,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+
+    thead {
+      display: none;
+    }
+
+    tr {
+      margin-block-end: 16px;
+      border: 1px solid var(--mat-sys-outline-variant);
+    }
+
+    th,
+    td {
+      white-space: normal;
+    }
+
+    tbody th {
+      position: static;
+    }
+
+    // The column headers are hidden: each cell says what it is.
+    td[data-label]::before {
+      content: attr(data-label) ': ';
+      font-weight: 500;
+    }
+  }
+}

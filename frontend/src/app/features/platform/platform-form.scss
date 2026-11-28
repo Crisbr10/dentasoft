@@ -1,0 +1,22 @@
+// The forms of the platform screens: one column, each field as wide as the form.
+.platform-form {
+  display: flex;
+  flex-direction: column;
+  max-inline-size: 32rem;
+}
+
+.platform-notice:empty {
+  margin: 0;
+}
+
+.first-admin__state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.first-admin__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
