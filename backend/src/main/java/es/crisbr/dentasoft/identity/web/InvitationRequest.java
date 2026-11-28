@@ -3,6 +3,7 @@ package es.crisbr.dentasoft.identity.web;
 import es.crisbr.dentasoft.identity.ClinicRole;
 import es.crisbr.dentasoft.identity.internal.ClinicUsers.Invitation;
 import es.crisbr.dentasoft.shared.NoControlCharacters;
+import es.crisbr.dentasoft.shared.PersonNames;
 import es.crisbr.dentasoft.shared.StrictEmail;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -28,16 +29,10 @@ public record InvitationRequest(
 
         @NotNull ClinicRole role) {
 
-    /**
-     * At least one letter, and no format characters (U+200B zero-width space, U+202E right-to-left override…), which
-     * {@code @NoControlCharacters} lets through: a name of only Unicode spaces would be blank once stripped, and format
-     * characters can disguise what a name looks like. Except the zero-width non-joiner and joiner (U+200C, U+200D)
-     * between two letters or marks, where Persian and Indic scripts need them in real names.
-     */
-    static final String PERSON_NAME =
-            "(?=.*\\p{L})(?:[^\\p{Cf}]|(?<=[\\p{L}\\p{M}])[\\u200C\\u200D](?=[\\p{L}\\p{M}]))*";
+    /** @see PersonNames#PATTERN */
+    static final String PERSON_NAME = PersonNames.PATTERN;
 
-    static final String PERSON_NAME_MESSAGE = "{es.crisbr.dentasoft.identity.PersonName.message}";
+    static final String PERSON_NAME_MESSAGE = PersonNames.MESSAGE;
 
     Invitation toInvitation() {
         return new Invitation(email.toLowerCase(Locale.ROOT), firstName.strip(), lastName.strip(), role);
