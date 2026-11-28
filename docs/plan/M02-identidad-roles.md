@@ -151,10 +151,16 @@ La matriz detallada de permisos por endpoint se mantiene en este fichero a medid
 
 - **Estado**: pendiente
 - **Depende de**: M02-T05, M02-T06, M02-T09, M02-T11, M01-T05
-- **Descripción**: pantallas para `PLATFORM_ADMIN` (clínicas, con la invitación del primer administrador de M02-T11) y, dentro del apartado de Configuración (M02-T09), para `ADMIN_CLINICA` (usuarios, roles y profesionales), con el cliente generado (`pnpm api:gen`). Los gabinetes no entran: son de la sección «Clínica» (M01-T10).
+- **Descripción**: pantallas para `PLATFORM_ADMIN` (clínicas, con la invitación del primer administrador de M02-T11 y la corrección de los datos fiscales de M01-T11) y, dentro del apartado de Configuración (M02-T09), para `ADMIN_CLINICA` (usuarios, roles y profesionales), con el cliente generado (`pnpm api:gen`). Los gabinetes no entran: son de la sección «Clínica» (M01-T10).
 - **Criterios de aceptación**:
   - [ ] Textos con Transloco y formularios validados
   - [ ] Flujo completo: crear clínica → invitar administrador → el administrador invita a un odontólogo. Se cubre con tests de componentes y con el test de integración del backend de M02-T11, y se comprueba a mano en local (anotado en el PR). El test de extremo a extremo es M03-T07.
+- **Notas**:
+  - **Pantallas**: `/configuracion/plataforma` (`features/platform`), `/configuracion/usuarios` (`features/clinic-users`) y `/configuracion/profesionales` (`features/practitioners`, de solo lectura para los roles con acceso `VIEW`).
+  - **Datos fiscales**: el CIF, NIF o NIE se valida y se normaliza en el formulario como en el backend (`shared/forms/tax-id.ts`, con los mismos casos que `SpanishTaxIdTests`).
+  - **OpenAPI**: los dos `ClinicDetails` se publican como `PlatformClinicDetails` y `ClinicConfigurationDetails` (`ApiDocsLocalProfileTests`).
+  - **Errores**: los formularios y las acciones muestran el `ProblemDetail` del backend, que ya viene traducido; los endpoints sin cuerpo lo reciben como texto y `toSaveFailure` lo interpreta.
+  - **Orden de las listas**: el cliente generado codifica dos veces la coma de `sort` (#160), así que las listas usan el orden por defecto del backend.
 
 ### M02-T09 · Apartado de Configuración
 
