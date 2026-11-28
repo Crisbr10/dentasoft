@@ -240,8 +240,8 @@
         "confirm": "Desactivar"
       },
       "notices": {
-        "created": "Gabinete {{name}} añadido.",
-        "updated": "Gabinete {{name}} guardado.",
+        "created": "{{name}} se ha añadido a los gabinetes.",
+        "updated": "Datos de {{name}} guardados.",
         "deactivated": "{{name}} ya no se ofrece para citas nuevas.",
         "activated": "{{name}} vuelve a ofrecerse para citas nuevas."
       },

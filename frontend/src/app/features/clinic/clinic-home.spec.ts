@@ -13,6 +13,7 @@ import { ClinicConfigurationDetails } from '../../api/models/clinic-configuratio
 import { LocationDetails } from '../../api/models/location-details';
 import { SettingsDetails } from '../../api/models/settings-details';
 import { Slot } from '../../api/models/slot';
+import { ActiveClinic } from '../../core/clinic/active-clinic';
 import { ConfigurationSections, SectionAccess } from '../configuration/configuration-sections';
 import { ClinicHome } from './clinic-home';
 
@@ -205,6 +206,7 @@ describe('ClinicHome', () => {
 
     it('saves the name and time zone with the version it read', async () => {
       await show();
+      const renamed = vi.spyOn(TestBed.inject(ActiveClinic), 'renamed');
 
       await type(field(data(), 'name'), '  Clínica Prueba Centro ');
       await save(data());
@@ -223,6 +225,8 @@ describe('ClinicHome', () => {
         );
       });
       expect(field(data(), 'name').value).toBe('Clínica Prueba Centro');
+      // The header shows the new name at once.
+      expect(renamed).toHaveBeenCalledWith('c-1', 'Clínica Prueba Centro');
     });
 
     it('offers the zones of the browser, filtered as the user types', async () => {
@@ -527,10 +531,55 @@ describe('ClinicHome', () => {
       await vi.waitFor(async () => {
         await settle();
         expect(rooms().querySelector('.clinic-locations__outcome')?.textContent).toContain(
-          'Gabinete Gabinete 3 añadido.',
+          'Gabinete 3 se ha añadido a los gabinetes.',
         );
       });
       expect(field(form, 'name').value).toBe('');
+    });
+
+    it('adds a room with Enter, and leaves the empty form without errors', async () => {
+      await show();
+
+      const form = rooms().querySelector('app-location-form') as HTMLElement;
+      await type(field(form, 'name'), 'Gabinete 3');
+      form.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
+      (await expectRequest('POST', LOCATIONS)).flush({
+        id: 'l-3',
+        name: 'Gabinete 3',
+        color: '#1E88E5',
+        status: 'ACTIVE',
+      });
+      (await expectRequest('GET', LOCATIONS)).flush(page([ROOM_1, ROOM_2]));
+
+      await vi.waitFor(async () => {
+        await settle();
+        expect(field(form, 'name').value).toBe('');
+      });
+      expect(errorsOf(form)).toBe('');
+      expect(field(form, 'name').getAttribute('aria-invalid')).not.toBe('true');
+    });
+
+    it('saves an edited room with Enter, and the new-room form shows no errors', async () => {
+      await show();
+
+      click(row('l-2'), es.clinic.locations.actions.edit);
+      await settle();
+      const form = rooms().querySelector('app-location-form') as HTMLElement;
+      await type(field(form, 'name'), 'Gabinete Sur');
+      form.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }));
+      (await expectRequest('PUT', `${LOCATIONS}/l-2`)).flush({
+        ...ROOM_2,
+        name: 'Gabinete Sur',
+        color: '#1E88E5',
+        version: 4,
+      });
+
+      await vi.waitFor(async () => {
+        await settle();
+        expect(form.textContent).toContain(es.clinic.locations.form.newTitle);
+      });
+      expect(field(form, 'name').value).toBe('');
+      expect(errorsOf(form)).toBe('');
     });
 
     it('shows a repeated name in the form', async () => {

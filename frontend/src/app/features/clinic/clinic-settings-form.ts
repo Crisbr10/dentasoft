@@ -72,7 +72,7 @@ import {
           [attr.aria-labelledby]="'clinic-settings-title'"
           [formGroup]="form"
         >
-          <mat-form-field>
+          <mat-form-field [subscriptSizing]="'dynamic'">
             <mat-label>{{ 'clinic.settings.appointmentMinutes' | transloco }}</mat-label>
             <input
               matInput
@@ -110,7 +110,7 @@ import {
             <mat-error><app-control-error [control]="form.controls.contactEmail" /></mat-error>
           </mat-form-field>
 
-          <mat-form-field>
+          <mat-form-field [subscriptSizing]="'dynamic'">
             <mat-label>{{ 'clinic.settings.contactPhone' | transloco }}</mat-label>
             <input matInput type="tel" formControlName="contactPhone" autocomplete="tel" />
             <mat-hint>{{ 'clinic.settings.contactPhoneHint' | transloco }}</mat-hint>

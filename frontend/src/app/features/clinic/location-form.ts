@@ -10,9 +10,16 @@ import {
   output,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import {
+  FormControl,
+  FormGroup,
+  FormGroupDirective,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -67,6 +74,7 @@ export interface SavedLocation {
       class="clinic-block__form"
       [attr.aria-labelledby]="'location-form-title'"
       [formGroup]="form"
+      (ngSubmit)="save()"
     >
       <mat-form-field>
         <mat-label>{{ 'clinic.locations.form.name' | transloco }}</mat-label>
@@ -150,6 +158,8 @@ export class LocationForm {
     { initialValue: false },
   );
 
+  private readonly formDirective = viewChild(FormGroupDirective);
+
   /** The room whose data the form shows; null for a new one. */
   private shownId: string | null = null;
 
@@ -165,6 +175,12 @@ export class LocationForm {
           return;
         }
         this.shownId = id;
+        // Leaving a field marks it as touched, and the list moves the focus to the room's row
+        // once the edit ends: leave it before the reset, so the empty new-room form shows no error.
+        const focused = document.activeElement;
+        if (focused instanceof HTMLElement && this.host.nativeElement.contains(focused)) {
+          focused.blur();
+        }
         this.fill(location);
         this.failure.set(null);
         if (location) {
@@ -181,6 +197,10 @@ export class LocationForm {
   }
 
   protected async save(): Promise<void> {
+    // Enter in the name field submits the form too: once is enough.
+    if (this.saving()) {
+      return;
+    }
     this.form.markAllAsTouched();
     if (this.form.invalid) {
       this.failure.set({ kind: 'validation' });
@@ -218,10 +238,18 @@ export class LocationForm {
   }
 
   private fill(location: LocationDetails | null): void {
-    this.form.reset({
+    const value = {
       name: location?.name ?? '',
       // The native picker only takes lower case.
       color: (location?.color ?? DEFAULT_COLOR).toLowerCase(),
-    });
+    };
+    // A submit with Enter leaves the form "submitted", and Material then marks every invalid
+    // field, even an empty one the user has not touched yet: resetForm clears that too.
+    const directive = this.formDirective();
+    if (directive?.submitted) {
+      directive.resetForm(value);
+    } else {
+      this.form.reset(value);
+    }
   }
 }

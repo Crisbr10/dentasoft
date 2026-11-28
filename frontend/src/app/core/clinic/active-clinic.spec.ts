@@ -82,6 +82,17 @@ describe('ActiveClinic', () => {
     expect(sessionStorage.getItem(ACTIVE_CLINIC_KEY)).toBe('b');
   });
 
+  it('shows the new name of a renamed clinic without reading /me again', async () => {
+    const clinic = create();
+    await load(clinic, { clinics: [CLINIC_A, CLINIC_B], invitations: [] });
+    clinic.select('a');
+
+    clinic.renamed('a', 'Clínica Norte Centro');
+
+    expect(clinic.current()?.name).toBe('Clínica Norte Centro');
+    expect(clinic.clinics().find((other) => other.clinicId === 'b')?.name).toBe('Clínica Sur');
+  });
+
   it('refuses a suspended clinic or one that is not the user’s', async () => {
     const clinic = create();
     await load(clinic, { clinics: [CLINIC_A, CLINIC_B, SUSPENDED], invitations: [] });

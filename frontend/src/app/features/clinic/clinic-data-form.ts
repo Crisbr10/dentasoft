@@ -23,6 +23,7 @@ import { Api } from '../../api/api';
 import { clinic } from '../../api/fn/clinic-configuration-controller/clinic';
 import { updateClinic } from '../../api/fn/clinic-configuration-controller/update-clinic';
 import { ClinicConfigurationDetails } from '../../api/models/clinic-configuration-details';
+import { ActiveClinic } from '../../core/clinic/active-clinic';
 import { ControlError } from '../../shared/forms/control-error';
 import { FormActions } from '../../shared/forms/form-actions';
 import { focusFirstInvalid } from '../../shared/forms/form-focus';
@@ -107,7 +108,7 @@ function normalized(text: string): string {
             {{ 'clinic.data.fiscalHint' | transloco }}
           </p>
 
-          <mat-form-field>
+          <mat-form-field [subscriptSizing]="'dynamic'">
             <mat-label>{{ 'clinic.data.timezone' | transloco }}</mat-label>
             <input
               matInput
@@ -165,6 +166,7 @@ function normalized(text: string): string {
 })
 export class ClinicDataForm implements OnInit {
   private readonly api = inject(Api);
+  private readonly activeClinic = inject(ActiveClinic);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** ADMIN_CLINICA (access EDIT) edits; the other roles only see the data. */
@@ -252,6 +254,10 @@ export class ClinicDataForm implements OnInit {
       });
       this.show(details);
       this.saved.set(true);
+      // The header names the active clinic: it shows the new name without a reload.
+      if (details.id && details.name) {
+        this.activeClinic.renamed(details.id, details.name);
+      }
     } catch (error) {
       this.failure.set(toSaveFailure(this.form, error));
       focusFirstInvalid(this.form, this.host.nativeElement);
