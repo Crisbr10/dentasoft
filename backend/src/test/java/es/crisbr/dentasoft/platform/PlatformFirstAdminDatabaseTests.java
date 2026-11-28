@@ -41,7 +41,7 @@ class PlatformFirstAdminDatabaseTests {
     private static final UUID ANA = UUID.fromString("7a1d0c00-0000-4000-8000-0000000000a1");
     private static final UUID BRUNO = UUID.fromString("7a1d0c00-0000-4000-8000-0000000000b2");
     private static final UUID CARLA = UUID.fromString("7a1d0c00-0000-4000-8000-0000000000c3");
-    private static final List<UUID> USERS = List.of(ANA, BRUNO, CARLA);
+    private static final List<UUID> USERS = List.of(ANA, BRUNO, CARLA, PLATFORM_ADMIN);
 
     private static final String INSUFFICIENT_PRIVILEGE = "42501";
     private static final String UNIQUE_VIOLATION = "23505";
@@ -198,6 +198,50 @@ class PlatformFirstAdminDatabaseTests {
         assertRejected(INSUFFICIENT_PRIVILEGE, () -> {
             try (Connection connection = platformTransaction()) {
                 update(connection, "UPDATE clinic_membership SET role = 'ODONTOLOGO' WHERE id = ?", invitation);
+            }
+        });
+    }
+
+    /**
+     * Once the clinic has an accepted administrator, the pending invitations left are the clinic's own (M02-T05): the
+     * trigger refuses cancelling them, although {@code platform_update} alone would let the platform.
+     */
+    @Test
+    void cannotCancelTheClinicsOwnInvitationOnceItHasAnAdministrator() throws SQLException {
+        IdentityTestDatabase.insertUser(CARLA);
+        IdentityTestDatabase.insertUser(BRUNO);
+        IdentityTestDatabase.insertMembership(CLINIC_A, CARLA, ClinicRole.ADMIN_CLINICA, true);
+        UUID coAdmin = IdentityTestDatabase.insertInvitation(CLINIC_A, BRUNO, ClinicRole.ADMIN_CLINICA);
+
+        assertRejected(INSUFFICIENT_PRIVILEGE, () -> setActive(coAdmin, false));
+        assertThat(IdentityTestDatabase.membership(CLINIC_A, BRUNO)).contains("ADMIN_CLINICA/true");
+    }
+
+    /** The platform administrator never gets a membership: they use a separate account to work in a clinic. */
+    @Test
+    void cannotInviteItself() throws SQLException {
+        assertRejected(INSUFFICIENT_PRIVILEGE, () -> {
+            try (Connection connection = platformTransaction()) {
+                createAccount(connection, PLATFORM_ADMIN);
+                insertMembership(connection, CLINIC_A, PLATFORM_ADMIN, "ADMIN_CLINICA");
+            }
+        });
+    }
+
+    /** In REPEATABLE READ the trigger's check would read an old snapshot after waiting for the lock: it refuses. */
+    @Test
+    void refusesToRunInRepeatableRead() throws SQLException {
+        assertRejected("25000", () -> {
+            try (Connection connection = connectAsPlatform()) {
+                connection.setAutoCommit(false);
+                connection.setTransactionIsolation(Connection.TRANSACTION_REPEATABLE_READ);
+                try (PreparedStatement statement =
+                        connection.prepareStatement("SELECT set_config('app.user_id', ?, true)")) {
+                    statement.setString(1, PLATFORM_ADMIN.toString());
+                    statement.execute();
+                }
+                createAccount(connection, ANA);
+                insertMembership(connection, CLINIC_A, ANA, "ADMIN_CLINICA");
             }
         });
     }

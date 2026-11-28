@@ -52,8 +52,9 @@ CREATE POLICY platform_select ON clinic_membership
     TO dentasoft_platform
     USING (role = 'ADMIN_CLINICA');
 
--- A new invitation: an active, pending ADMIN_CLINICA membership in the platform administrator's name. accepted_at is
--- not granted, so it is always NULL; the check repeats it.
+-- A new invitation: an active, pending ADMIN_CLINICA membership in the platform administrator's name, never for the
+-- platform administrator themselves (they use a separate account to work in a clinic, ADR 0016). accepted_at is not
+-- granted, so it is always NULL; the check repeats it.
 GRANT INSERT (id, tenant_id, user_id, role, active, created_at, created_by, updated_at, updated_by, version)
     ON clinic_membership TO dentasoft_platform;
 
@@ -66,6 +67,7 @@ CREATE POLICY platform_insert ON clinic_membership
         AND accepted_at IS NULL
         AND created_by = NULLIF(current_setting('app.user_id', true), '')::uuid
         AND updated_by = created_by
+        AND user_id <> NULLIF(current_setting('app.user_id', true), '')::uuid
     );
 
 -- Cancelling a pending invitation (active = false) or inviting the same person again (active = true). Only pending
@@ -84,14 +86,23 @@ CREATE POLICY platform_update ON clinic_membership
     );
 
 -- What a policy cannot express: "only while the clinic has no administrator", safely against concurrent requests. When
--- the platform makes an ADMIN_CLINICA membership active (a new invitation, or a cancelled one again), the trigger
--- first locks the clinic's row, so two of them for the same clinic run one after the other, and then refuses it if
--- the clinic already has an active ADMIN_CLINICA, accepted or pending. In READ COMMITTED each statement of the
--- function takes a new snapshot, so the second one, once the lock is free, sees the membership the first committed.
+-- the platform makes an ADMIN_CLINICA membership active (a new invitation, or a cancelled one again) or cancels one,
+-- the trigger first locks the clinic's row, so those changes for the same clinic run one after the other. Then:
 --
--- SECURITY INVOKER: it runs as the platform, under its policies and grants (SELECT … FOR UPDATE on clinic needs its
--- UPDATE privilege, and it sees every ADMIN_CLINICA membership). Other roles are not limited by it: an administrator
--- of the clinic (dentasoft_app) invites other administrators (M02-T05).
+-- - making one active is refused if the clinic already has an active ADMIN_CLINICA, accepted or pending;
+-- - cancelling is refused once the clinic has an accepted administrator: the pending invitations left are the clinic's
+--   own (M02-T05), which the platform does not touch.
+--
+-- In READ COMMITTED each statement of the function takes a new snapshot, so the second change, once the lock is free,
+-- sees what the first committed. In REPEATABLE READ it would not (the first only locked the row), so the trigger refuses
+-- to run there; SERIALIZABLE detects the conflict itself.
+--
+-- FOR NO KEY UPDATE, not FOR UPDATE: it serializes these changes without blocking the foreign key checks of other
+-- tables that reference the clinic (FOR KEY SHARE).
+--
+-- SECURITY INVOKER: it runs as the platform, under its policies and grants (locking the clinic's row needs its UPDATE
+-- privilege, and it sees every ADMIN_CLINICA membership). Other roles are not limited by it: an administrator of the
+-- clinic (dentasoft_app) invites and deactivates other administrators (M02-T05).
 CREATE FUNCTION guard_platform_first_admin()
     RETURNS trigger
     LANGUAGE plpgsql
@@ -99,18 +110,33 @@ CREATE FUNCTION guard_platform_first_admin()
 AS
 $$
 BEGIN
-    IF current_user <> 'dentasoft_platform' OR NOT NEW.active OR (TG_OP = 'UPDATE' AND OLD.active) THEN
+    IF current_user <> 'dentasoft_platform' OR (TG_OP = 'UPDATE' AND NEW.active = OLD.active)
+        OR (TG_OP = 'INSERT' AND NOT NEW.active) THEN
         RETURN NEW;
     END IF;
-    PERFORM 1 FROM public.clinic c WHERE c.id = NEW.tenant_id FOR UPDATE;
-    IF EXISTS (SELECT 1
-               FROM public.clinic_membership m
-               WHERE m.tenant_id = NEW.tenant_id
-                 AND m.role = 'ADMIN_CLINICA'
-                 AND m.active
-                 AND m.id <> NEW.id) THEN
-        RAISE EXCEPTION 'the clinic already has an administrator or a pending invitation of one'
-            USING ERRCODE = 'unique_violation', CONSTRAINT = 'clinic_first_admin';
+    IF current_setting('transaction_isolation') = 'repeatable read' THEN
+        RAISE EXCEPTION 'the first administrator of a clinic is changed in READ COMMITTED or SERIALIZABLE only'
+            USING ERRCODE = 'invalid_transaction_state';
+    END IF;
+    PERFORM 1 FROM public.clinic c WHERE c.id = NEW.tenant_id FOR NO KEY UPDATE;
+    IF NEW.active THEN
+        IF EXISTS (SELECT 1
+                   FROM public.clinic_membership m
+                   WHERE m.tenant_id = NEW.tenant_id
+                     AND m.role = 'ADMIN_CLINICA'
+                     AND m.active
+                     AND m.id <> NEW.id) THEN
+            RAISE EXCEPTION 'the clinic already has an administrator or a pending invitation of one'
+                USING ERRCODE = 'unique_violation', CONSTRAINT = 'clinic_first_admin';
+        END IF;
+    ELSIF EXISTS (SELECT 1
+                  FROM public.clinic_membership m
+                  WHERE m.tenant_id = NEW.tenant_id
+                    AND m.role = 'ADMIN_CLINICA'
+                    AND m.active
+                    AND m.accepted_at IS NOT NULL) THEN
+        RAISE EXCEPTION 'the clinic has an administrator: its invitations are its own'
+            USING ERRCODE = 'insufficient_privilege';
     END IF;
     RETURN NEW;
 END;

@@ -95,7 +95,8 @@ class RowLevelSecurityGuardTests {
                     "INSERT",
                     null,
                     "(((role)::text = 'ADMIN_CLINICA'::text) AND active AND (accepted_at IS NULL) AND (created_by = "
-                            + CURRENT_USER + ") AND (updated_by = created_by))"),
+                            + CURRENT_USER + ") AND (updated_by = created_by) AND (user_id <> " + CURRENT_USER
+                            + "))"),
             new AllowedPolicy(
                     "clinic_membership",
                     "platform_update",

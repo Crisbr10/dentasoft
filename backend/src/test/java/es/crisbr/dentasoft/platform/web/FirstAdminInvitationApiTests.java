@@ -295,6 +295,42 @@ class FirstAdminInvitationApiTests {
                 .doesNotContain(admin.toString());
     }
 
+    /**
+     * Once the clinic has an accepted administrator, its own pending invitations of other administrators (M02-T05)
+     * are not the platform's to resend or cancel.
+     */
+    @Test
+    void theClinicsOwnInvitationsAreNotThePlatforms() throws SQLException {
+        UUID coAdmin = keycloak.addUser("coadmin@clinica-a.test", "Co", "Pruebas", true, List.of());
+        IdentityTestDatabase.insertUser(CLINIC_ADMIN);
+        IdentityTestDatabase.insertUser(coAdmin);
+        IdentityTestDatabase.insertMembership(CLINIC_A, CLINIC_ADMIN, ClinicRole.ADMIN_CLINICA, true);
+        IdentityTestDatabase.insertInvitation(CLINIC_A, coAdmin, ClinicRole.ADMIN_CLINICA);
+
+        assertStatus(status(CLINIC_A), "ACCEPTED");
+        assertThat(platform(post(CLINICS + "/" + CLINIC_A + "/admin-invitation/resend")))
+                .hasStatus(HttpStatus.NOT_FOUND);
+        assertThat(platform(post(CLINICS + "/" + CLINIC_A + "/admin-invitation/cancellation")))
+                .hasStatus(HttpStatus.NOT_FOUND);
+
+        assertThat(IdentityTestDatabase.membership(CLINIC_A, coAdmin)).contains("ADMIN_CLINICA/true");
+        assertThat(keycloak.actionsEmails()).isEmpty();
+    }
+
+    /** Inviting the same person again after cancelling is a new invitation, with its own date. */
+    @Test
+    void aReactivatedInvitationHasTheDateOfTheNewInvitation() {
+        inviteAdmin(CLINIC_A, "directora@clinica-a.test");
+        Instant first = Instant.parse(JsonPath.read(body(status(CLINIC_A)), "$.invitedAt"));
+        platform(post(CLINICS + "/" + CLINIC_A + "/admin-invitation/cancellation"));
+
+        inviteAdmin(CLINIC_A, "directora@clinica-a.test");
+
+        MvcTestResult pending = status(CLINIC_A);
+        assertStatus(pending, "PENDING");
+        assertThat(Instant.parse(JsonPath.read(body(pending), "$.invitedAt"))).isAfter(first);
+    }
+
     @Test
     void theStatusOfAnUnknownClinicIsNotFound() {
         assertThat(status(UUID.fromString("0190a6e8-0000-7000-8000-0000000000aa")))

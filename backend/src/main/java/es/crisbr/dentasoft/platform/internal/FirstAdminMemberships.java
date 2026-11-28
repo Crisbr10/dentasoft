@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 class FirstAdminMemberships {
 
     private static final String UNIQUE_VIOLATION = "23505";
+
+    private static final String INSUFFICIENT_PRIVILEGE = "42501";
 
     private final PlatformClinics clinics;
     private final PlatformAdminMemberships memberships;
@@ -169,6 +172,12 @@ class FirstAdminMemberships {
             // Accepted or cancelled since it was read. PostgreSQL's USING (accepted_at IS NULL) also hides an accepted
             // one from the UPDATE, which Hibernate sees as a stale version.
             throw new FirstAdminInvitationNotFoundException();
+        } catch (DataAccessException refused) {
+            // V013's trigger: another administrator accepted meanwhile, so this invitation is the clinic's own now.
+            if (hasSqlState(refused, INSUFFICIENT_PRIVILEGE)) {
+                throw new FirstAdminInvitationNotFoundException();
+            }
+            throw refused;
         }
         memberships.add(PlatformAuditRecord.ofMembership(
                 clinicId,
@@ -181,8 +190,17 @@ class FirstAdminMemberships {
     /** The invitation to resend: the membership and its user. */
     record PendingInvitation(UUID membershipId, UUID userId) {}
 
+    /**
+     * The first administrator's pending invitation. Once the clinic has an accepted administrator there is none: the
+     * pending invitations left are the clinic's own (M02-T05), which the platform does not touch (PostgreSQL refuses
+     * cancelling them too, V013).
+     */
     private PlatformAdminMembership pendingOf(UUID clinicId) {
-        return adminsOf(clinicId).stream()
+        List<PlatformAdminMembership> admins = adminsOf(clinicId);
+        if (admins.stream().anyMatch(admin -> admin.isActive() && admin.isAccepted())) {
+            throw new FirstAdminInvitationNotFoundException();
+        }
+        return admins.stream()
                 .filter(admin -> admin.isActive() && !admin.isAccepted())
                 .findFirst()
                 .orElseThrow(FirstAdminInvitationNotFoundException::new);
@@ -203,7 +221,7 @@ class FirstAdminMemberships {
         } catch (DataIntegrityViolationException violation) {
             // The trigger's refusal (constraint clinic_first_admin), or UNIQUE (tenant_id, user_id): the same person
             // was invited at the same time. Either way the clinic has an administrator now.
-            if (isUniqueViolation(violation)) {
+            if (hasSqlState(violation, UNIQUE_VIOLATION)) {
                 throw new FirstAdminConflictException();
             }
             throw violation;
@@ -214,9 +232,9 @@ class FirstAdminMemberships {
     }
 
     /** Read from the SQLSTATE, not from the message, which is in the server's language. */
-    private static boolean isUniqueViolation(Throwable violation) {
-        for (Throwable cause = violation; cause != null; cause = cause.getCause()) {
-            if (cause instanceof SQLException sql && UNIQUE_VIOLATION.equals(sql.getSQLState())) {
+    private static boolean hasSqlState(Throwable failure, String sqlState) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SQLException sql && sqlState.equals(sql.getSQLState())) {
                 return true;
             }
         }
