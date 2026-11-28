@@ -228,6 +228,80 @@ class PlatformFirstAdminDatabaseTests {
         });
     }
 
+    /**
+     * With {@code app.tenant_id} set, {@code tenant_isolation} (TO PUBLIC) would let the platform reach every membership
+     * of the clinic and write any audit entry there. The restrictive {@code platform_without_clinic} leaves it nothing
+     * at all: it works without an active clinic, or not at all.
+     */
+    @Test
+    void withAnActiveClinicThePlatformGetsNothing() throws SQLException {
+        IdentityTestDatabase.insertUser(CARLA);
+        IdentityTestDatabase.insertUser(BRUNO);
+        UUID admin = IdentityTestDatabase.insertMembership(CLINIC_A, CARLA, ClinicRole.ADMIN_CLINICA, true);
+        IdentityTestDatabase.insertMembership(CLINIC_A, BRUNO, ClinicRole.ODONTOLOGO, true);
+
+        try (Connection connection = platformTransactionIn(CLINIC_A);
+                PreparedStatement read =
+                        connection.prepareStatement("SELECT count(*) FROM clinic_membership WHERE tenant_id = ?")) {
+            read.setObject(1, CLINIC_A);
+            try (ResultSet result = read.executeQuery()) {
+                result.next();
+                assertThat(result.getLong(1)).isZero();
+            }
+        }
+        try (Connection connection = platformTransactionIn(CLINIC_A);
+                PreparedStatement update = connection.prepareStatement(
+                        "UPDATE clinic_membership SET active = false, updated_by = ? WHERE id = ?")) {
+            update.setObject(1, PLATFORM_ADMIN);
+            update.setObject(2, admin);
+            assertThat(update.executeUpdate()).isZero();
+        }
+        assertRejected(INSUFFICIENT_PRIVILEGE, () -> {
+            try (Connection connection = platformTransactionIn(CLINIC_A)) {
+                insertMembership(connection, CLINIC_A, BRUNO, "ODONTOLOGO");
+            }
+        });
+        assertRejected(INSUFFICIENT_PRIVILEGE, () -> {
+            try (Connection connection = platformTransactionIn(CLINIC_A)) {
+                createAccount(connection, ANA);
+            }
+        });
+        assertRejected(INSUFFICIENT_PRIVILEGE, () -> {
+            try (Connection connection = platformTransactionIn(CLINIC_A)) {
+                insertAudit(connection, CLINIC_A, "PATIENT", UUID.randomUUID());
+            }
+        });
+        assertThat(IdentityTestDatabase.membership(CLINIC_A, CARLA)).contains("ADMIN_CLINICA/true");
+    }
+
+    /**
+     * {@code user_isolation} (TO PUBLIC) lets anyone create their own account: the restrictive
+     * {@code platform_insert_check} keeps the platform to active accounts created in its name.
+     */
+    @Test
+    void cannotCreateItsOwnAccountWithAnotherStatus() throws SQLException {
+        assertRejected(INSUFFICIENT_PRIVILEGE, () -> {
+            try (Connection connection = platformTransaction();
+                    PreparedStatement statement = connection.prepareStatement(
+                            "INSERT INTO user_account (id, status, created_at, updated_at) VALUES (?, 'DISABLED',"
+                                    + " now(), now())")) {
+                statement.setObject(1, PLATFORM_ADMIN);
+                statement.executeUpdate();
+            }
+        });
+    }
+
+    /** Not even making a cancelled membership of the platform administrator active again. */
+    @Test
+    void cannotReactivateAMembershipOfItsOwn() throws SQLException {
+        IdentityTestDatabase.insertUser(PLATFORM_ADMIN);
+        UUID own = IdentityTestDatabase.insertInvitation(CLINIC_A, PLATFORM_ADMIN, ClinicRole.ADMIN_CLINICA);
+        IdentityTestDatabase.setMembershipActive(CLINIC_A, PLATFORM_ADMIN, false);
+
+        assertRejected(INSUFFICIENT_PRIVILEGE, () -> setActive(own, true));
+        assertThat(IdentityTestDatabase.membership(CLINIC_A, PLATFORM_ADMIN)).contains("ADMIN_CLINICA/false");
+    }
+
     /** In REPEATABLE READ the trigger's check would read an old snapshot after waiting for the lock: it refuses. */
     @Test
     void refusesToRunInRepeatableRead() throws SQLException {
@@ -307,6 +381,16 @@ class PlatformFirstAdminDatabaseTests {
         connection.setAutoCommit(false);
         try (PreparedStatement statement = connection.prepareStatement("SELECT set_config('app.user_id', ?, true)")) {
             statement.setString(1, PLATFORM_ADMIN.toString());
+            statement.execute();
+        }
+        return connection;
+    }
+
+    /** A platform transaction with {@code app.tenant_id} set too, which the application never does. */
+    private static Connection platformTransactionIn(UUID clinic) throws SQLException {
+        Connection connection = platformTransaction();
+        try (PreparedStatement statement = connection.prepareStatement("SELECT set_config('app.tenant_id', ?, true)")) {
+            statement.setString(1, clinic.toString());
             statement.execute();
         }
         return connection;

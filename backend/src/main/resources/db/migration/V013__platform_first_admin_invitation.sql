@@ -22,6 +22,8 @@
 -- To undo it by hand, as the owner: DROP TRIGGER platform_first_admin ON clinic_membership; DROP FUNCTION
 -- guard_platform_first_admin(); DROP POLICY platform_select ON clinic_membership; DROP POLICY platform_insert ON
 -- clinic_membership; DROP POLICY platform_update ON clinic_membership; DROP POLICY platform_insert ON user_account;
+-- DROP POLICY platform_without_clinic ON clinic_membership; DROP POLICY platform_without_clinic ON user_account; DROP
+-- POLICY platform_without_clinic ON audit_log; DROP POLICY platform_insert_check ON user_account;
 -- REVOKE ALL ON clinic_membership, user_account FROM dentasoft_platform; REVOKE EXECUTE ON FUNCTION
 -- create_invited_user_account(uuid) FROM dentasoft_platform; and restore V004's platform_insert on audit_log with
 -- ALTER POLICY … WITH CHECK (…).
@@ -83,6 +85,7 @@ CREATE POLICY platform_update ON clinic_membership
     role = 'ADMIN_CLINICA'
         AND accepted_at IS NULL
         AND updated_by = NULLIF(current_setting('app.user_id', true), '')::uuid
+        AND user_id <> NULLIF(current_setting('app.user_id', true), '')::uuid
     );
 
 -- What a policy cannot express: "only while the clinic has no administrator", safely against concurrent requests. When
@@ -162,4 +165,44 @@ ALTER POLICY platform_insert ON audit_log
                         FROM clinic_membership m
                         WHERE m.id = audit_log.entity_id
                           AND m.tenant_id = audit_log.tenant_id)))
+    );
+
+-- The policies above are permissive, and PostgreSQL ORs them with tenant_isolation and user_isolation, which are TO
+-- PUBLIC. With app.tenant_id set, tenant_isolation would let the platform reach every membership of that clinic, of any
+-- role, and write audit entries of any kind there; with app.user_id set, user_isolation would let it create its own
+-- account with any status. The application never sets a clinic for the platform (ADR 0011), but any role can call
+-- set_config. Restrictive policies are ANDed with the permissive ones instead, so PostgreSQL itself keeps the platform
+-- to the rules above:
+--
+-- - platform_without_clinic: the platform works without an active clinic, or not at all;
+-- - platform_insert_check on user_account: an account it creates is always one it invites.
+CREATE POLICY platform_without_clinic ON clinic_membership
+    AS RESTRICTIVE
+    FOR ALL
+    TO dentasoft_platform
+    USING (NULLIF(current_setting('app.tenant_id', true), '') IS NULL)
+    WITH CHECK (NULLIF(current_setting('app.tenant_id', true), '') IS NULL);
+
+CREATE POLICY platform_without_clinic ON user_account
+    AS RESTRICTIVE
+    FOR ALL
+    TO dentasoft_platform
+    USING (NULLIF(current_setting('app.tenant_id', true), '') IS NULL)
+    WITH CHECK (NULLIF(current_setting('app.tenant_id', true), '') IS NULL);
+
+CREATE POLICY platform_without_clinic ON audit_log
+    AS RESTRICTIVE
+    FOR ALL
+    TO dentasoft_platform
+    USING (NULLIF(current_setting('app.tenant_id', true), '') IS NULL)
+    WITH CHECK (NULLIF(current_setting('app.tenant_id', true), '') IS NULL);
+
+CREATE POLICY platform_insert_check ON user_account
+    AS RESTRICTIVE
+    FOR INSERT
+    TO dentasoft_platform
+    WITH CHECK (
+    status = 'ACTIVE'
+        AND created_by = NULLIF(current_setting('app.user_id', true), '')::uuid
+        AND updated_by = created_by
     );

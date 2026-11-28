@@ -44,7 +44,14 @@ import org.springframework.test.web.servlet.assertj.MvcTestResult;
 @AutoConfigureMockMvc
 class FirstAdminInvitationApiTests {
 
-    private static final UUID CLINIC_A = TestData.CLINIC_A.id();
+    /**
+     * A clinic of its own, not {@code TestData}'s: invitations count against the clinic's daily quota, and while Redis
+     * is unavailable the limiter keeps it in memory, where deleting the Redis keys does not reset it for other classes.
+     */
+    private static final TestData.Clinic CLINIC = new TestData.Clinic(
+            UUID.fromString("7a1d0c00-0000-7000-8000-0000000000c1"), "Clínica Primer Administrador");
+
+    private static final UUID CLINIC_A = CLINIC.id();
     private static final UUID PLATFORM_ADMIN = UUID.fromString("7a1d0c00-0000-4000-8000-0000000001f1");
     private static final UUID CLINIC_ADMIN = UUID.fromString("7a1d0c00-0000-4000-8000-0000000001a1");
     private static final String CLINICS = "/api/v1/platform/clinics";
@@ -64,12 +71,12 @@ class FirstAdminInvitationApiTests {
     void seed() throws SQLException {
         keycloak.reset();
         deleteQuotas();
-        TenancyTestDatabase.insertClinic(TestData.CLINIC_A, "ACTIVE");
+        TenancyTestDatabase.insertClinic(CLINIC, "ACTIVE");
     }
 
     @AfterEach
     void deleteData() throws SQLException {
-        TenancyTestDatabase.deleteClinicsAnd(List.of("clinic_membership"));
+        TenancyTestDatabase.deleteClinicAnd(CLINIC_A, List.of("clinic_membership"));
         for (UUID clinic : createdClinics) {
             TenancyTestDatabase.deleteClinicAnd(clinic, List.of("clinic_membership", "clinic_settings"));
         }

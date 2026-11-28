@@ -17,9 +17,13 @@ Había que decidir con qué rol se crea la membresía, cómo impone PostgreSQL �
   - **en `user_account`**: `INSERT` de una cuenta activa en su nombre (`created_by = app.user_id`), con la política `platform_insert`, y `EXECUTE` de `create_invited_user_account` (V008, `SECURITY INVOKER`: se ejecuta con esa misma política). No lee, cambia ni borra cuentas;
   - **en `clinic_membership`**:
     - `SELECT` de `id`, `tenant_id`, `user_id`, `role`, `active`, `accepted_at`, `updated_at` y `version`, solo de las filas `ADMIN_CLINICA` (`platform_select`). Ve los ids de usuario de los administradores de todas las clínicas: nombres y emails siguen en Keycloak;
-    - `INSERT` de una membresía `ADMIN_CLINICA` activa y pendiente, en su nombre y nunca para sí mismo (`platform_insert`, `user_id <> app.user_id`): el administrador de plataforma usa otra cuenta para trabajar en una clínica (ADR 0016). No tiene permiso sobre `accepted_at`;
+    - `INSERT` de una membresía `ADMIN_CLINICA` activa y pendiente, en su nombre y nunca para sí mismo (`platform_insert`): el administrador de plataforma usa otra cuenta para trabajar en una clínica (ADR 0016). No tiene permiso sobre `accepted_at`;
     - `UPDATE` solo de `active` y de las columnas de auditoría, y solo de filas pendientes, antes y después del cambio (`platform_update`, `accepted_at IS NULL` en `USING` y `WITH CHECK`). Así cancela una invitación o vuelve a activar una cancelada. Nunca toca `accepted_at` ni `role`: aceptar es solo de la persona invitada (V009 y V011). Una membresía aceptada queda fuera de su alcance;
   - **en `audit_log`**: `platform_insert` admite también `entity_type = 'CLINIC_MEMBERSHIP'` cuando `entity_id` es una membresía de esa misma clínica (`tenant_id`).
+- **Políticas restrictivas para que nada más se sume.** Las políticas anteriores son permisivas, y PostgreSQL las combina con `OR` con `tenant_isolation` y `user_isolation`, que son `TO PUBLIC`. Con `app.tenant_id` fijado, la plataforma alcanzaría todas las membresías de esa clínica y podría escribir cualquier entrada de auditoría. Con `app.user_id`, podría crear su propia cuenta con cualquier estado. La aplicación nunca fija una clínica para la plataforma, pero cualquier rol puede llamar a `set_config`. Por eso V013 añade políticas `AS RESTRICTIVE TO dentasoft_platform`, que PostgreSQL combina con `AND`:
+  - `platform_without_clinic` en `clinic_membership`, `user_account` y `audit_log`: sin clínica activa o nada;
+  - `platform_insert_check` en `user_account`: solo cuentas activas creadas en su nombre.
+- **Nunca para sí mismo**: ni al invitar ni al reactivar (`user_id <> app.user_id` en `platform_insert` y `platform_update`).
 - **El trigger `platform_first_admin` impone la regla.** Cuando la plataforma activa una membresía de administrador (nueva o cancelada) o la cancela, el trigger bloquea antes la fila de `clinic` con `FOR NO KEY UPDATE`, que no bloquea las comprobaciones de claves foráneas de otras tablas. Después:
   - rechaza activarla si la clínica ya tiene un `ADMIN_CLINICA` activo, aceptado o pendiente (`unique_violation`, restricción `clinic_first_admin`);
   - rechaza cancelarla si la clínica ya tiene un administrador aceptado (`insufficient_privilege`): las invitaciones pendientes que quedan son de la propia clínica (M02-T05) y la plataforma no las toca. El servicio responde 404 antes de llegar ahí.
@@ -33,7 +37,7 @@ Había que decidir con qué rol se crea la membresía, cómo impone PostgreSQL �
 ## Consecuencias
 
 - **La regla la impone PostgreSQL, no el servicio.** Aunque falle el código, la plataforma no crea un segundo administrador ni acepta o cambia una membresía aceptada. `PlatformFirstAdminDatabaseTests` lo prueba por SQL, también con dos transacciones simultáneas.
-- **La plataforma ve más que antes**: los ids de usuario de los administradores, sin datos personales. `PlatformRoleTests` compara la lista completa de permisos y `RowLevelSecurityGuardTests` cada política, expresión a expresión.
+- **La plataforma ve más que antes**: los ids de usuario de los administradores, sin datos personales. `PlatformRoleTests` compara la lista completa de permisos y `RowLevelSecurityGuardTests` cada política, permisiva o restrictiva, expresión a expresión.
 - **`create_invited_user_account` es la única función que puede ejecutar la plataforma.** `PlatformRoleTests` lo fija.
 - **Invitar al primer administrador gasta cuota de la clínica**: la misma de 20 al día que usan sus administradores.
 - **Una clínica con su administrador aceptado ya no depende de la plataforma.** Si pierde el acceso de ese administrador (por ejemplo, porque deja la clínica sin nombrar a otro), la recuperación queda fuera de esta tarea.
