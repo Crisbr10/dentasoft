@@ -11,9 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The active clinic's opening hours, for {@code ADMIN_CLINICA} (M01-T06): read the week, or replace it whole. Closed to
- * every request until M02-T02 (see {@code TenancySecurityConfiguration}); authorization lives in {@link
- * ClinicOpeningHours}.
+ * The active clinic's opening hours (M01-T06): every role of the clinic reads the week and only {@code ADMIN_CLINICA}
+ * replaces it whole (M01-T10). Authorization lives in {@link ClinicOpeningHours}.
  */
 @RestController
 @RequestMapping(OpeningHoursController.PATH)

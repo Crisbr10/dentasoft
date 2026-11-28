@@ -13,11 +13,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The active clinic's opening hours, which {@code ADMIN_CLINICA} edits (M01-T06): its week, as slots of wall-clock
- * time in the clinic's time zone, several per day. The week is always replaced whole.
+ * The active clinic's opening hours, which {@code ADMIN_CLINICA} edits and every other role of the clinic only reads
+ * (M01-T06, M01-T10; see {@link ConfigurationRoles}): its week, as slots of wall-clock time in the clinic's time zone,
+ * several per day. The week is always replaced whole.
  */
 @Service
-@PreAuthorize("hasRole('ADMIN_CLINICA')")
+@PreAuthorize(ConfigurationRoles.ADMIN)
 public class ClinicOpeningHours {
 
     /** In order: by day, then by opening time. */
@@ -33,6 +34,7 @@ public class ClinicOpeningHours {
     }
 
     /** The week in order; empty while the clinic has not set its hours. */
+    @PreAuthorize(ConfigurationRoles.MEMBER)
     @Transactional(readOnly = true)
     public List<Slot> week() {
         return hours.findAllByOrderByDayOfWeekAscOpeningTimeAsc().stream()

@@ -11,9 +11,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The active clinic's data and settings, for {@code ADMIN_CLINICA} (M01-T06). There is no clinic id in the path: it is
- * always the clinic of {@code TenantContext}. Closed to every request until M02-T02 (see {@code
- * TenancySecurityConfiguration}); authorization lives in {@link ClinicConfiguration}.
+ * The active clinic's data and settings (M01-T06): every role of the clinic reads them and only {@code ADMIN_CLINICA}
+ * changes them (M01-T10). There is no clinic id in the path: it is always the clinic of {@code TenantContext}.
+ * Authorization lives in {@link ClinicConfiguration}.
  */
 @RestController
 @RequestMapping(ClinicConfigurationController.PATH)

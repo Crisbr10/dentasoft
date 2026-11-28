@@ -81,6 +81,19 @@ export class ActiveClinic {
     return before !== null && this.id() === before;
   }
 
+  /** One of the user's clinics has a new name (M01-T10): shown at once, without reading /me again. */
+  renamed(clinicId: string, name: string): void {
+    this.me.update(
+      (me) =>
+        me && {
+          ...me,
+          clinics: me.clinics?.map((clinic) =>
+            clinic.clinicId === clinicId ? { ...clinic, name } : clinic,
+          ),
+        },
+    );
+  }
+
   /** Accepts an invitation (M02-T05): the clinic is the user's from the next request. */
   async accept(invitationId: string): Promise<void> {
     await this.api.invoke(accept, { id: invitationId });

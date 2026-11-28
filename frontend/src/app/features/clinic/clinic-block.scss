@@ -1,0 +1,259 @@
+// Shared by the blocks of «Clínica» (M01-T10): each one is a component of its own, with these
+// styles encapsulated in it.
+
+:host {
+  display: block;
+}
+
+.clinic-block__form {
+  display: flex;
+  flex-direction: column;
+  max-inline-size: 32rem;
+}
+
+.clinic-block__loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clinic-block__hint {
+  margin-block: 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.clinic-block__error {
+  margin-block: 0 8px;
+  color: var(--mat-sys-error);
+  font: var(--mat-sys-body-small);
+  flex-basis: 100%;
+}
+
+.clinic-block__notice:empty {
+  margin: 0;
+}
+
+// Read-only data, for the roles that only see the section, and the fiscal data everyone sees.
+.clinic-block__values,
+.clinic-block__fiscal {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 16px;
+  margin-block: 0 16px;
+
+  dt {
+    font: var(--mat-sys-label-large);
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.clinic-block__fiscal {
+  margin-block-end: 4px;
+}
+
+.clinic-block__cancel {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: 8px;
+}
+
+// The colour is always written; the swatch only adds to it (Modern Web Guidance «color»).
+.clinic-block__color {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-block-end: 16px;
+
+  input[type='color'] {
+    inline-size: 3rem;
+    block-size: 2.5rem;
+    padding: 2px;
+    border: 1px solid var(--mat-sys-outline);
+    border-radius: 4px;
+    background: var(--mat-sys-surface);
+    // The swatch is the information: forced colours must not repaint it.
+    forced-color-adjust: none;
+  }
+}
+
+.clinic-block__swatch {
+  display: inline-block;
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  border: 1px solid var(--mat-sys-outline);
+  border-radius: 4px;
+  forced-color-adjust: none;
+}
+
+.clinic-block__color-value {
+  font-family: monospace;
+}
+
+// Opening hours: one fieldset per day, its slots in a row that wraps on narrow screens.
+.clinic-hours {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-inline-size: 40rem;
+}
+
+.clinic-hours__day {
+  margin: 0;
+  padding: 8px 0 16px;
+  border: none;
+  border-block-end: 1px solid var(--mat-sys-outline-variant);
+
+  legend {
+    font: var(--mat-sys-title-small);
+    padding: 0;
+  }
+}
+
+.clinic-hours__closed {
+  margin-block: 4px 8px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.clinic-hours__slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 12px;
+
+  mat-form-field {
+    inline-size: 9rem;
+  }
+}
+
+.clinic-hours__ranges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clinic-hours__table {
+  border-collapse: collapse;
+  margin-block-end: 16px;
+
+  caption {
+    text-align: start;
+    font: var(--mat-sys-title-small);
+    padding-block-end: 8px;
+  }
+
+  th,
+  td {
+    padding: 8px 12px;
+    text-align: start;
+    border-block-end: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  th {
+    font-weight: 500;
+  }
+}
+
+// Treatment rooms: the responsive table of the other configuration lists (Modern Web Guidance):
+// the wrapper scrolls, can be reached with the keyboard and adapts to its own width; the name stays
+// visible as row header.
+.clinic-locations__filter {
+  margin-block-end: 16px;
+}
+
+.clinic-locations__table-wrapper {
+  overflow: auto;
+  max-inline-size: 100%;
+  container-type: inline-size;
+}
+
+.clinic-locations__table {
+  inline-size: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+
+  caption {
+    text-align: start;
+    font: var(--mat-sys-title-small);
+    padding-block-end: 8px;
+  }
+
+  th,
+  td {
+    padding: 8px 12px;
+    text-align: start;
+    border-block-end: 1px solid var(--mat-sys-outline-variant);
+    white-space: nowrap;
+  }
+
+  thead th {
+    font: var(--mat-sys-label-large);
+  }
+
+  tbody th {
+    position: sticky;
+    inset-inline-start: 0;
+    background: var(--mat-sys-surface);
+    font-weight: 500;
+  }
+}
+
+.clinic-locations__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.clinic-locations__status[data-status='INACTIVE'] {
+  color: var(--mat-sys-error);
+}
+
+app-location-form {
+  display: block;
+  margin-block-start: 24px;
+}
+
+@container (width < 600px) {
+  .clinic-locations__table {
+    &,
+    thead,
+    tbody,
+    tr,
+    th,
+    td {
+      display: block;
+    }
+
+    thead {
+      display: none;
+    }
+
+    tr {
+      margin-block-end: 16px;
+      border: 1px solid var(--mat-sys-outline-variant);
+    }
+
+    th,
+    td {
+      white-space: normal;
+    }
+
+    tbody th {
+      position: static;
+    }
+
+    // The column headers are hidden: each cell says what it is.
+    td[data-label]::before {
+      content: attr(data-label) ': ';
+      font-weight: 500;
+    }
+  }
+}
