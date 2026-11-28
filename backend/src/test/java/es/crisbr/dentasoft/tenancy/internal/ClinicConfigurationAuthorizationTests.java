@@ -2,6 +2,7 @@ package es.crisbr.dentasoft.tenancy.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 import es.crisbr.dentasoft.IntegrationTest;
 import es.crisbr.dentasoft.TestData;
@@ -12,6 +13,8 @@ import es.crisbr.dentasoft.tenancy.internal.ClinicConfiguration.ClinicChanges;
 import es.crisbr.dentasoft.tenancy.internal.ClinicConfiguration.SettingsChanges;
 import es.crisbr.dentasoft.tenancy.internal.ClinicOpeningHours.Slot;
 import es.crisbr.dentasoft.tenancy.internal.Locations.LocationData;
+import es.crisbr.dentasoft.tenancy.persistence.ClinicSettings;
+import es.crisbr.dentasoft.tenancy.persistence.ClinicSettingsRepository;
 import java.sql.SQLException;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
@@ -27,10 +30,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Only {@code ADMIN_CLINICA} configures its clinic: every other caller is refused before anything is read or written,
- * even with the clinic active. Until M02 the role comes from a simulated user.
+ * Every role of the clinic reads its configuration and only {@code ADMIN_CLINICA} changes it (M01-T10): any other
+ * caller is refused before anything is read or written, even with the clinic active. The role comes from a simulated
+ * user; {@code ConfigurationRolesMatrixTests} checks each role against the matrix, and {@code ClinicApiSecurityTests}
+ * with real tokens.
  */
 @IntegrationTest
 class ClinicConfigurationAuthorizationTests {
@@ -48,17 +54,28 @@ class ClinicConfigurationAuthorizationTests {
     @Autowired
     private Locations locations;
 
+    @Autowired
+    private ClinicSettingsRepository settings;
+
+    @Autowired
+    private TransactionTemplate transaction;
+
     private String clinicBefore;
 
     @BeforeEach
     void createClinics() throws SQLException {
         TenancyTestDatabase.insertClinics();
+        TenantContext.runAs(
+                CLINIC_A,
+                () -> transaction.executeWithoutResult(
+                        status -> settings.save(new ClinicSettings(ClinicSettings.DEFAULT_APPOINTMENT_MINUTES))));
         clinicBefore = storedClinic();
     }
 
     @AfterEach
     void deleteClinics() throws SQLException {
-        TenancyTestDatabase.deleteClinicsAnd(TABLES);
+        TenancyTestDatabase.deleteClinicsAnd(
+                Stream.concat(Stream.of("clinic_settings"), TABLES.stream()).toList());
     }
 
     @Test
@@ -72,13 +89,39 @@ class ClinicConfigurationAuthorizationTests {
         assertNothingChanged();
     }
 
+    /** The platform administrator is no member of the clinic: not even reads. */
     @ParameterizedTest
     @MethodSource("operationNames")
-    @WithJwtUser(roles = {"PLATFORM_ADMIN", "ODONTOLOGO", "HIGIENISTA", "RECEPCION", "FACTURACION"})
-    void refusesEveryOtherRole(String operation) throws SQLException {
+    @WithJwtUser(roles = "PLATFORM_ADMIN")
+    void refusesEveryOperationToThePlatformAdministrator(String operation) throws SQLException {
         assertThatThrownBy(() -> TenantContext.runAs(CLINIC_A, operation(operation)))
                 .isInstanceOf(AccessDeniedException.class);
 
+        assertNothingChanged();
+    }
+
+    @ParameterizedTest
+    @MethodSource("writeNames")
+    @WithJwtUser(roles = {"PLATFORM_ADMIN", "ODONTOLOGO", "HIGIENISTA", "RECEPCION", "FACTURACION"})
+    void refusesEveryWriteToTheOtherRoles(String operation) throws SQLException {
+        assertThatThrownBy(() -> TenantContext.runAs(CLINIC_A, operation(operation)))
+                .isInstanceOf(AccessDeniedException.class);
+
+        assertNothingChanged();
+    }
+
+    /** Past authorization: reading a room that does not exist is a not found, never a refusal. */
+    @ParameterizedTest
+    @MethodSource("readNames")
+    @WithJwtUser(roles = "RECEPCION")
+    void letsAnyOtherRoleRead(String operation) throws SQLException {
+        Throwable thrown = catchThrowable(() -> TenantContext.runAs(CLINIC_A, operation(operation)));
+
+        if (operation.equals("getLocation")) {
+            assertThat(thrown).isInstanceOf(LocationNotFoundException.class);
+        } else {
+            assertThat(thrown).isNull();
+        }
         assertNothingChanged();
     }
 
@@ -94,15 +137,18 @@ class ClinicConfigurationAuthorizationTests {
     }
 
     static Stream<String> operationNames() {
+        return Stream.concat(readNames(), writeNames());
+    }
+
+    static Stream<String> readNames() {
+        return Stream.of("clinic", "settings", "week", "listLocations", "getLocation");
+    }
+
+    static Stream<String> writeNames() {
         return Stream.of(
-                "clinic",
                 "updateClinic",
-                "settings",
                 "updateSettings",
-                "week",
                 "replaceWeek",
-                "listLocations",
-                "getLocation",
                 "createLocation",
                 "updateLocation",
                 "deactivateLocation",

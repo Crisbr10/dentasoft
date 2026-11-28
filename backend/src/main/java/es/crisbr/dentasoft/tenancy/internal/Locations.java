@@ -20,12 +20,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The active clinic's treatment rooms (gabinetes), which {@code ADMIN_CLINICA} manages (M01-T06). A room is never
- * deleted: it is deactivated, and may be activated again. Two active rooms of the clinic never share a name, whatever
- * the case.
+ * The active clinic's treatment rooms (gabinetes), which {@code ADMIN_CLINICA} manages and every other role of the
+ * clinic only reads (M01-T06, M01-T10; see {@link ConfigurationRoles}). A room is never deleted: it is deactivated, and
+ * may be activated again. Two active rooms of the clinic never share a name, whatever the case.
  */
 @Service
-@PreAuthorize("hasRole('ADMIN_CLINICA')")
+@PreAuthorize(ConfigurationRoles.ADMIN)
 public class Locations {
 
     private final LocationRepository locations;
@@ -35,6 +35,7 @@ public class Locations {
     }
 
     /** One page of the clinic's rooms; all of them, or only those with {@code status}. */
+    @PreAuthorize(ConfigurationRoles.MEMBER)
     @Transactional(readOnly = true)
     public Page<LocationDetails> list(@Nullable LocationStatus status, Pageable pageable) {
         Pageable requested = PageLimits.bounded(pageable, LocationRepository.SORTABLE);
@@ -48,6 +49,7 @@ public class Locations {
     }
 
     /** @throws LocationNotFoundException if the active clinic has no room with {@code id} */
+    @PreAuthorize(ConfigurationRoles.MEMBER)
     @Transactional(readOnly = true)
     public LocationDetails get(UUID id) {
         return LocationDetails.of(find(id));

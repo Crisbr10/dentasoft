@@ -23,9 +23,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The active clinic's treatment rooms (gabinetes), for {@code ADMIN_CLINICA} (M01-T06). Rooms are never deleted:
- * {@code POST …/deactivation} takes one out of use and {@code POST …/activation} puts it back. Closed to every request
- * until M02-T02 (see {@code TenancySecurityConfiguration}); authorization lives in {@link Locations}.
+ * The active clinic's treatment rooms (gabinetes) (M01-T06): every role of the clinic reads them and only {@code
+ * ADMIN_CLINICA} manages them (M01-T10). Rooms are never deleted: {@code POST …/deactivation} takes one out of use and
+ * {@code POST …/activation} puts it back. Authorization lives in {@link Locations}.
  */
 @RestController
 @RequestMapping(LocationsController.PATH)

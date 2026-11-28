@@ -13,14 +13,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The active clinic's own data and settings, which {@code ADMIN_CLINICA} edits (M01-T06). Always the clinic of {@link
- * TenantContext}: no method takes a clinic id.
+ * The active clinic's own data and settings, which {@code ADMIN_CLINICA} edits and every other role of the clinic only
+ * reads (M01-T06, M01-T10; see {@link ConfigurationRoles}). Always the clinic of {@link TenantContext}: no method takes
+ * a clinic id.
  *
  * <p>The clinic edits its name and time zone; its legal name and tax id are shown but only the platform corrects them
  * (M01-T11).
  */
 @Service
-@PreAuthorize("hasRole('ADMIN_CLINICA')")
+@PreAuthorize(ConfigurationRoles.ADMIN)
 public class ClinicConfiguration {
 
     private final ClinicRepository clinics;
@@ -31,6 +32,7 @@ public class ClinicConfiguration {
         this.settings = settings;
     }
 
+    @PreAuthorize(ConfigurationRoles.MEMBER)
     @Transactional(readOnly = true)
     public ClinicDetails clinic() {
         return ClinicDetails.of(activeClinic());
@@ -47,6 +49,7 @@ public class ClinicConfiguration {
         return ClinicDetails.of(clinic);
     }
 
+    @PreAuthorize(ConfigurationRoles.MEMBER)
     @Transactional(readOnly = true)
     public SettingsDetails settings() {
         return SettingsDetails.of(activeSettings());
