@@ -139,6 +139,122 @@
       "back": "Volver a la configuración"
     }
   },
+  "clinic": {
+    "title": "Clínica",
+    "intro": "Los datos de la clínica, su horario y sus gabinetes. Los cambios de cada bloque se guardan por separado.",
+    "introViewOnly": "Los datos de la clínica, su horario y sus gabinetes. Solo la administración de la clínica puede cambiarlos.",
+    "retry": "Volver a intentarlo",
+    "notGiven": "Sin indicar",
+    "errors": {
+      "plainText": "Escribe algún carácter visible, sin saltos de línea ni caracteres de control.",
+      "timeZone": "Elige una zona horaria de la lista.",
+      "minutes": "Escribe un número entero de minutos entre {{min}} y {{max}}.",
+      "contactPhone": "Escribe solo números y espacios; puede empezar por «+»."
+    },
+    "data": {
+      "title": "Datos de la clínica",
+      "loading": "Cargando los datos de la clínica…",
+      "loadError": "No se han podido cargar los datos de la clínica.",
+      "name": "Nombre de la clínica",
+      "legalName": "Razón social",
+      "taxId": "CIF o NIF",
+      "fiscalHint": "La razón social y el NIF solo los corrige la administración de la plataforma.",
+      "timezone": "Zona horaria",
+      "timezoneHint": "La de las citas y el horario de la clínica. Escribe para buscar, por ejemplo «Madrid».",
+      "saved": "Datos de la clínica guardados."
+    },
+    "settings": {
+      "title": "Ajustes",
+      "loading": "Cargando los ajustes…",
+      "loadError": "No se han podido cargar los ajustes.",
+      "appointmentMinutes": "Duración de una cita (minutos)",
+      "appointmentMinutesHint": "La duración de una cita nueva si no se indica otra: de {{min}} a {{max}} minutos.",
+      "minutesValue": "{{minutes}} minutos",
+      "contactEmail": "Email de contacto",
+      "contactPhone": "Teléfono de contacto",
+      "contactPhoneHint": "Con prefijo internacional si hace falta, por ejemplo +34 910 000 000.",
+      "saved": "Ajustes guardados."
+    },
+    "hours": {
+      "title": "Horario de apertura",
+      "intro": "La hora de la clínica en su zona horaria. Un día puede tener varios tramos, por ejemplo de mañana y de tarde; un día sin tramos está cerrado.",
+      "loading": "Cargando el horario…",
+      "loadError": "No se ha podido cargar el horario.",
+      "caption": "Horario semanal de la clínica",
+      "days": {
+        "MONDAY": "Lunes",
+        "TUESDAY": "Martes",
+        "WEDNESDAY": "Miércoles",
+        "THURSDAY": "Jueves",
+        "FRIDAY": "Viernes",
+        "SATURDAY": "Sábado",
+        "SUNDAY": "Domingo"
+      },
+      "closed": "Cerrado",
+      "slot": "{{day}}, tramo {{number}}",
+      "opening": "Abre",
+      "closing": "Cierra",
+      "range": "de {{opening}} a {{closing}}",
+      "addSlot": "Añadir tramo",
+      "removeSlot": "Quitar",
+      "full": "La semana ya tiene {{max}} tramos, el máximo.",
+      "errors": {
+        "closesBeforeOpening": "El tramo debe cerrar después de abrir.",
+        "overlapping": "Los tramos de este día se solapan."
+      },
+      "saved": "Horario guardado."
+    },
+    "locations": {
+      "title": "Gabinetes",
+      "intro": "Las salas donde se atiende a los pacientes. Un gabinete no se borra: se desactiva y deja de ofrecerse para citas nuevas.",
+      "filter": {
+        "label": "Mostrar gabinetes",
+        "ACTIVE": "Activos",
+        "INACTIVE": "Desactivados"
+      },
+      "list": {
+        "caption": "Gabinetes de la clínica",
+        "name": "Gabinete",
+        "color": "Color",
+        "noColor": "Sin color",
+        "status": "Estado",
+        "actions": "Acciones",
+        "loading": "Cargando los gabinetes…",
+        "loadError": "No se han podido cargar los gabinetes.",
+        "empty": "No hay gabinetes que mostrar.",
+        "paginator": "Páginas de gabinetes"
+      },
+      "status": {
+        "ACTIVE": "Activo",
+        "INACTIVE": "Desactivado"
+      },
+      "actions": {
+        "group": "Acciones para {{name}}",
+        "edit": "Editar",
+        "deactivate": "Desactivar",
+        "activate": "Reactivar"
+      },
+      "deactivateConfirm": {
+        "title": "¿Desactivar el gabinete?",
+        "message": "{{name}} dejará de ofrecerse para citas nuevas. Las citas que ya tiene no cambian, y podrás reactivarlo.",
+        "confirm": "Desactivar"
+      },
+      "notices": {
+        "created": "Gabinete {{name}} añadido.",
+        "updated": "Gabinete {{name}} guardado.",
+        "deactivated": "{{name}} ya no se ofrece para citas nuevas.",
+        "activated": "{{name}} vuelve a ofrecerse para citas nuevas."
+      },
+      "form": {
+        "newTitle": "Nuevo gabinete",
+        "editTitle": "Editar {{name}}",
+        "name": "Nombre",
+        "color": "Color en la agenda",
+        "create": "Añadir gabinete",
+        "cancelEdit": "Cancelar la edición"
+      }
+    }
+  },
   "clinicUsers": {
     "title": "Usuarios y roles",
     "intro": "Invita a las personas que trabajan en la clínica, cambia su rol o desactiva su acceso. Para que alguien desactivado vuelva a entrar, invítale de nuevo con su email.",

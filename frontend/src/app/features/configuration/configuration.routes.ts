@@ -2,12 +2,12 @@ import { Route, Routes } from '@angular/router';
 
 import { firstSectionGuard, sectionGuard } from './configuration-guards';
 import { ConfigurationLayout } from './configuration-layout';
-import { ConfigurationIndex, NoAccess, SectionPlaceholder } from './configuration-pages';
+import { ConfigurationIndex, NoAccess } from './configuration-pages';
 import { SECTIONS, SectionEntry, SectionId } from './configuration-sections';
 
-/** The screens of each section; those still to come show a placeholder. */
+/** The screens of each section; one still to come shows `SectionPlaceholder`. */
 const SCREENS: Record<SectionId, NonNullable<Route['loadComponent']>> = {
-  CLINIC: () => SectionPlaceholder, // M01-T10
+  CLINIC: () => import('../clinic/clinic-home').then((m) => m.ClinicHome),
   USERS_AND_ROLES: () => import('../clinic-users/clinic-users-home').then((m) => m.ClinicUsersHome),
   PRACTITIONERS: () =>
     import('../practitioners/practitioners-home').then((m) => m.PractitionersHome),
