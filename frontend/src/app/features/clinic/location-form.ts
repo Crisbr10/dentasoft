@@ -150,11 +150,21 @@ export class LocationForm {
     { initialValue: false },
   );
 
+  /** The room whose data the form shows; null for a new one. */
+  private shownId: string | null = null;
+
   constructor() {
-    // A new room, or another one to edit: the form shows its data.
+    // A new room, or another one to edit: the form shows its data. The same room with a new
+    // version (activated or deactivated from its row while open here) keeps what the user typed;
+    // saving sends that new version.
     effect(() => {
       const location = this.location();
       untracked(() => {
+        const id = location?.id ?? null;
+        if (id !== null && id === this.shownId && this.form.dirty) {
+          return;
+        }
+        this.shownId = id;
         this.fill(location);
         this.failure.set(null);
         if (location) {

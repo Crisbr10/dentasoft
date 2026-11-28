@@ -605,6 +605,36 @@ describe('ClinicHome', () => {
       });
     });
 
+    it('keeps what the user typed when the room open in the form changes status', async () => {
+      await show();
+
+      click(row('l-1'), es.clinic.locations.actions.edit);
+      await settle();
+      const form = rooms().querySelector('app-location-form') as HTMLElement;
+      await type(field(form, 'name'), 'Gabinete Norte');
+      click(row('l-1'), es.clinic.locations.actions.deactivate);
+      (await dialogButton('.confirm-dialog__confirm')).click();
+      (await expectRequest('POST', `${LOCATIONS}/l-1/deactivation`)).flush({
+        ...ROOM_1,
+        status: 'INACTIVE',
+        version: 1,
+      });
+      await vi.waitFor(async () => {
+        await settle();
+        expect(row('l-1').textContent).toContain(es.clinic.locations.status.INACTIVE);
+      });
+
+      expect(field(form, 'name').value).toBe('Gabinete Norte');
+      await save(form);
+      const request = await expectRequest('PUT', `${LOCATIONS}/l-1`);
+      expect(request.request.body).toEqual({
+        name: 'Gabinete Norte',
+        color: '#1E88E5',
+        version: 1,
+      });
+      request.flush({ ...ROOM_1, name: 'Gabinete Norte', status: 'INACTIVE', version: 2 });
+    });
+
     it('sends nothing if the user cancels the deactivation', async () => {
       await show();
 
