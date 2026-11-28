@@ -181,3 +181,14 @@
   - [x] Con la caché disponible y sin cambios en `pom.xml`, el job `image` no descarga nada de Maven Central
   - [x] La imagen resultante es la misma que antes: etiquetas, escaneo con Trivy y publicación en GHCR sin cambios, y `docker build -t dentasoft-backend:local backend` sigue funcionando en local
   - [x] Documentado en `docs/operaciones/integracion-continua.md`
+
+### M00-T13 · Guía Modern Web Guidance en las reglas del frontend
+
+- **Estado**: hecho
+- **Depende de**: M00-T01
+- **Descripción**: añadir a la sección Frontend de `AGENTS.md` cuándo consultar la skill Modern Web Guidance (instalada a nivel global, no en el proyecto), la prioridad de las reglas del proyecto sobre la guía y el objetivo de compatibilidad de navegadores.
+- **Criterios de aceptación**:
+  - [x] `AGENTS.md` indica consultar Modern Web Guidance antes de escribir código de interfaz, maquetación, rendimiento o API del navegador
+  - [x] Las reglas del proyecto tienen prioridad (Angular Material y CDK, Transloco, signals y OnPush, CSP estricta, seguridad en el backend); un choque se resuelve con la regla del proyecto y se explica en el PR
+  - [x] Objetivo de compatibilidad definido y justificado por los navegadores de las clínicas: Baseline «Widely available» en la fecha de la versión de Angular del proyecto
+  - [x] La skill no se instala en el proyecto

@@ -121,6 +121,12 @@ cd frontend; pnpm api:gen               # regenera el cliente desde el OpenAPI d
 - El cliente de la API se genera con `pnpm api:gen`; no escribas a mano DTO que ya existen en el backend.
 - Componentes de UI de Angular Material y CDK (ADR 0008); no mezcles otras librerías de componentes.
 - La seguridad real está en el backend: ocultar un botón no es control de acceso.
+- En tareas de frontend, consulta Modern Web Guidance antes de escribir código de interfaz, maquetación, rendimiento o API del navegador. Es una skill instalada a nivel global, no en el repositorio: no la añadas al proyecto.
+- Las reglas del proyecto tienen prioridad sobre la guía: componentes de Angular Material y CDK (ADR 0008), textos con Transloco, signals y `OnPush`, CSP estricta y la seguridad en el backend. Si la guía propone algo que choca con ellas, se sigue la regla del proyecto y se explica en el PR.
+- Compatibilidad de navegadores: Baseline «Widely available» en la fecha que fija la versión de Angular del proyecto (con Angular 22, el 7 de mayo de 2026, en `@angular/build`), sin `browserslist` propio.
+  - Es lo que el build ya tiene como objetivo, y cubre Chrome y Edge de escritorio, Firefox y Safari en Mac e iPad, incluidos los equipos de una clínica que no se actualizan cada mes.
+  - Lo que sea Baseline «Newly available» o aún no sea Baseline solo se usa como mejora progresiva: la pantalla funciona igual sin ello.
+  - La firma en tablet es la app de Expo (`mobile/`), no el navegador, así que esto no se aplica allí.
 
 ### Tests
 
