@@ -8,13 +8,13 @@ import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
 import { Pageable } from '../../models/pageable';
-import { PagedModelClinicDetails } from '../../models/paged-model-clinic-details';
+import { PagedModelPlatformClinicDetails } from '../../models/paged-model-platform-clinic-details';
 
 export interface List$Params {
   pageable: Pageable;
 }
 
-export function list(http: HttpClient, rootUrl: string, params: List$Params, context?: HttpContext): Observable<StrictHttpResponse<PagedModelClinicDetails>> {
+export function list(http: HttpClient, rootUrl: string, params: List$Params, context?: HttpContext): Observable<StrictHttpResponse<PagedModelPlatformClinicDetails>> {
   const rb = new RequestBuilder(rootUrl, list.PATH, 'get');
   if (params) {
     rb.query('pageable', params.pageable, {});
@@ -25,7 +25,7 @@ export function list(http: HttpClient, rootUrl: string, params: List$Params, con
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<PagedModelClinicDetails>;
+      return r as StrictHttpResponse<PagedModelPlatformClinicDetails>;
     })
   );
 }

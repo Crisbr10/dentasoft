@@ -58,6 +58,25 @@ class ApiDocsLocalProfileTests {
                 .containsOnlyKeys("application/json");
     }
 
+    /**
+     * The platform and the clinic configuration APIs each return their own record called {@code ClinicDetails}; with
+     * the same schema name, the generated client typed both with whichever came first (M02-T08).
+     */
+    @Test
+    void clinicDetailsOfEachApiHaveTheirOwnSchema() {
+        var document = assertThat(mvc.get().uri("/v3/api-docs")).hasStatusOk().bodyJson();
+        document.extractingPath(
+                        "$.paths['/api/v1/clinic'].get.responses['200'].content['application/json'].schema.$ref")
+                .isEqualTo("#/components/schemas/ClinicConfigurationDetails");
+        document.extractingPath(
+                        "$.paths['/api/v1/platform/clinics'].post.responses['200'].content['application/json'].schema.$ref")
+                .isEqualTo("#/components/schemas/PlatformClinicDetails");
+        document.extractingPath("$.components.schemas")
+                .asMap()
+                .containsKeys("ClinicConfigurationDetails", "PlatformClinicDetails")
+                .doesNotContainKey("ClinicDetails");
+    }
+
     @Test
     void localProfileProvidesLocalhostUrls(@Autowired DentasoftUrls urls) {
         assertThat(urls)

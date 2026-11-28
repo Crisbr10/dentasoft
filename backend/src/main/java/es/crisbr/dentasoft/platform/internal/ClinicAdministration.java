@@ -11,6 +11,7 @@ import es.crisbr.dentasoft.platform.persistence.PlatformClinicSettings;
 import es.crisbr.dentasoft.platform.persistence.PlatformClinics;
 import es.crisbr.dentasoft.shared.PageLimits;
 import es.crisbr.dentasoft.tenancy.TenantContext;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -155,6 +156,7 @@ public class ClinicAdministration {
     public record FiscalDataCorrection(String legalName, String taxId, long version) {}
 
     /** A clinic as the platform API returns it; {@code version} is what a correction sends back. */
+    @Schema(name = "PlatformClinicDetails")
     public record ClinicDetails(
             UUID id,
             String name,

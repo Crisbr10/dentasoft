@@ -7,16 +7,15 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { InvitationRequest } from '../../models/invitation-request';
 
-export interface Invite$Params {
-      body: InvitationRequest
+export interface Cancel$Params {
+  id: string;
 }
 
-export function invite(http: HttpClient, rootUrl: string, params: Invite$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
-  const rb = new RequestBuilder(rootUrl, invite.PATH, 'post');
+export function cancel(http: HttpClient, rootUrl: string, params: Cancel$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+  const rb = new RequestBuilder(rootUrl, cancel.PATH, 'post');
   if (params) {
-    rb.body(params.body, 'application/json');
+    rb.path('id', params.id, {});
   }
 
   return http.request(
@@ -29,4 +28,4 @@ export function invite(http: HttpClient, rootUrl: string, params: Invite$Params,
   );
 }
 
-invite.PATH = '/api/v1/clinic/users/invitations';
+cancel.PATH = '/api/v1/platform/clinics/{id}/admin-invitation/cancellation';

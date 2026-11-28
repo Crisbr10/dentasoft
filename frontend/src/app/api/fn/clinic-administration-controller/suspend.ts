@@ -7,13 +7,13 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { ClinicDetails } from '../../models/clinic-details';
+import { PlatformClinicDetails } from '../../models/platform-clinic-details';
 
 export interface Suspend$Params {
   id: string;
 }
 
-export function suspend(http: HttpClient, rootUrl: string, params: Suspend$Params, context?: HttpContext): Observable<StrictHttpResponse<ClinicDetails>> {
+export function suspend(http: HttpClient, rootUrl: string, params: Suspend$Params, context?: HttpContext): Observable<StrictHttpResponse<PlatformClinicDetails>> {
   const rb = new RequestBuilder(rootUrl, suspend.PATH, 'post');
   if (params) {
     rb.path('id', params.id, {});
@@ -24,7 +24,7 @@ export function suspend(http: HttpClient, rootUrl: string, params: Suspend$Param
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<ClinicDetails>;
+      return r as StrictHttpResponse<PlatformClinicDetails>;
     })
   );
 }
