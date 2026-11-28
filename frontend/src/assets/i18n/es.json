@@ -57,14 +57,7 @@
       "SUSPENDED": "Suspendida"
     },
     "paginator": {
-      "label": "Páginas de clínicas",
-      "itemsPerPage": "Clínicas por página",
-      "first": "Primera página",
-      "previous": "Página anterior",
-      "next": "Página siguiente",
-      "last": "Última página",
-      "range": "{{start}}–{{end}} de {{total}}",
-      "empty": "0 de 0"
+      "label": "Páginas de clínicas"
     },
     "fields": {
       "name": "Nombre comercial",
@@ -73,12 +66,6 @@
       "email": "Email",
       "firstName": "Nombre",
       "lastName": "Apellidos"
-    },
-    "errors": {
-      "required": "Este campo es obligatorio.",
-      "maxlength": "Escribe como máximo {{max}} caracteres.",
-      "email": "Escribe un email válido.",
-      "taxId": "No es un CIF, NIF o NIE válido: revisa el formato y la letra o el dígito de control."
     },
     "create": {
       "title": "Nueva clínica",
@@ -107,6 +94,7 @@
       "loading": "Consultando la invitación…",
       "retry": "Volver a intentarlo",
       "none": "Todavía no se ha invitado a ningún administrador. Indica a quién invitar:",
+      "send": "Enviar invitación",
       "pending": "Invitación enviada el {{date}}. Pendiente de aceptar.",
       "accepted": "El administrador aceptó la invitación el {{date}}.",
       "resend": "Reenviar",
@@ -151,6 +139,57 @@
       "back": "Volver a la configuración"
     }
   },
+  "clinicUsers": {
+    "title": "Usuarios y roles",
+    "intro": "Invita a las personas que trabajan en la clínica, cambia su rol o desactiva su acceso. Para que alguien desactivado vuelva a entrar, invítale de nuevo con su email.",
+    "list": {
+      "caption": "Personas de la clínica",
+      "person": "Persona",
+      "email": "Email",
+      "role": "Rol",
+      "status": "Acceso",
+      "actions": "Acciones",
+      "you": "{{name}} (tú)",
+      "loading": "Cargando los usuarios…",
+      "loadError": "No se han podido cargar los usuarios.",
+      "retry": "Volver a intentarlo",
+      "empty": "Todavía no hay nadie más en la clínica.",
+      "paginator": "Páginas de usuarios"
+    },
+    "status": {
+      "ACTIVE": "Activo",
+      "PENDING": "Invitación pendiente",
+      "INACTIVE": "Desactivado"
+    },
+    "actions": {
+      "group": "Acciones para {{name}}",
+      "self": "Es tu cuenta: otra persona con el rol de administración puede cambiar tu rol o desactivarte.",
+      "newRole": "Rol nuevo",
+      "applyRole": "Cambiar rol",
+      "resend": "Reenviar invitación",
+      "deactivate": "Desactivar"
+    },
+    "deactivateConfirm": {
+      "title": "¿Desactivar el acceso?",
+      "message": "{{name}} dejará de poder entrar en la clínica de inmediato. Podrás volver a invitarle más adelante.",
+      "confirm": "Desactivar"
+    },
+    "notices": {
+      "resent": "Invitación reenviada a {{name}}.",
+      "roleChanged": "Rol de {{name}} cambiado a «{{role}}».",
+      "deactivated": "{{name}} ya no tiene acceso a la clínica."
+    },
+    "invite": {
+      "title": "Invitar a una persona",
+      "intro": "Recibirá un email para unirse a la clínica con el rol que elijas.",
+      "email": "Email",
+      "firstName": "Nombre",
+      "lastName": "Apellidos",
+      "role": "Rol",
+      "send": "Enviar invitación",
+      "invited": "Invitación enviada a {{email}}."
+    }
+  },
   "forms": {
     "save": "Guardar",
     "saving": "Guardando…",
@@ -166,9 +205,26 @@
       "cancel": "Cancelar",
       "change": "Cambiar",
       "set": "Configurar"
+    },
+    "errors": {
+      "required": "Este campo es obligatorio.",
+      "maxlength": "Escribe como máximo {{max}} caracteres.",
+      "email": "Escribe un email válido.",
+      "taxId": "No es un CIF, NIF o NIE válido: revisa el formato y la letra o el dígito de control."
     }
   },
   "dialogs": {
     "cancel": "Cancelar"
+  },
+  "lists": {
+    "paginator": {
+      "itemsPerPage": "Elementos por página",
+      "first": "Primera página",
+      "previous": "Página anterior",
+      "next": "Página siguiente",
+      "last": "Última página",
+      "range": "{{start}}–{{end}} de {{total}}",
+      "empty": "0 de 0"
+    }
   }
 }

@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatPaginatorIntl, MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -19,7 +19,7 @@ import { list } from '../../api/fn/clinic-administration-controller/list';
 import { PagedModelPlatformClinicDetails } from '../../api/models/paged-model-platform-clinic-details';
 import { PlatformClinicDetails } from '../../api/models/platform-clinic-details';
 import { ClinicPanel } from './clinic-panel';
-import { ClinicsPaginatorIntl } from './clinics-paginator-intl';
+import { providePaginatorIntl } from '../../shared/lists/paginator-intl';
 import { NewClinicForm } from './new-clinic-form';
 
 /** Clinics per page of the list. */
@@ -42,7 +42,7 @@ export const CLINICS_PAGE_SIZE = 20;
     NewClinicForm,
     TranslocoPipe,
   ],
-  providers: [{ provide: MatPaginatorIntl, useClass: ClinicsPaginatorIntl }],
+  providers: [providePaginatorIntl()],
   templateUrl: './platform-home.html',
   styleUrl: './platform-home.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

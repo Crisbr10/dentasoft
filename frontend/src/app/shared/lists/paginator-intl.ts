@@ -1,11 +1,14 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, Provider, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 import { TranslocoService } from '@jsverse/transloco';
 
-/** The texts of the clinics paginator, from Transloco instead of Material's English defaults. */
+/**
+ * The texts of a Material paginator, from Transloco (`lists.paginator`) instead of Material's
+ * English defaults. Each list names its own paginator with an aria-label.
+ */
 @Injectable()
-export class ClinicsPaginatorIntl extends MatPaginatorIntl {
+export class PaginatorIntl extends MatPaginatorIntl {
   private readonly transloco = inject(TranslocoService);
 
   constructor() {
@@ -29,10 +32,15 @@ export class ClinicsPaginatorIntl extends MatPaginatorIntl {
     }
     const start = page * pageSize + 1;
     const end = Math.min((page + 1) * pageSize, length);
-    return this.transloco.translate('platform.paginator.range', { start, end, total: length });
+    return this.transloco.translate('lists.paginator.range', { start, end, total: length });
   };
 
   private text(key: string): string {
-    return this.transloco.translate(`platform.paginator.${key}`);
+    return this.transloco.translate(`lists.paginator.${key}`);
   }
+}
+
+/** For the `providers` of a component with a paginated list. */
+export function providePaginatorIntl(): Provider {
+  return { provide: MatPaginatorIntl, useClass: PaginatorIntl };
 }

@@ -272,7 +272,7 @@ describe('PlatformHome', () => {
 
       await save(form());
 
-      expect(form().textContent).toContain(es.platform.errors.taxId);
+      expect(form().textContent).toContain(es.forms.errors.taxId);
       expect(form().textContent).toContain(es.forms.invalid);
       expect(document.activeElement).toBe(input(form(), 'taxId'));
     });
@@ -283,7 +283,7 @@ describe('PlatformHome', () => {
 
       await save(form());
 
-      expect(form().textContent).toContain(es.platform.errors.required);
+      expect(form().textContent).toContain(es.forms.errors.required);
       expect(document.activeElement).toBe(input(form(), 'name'));
     });
 
@@ -422,7 +422,7 @@ describe('PlatformHome', () => {
       await type(form(), 'taxId', 'X1234567A');
       await save(form());
 
-      expect(form().textContent).toContain(es.platform.errors.taxId);
+      expect(form().textContent).toContain(es.forms.errors.taxId);
       expect(document.activeElement).toBe(input(form(), 'taxId'));
     });
 
@@ -460,6 +460,9 @@ describe('PlatformHome', () => {
       await show([NORTE]);
       await open(NORTE, NONE);
       expect(form().textContent).toContain(es.platform.admin.none);
+      expect(form().querySelector('.form-actions__save')?.textContent?.trim()).toBe(
+        es.platform.admin.send,
+      );
 
       await fillInvitation();
       await save(form());
@@ -492,7 +495,7 @@ describe('PlatformHome', () => {
       await type(form(), 'lastName', 'Pérez');
       await save(form());
 
-      expect(form().textContent).toContain(es.platform.errors.email);
+      expect(form().textContent).toContain(es.forms.errors.email);
       expect(document.activeElement).toBe(input(form(), 'email'));
     });
 

@@ -20,8 +20,8 @@ import { PlatformClinicDetails } from '../../api/models/platform-clinic-details'
 import { FormActions } from '../../shared/forms/form-actions';
 import { SaveFailure, toSaveFailure } from '../../shared/forms/save-failure';
 import { normalizeTaxId, spanishTaxId } from '../../shared/forms/tax-id';
-import { ControlError } from './control-error';
-import { focusFirstInvalid } from './form-focus';
+import { ControlError } from '../../shared/forms/control-error';
+import { focusFirstInvalid } from '../../shared/forms/form-focus';
 import { CLINIC_NAME_MAX } from './new-clinic-form';
 
 /**

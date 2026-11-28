@@ -33,9 +33,7 @@ export function toSaveFailure(form: AbstractControl, error: unknown): SaveFailur
   if (!(error instanceof HttpErrorResponse) || error.status === 0 || error.status >= 500) {
     return { kind: 'unexpected' };
   }
-  const problem = (
-    typeof error.error === 'object' && error.error !== null ? error.error : {}
-  ) as Problem;
+  const problem = problemOf(error.error);
   if (error.status === 400 && Array.isArray(problem.errors) && problem.errors.length > 0) {
     const fields = problem.errors as InvalidField[];
     // Every field gets its message, even after one the form does not have.
@@ -54,6 +52,25 @@ export function toSaveFailure(form: AbstractControl, error: unknown): SaveFailur
  */
 export function toActionFailure(error: unknown): SaveFailure {
   return toSaveFailure(new FormGroup({}), error);
+}
+
+/**
+ * The ProblemDetail of an error response. The generated client reads the answers of endpoints
+ * with no body (202, 204) as text, so theirs arrives as a JSON string; a body that is not a JSON
+ * object gives an empty problem.
+ */
+function problemOf(body: unknown): Problem {
+  let value = body;
+  if (typeof value === 'string') {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Problem)
+    : {};
 }
 
 /** `hours[0].opens` from Spring is `hours.0.opens` for Angular forms. */

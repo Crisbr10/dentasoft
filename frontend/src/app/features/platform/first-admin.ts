@@ -28,9 +28,8 @@ import { confirm } from '../../shared/dialogs/confirm-dialog';
 import { FailureMessage } from '../../shared/forms/failure-message';
 import { FormActions } from '../../shared/forms/form-actions';
 import { SaveFailure, toActionFailure, toSaveFailure } from '../../shared/forms/save-failure';
-import { ControlError } from './control-error';
-import { focusFirstInvalid } from './form-focus';
-import { withParsedProblem } from './text-problem';
+import { ControlError } from '../../shared/forms/control-error';
+import { focusFirstInvalid } from '../../shared/forms/form-focus';
 
 /** First and last name, as long as the backend accepts them. */
 const PERSON_NAME_MAX = 100;
@@ -128,6 +127,7 @@ type Notice = 'invited' | 'resent' | 'cancelled';
               [form]="form"
               [saving]="saving()"
               [failure]="failure()"
+              [saveKey]="'platform.admin.send'"
               (save)="sendInvitation()"
               (discard)="discard()"
             />
@@ -221,7 +221,7 @@ export class FirstAdmin {
       this.notice.set('invited');
       await this.load(id);
     } catch (error) {
-      this.failure.set(toSaveFailure(this.form, withParsedProblem(error)));
+      this.failure.set(toSaveFailure(this.form, error));
       focusFirstInvalid(this.form, this.host.nativeElement);
     } finally {
       this.saving.set(false);
@@ -260,7 +260,7 @@ export class FirstAdmin {
       this.notice.set(notice);
       await this.load(id);
     } catch (error) {
-      this.actionFailure.set(toActionFailure(withParsedProblem(error)));
+      this.actionFailure.set(toActionFailure(error));
     } finally {
       this.busy.set(false);
     }

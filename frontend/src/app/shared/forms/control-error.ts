@@ -17,13 +17,13 @@ import { map, startWith, switchMap } from 'rxjs';
       @if (errors['server']) {
         {{ serverText(errors['server']) ?? ('forms.invalid' | transloco) }}
       } @else if (errors['required']) {
-        {{ 'platform.errors.required' | transloco }}
+        {{ 'forms.errors.required' | transloco }}
       } @else if (errors['maxlength']) {
-        {{ 'platform.errors.maxlength' | transloco: { max: errors['maxlength'].requiredLength } }}
+        {{ 'forms.errors.maxlength' | transloco: { max: errors['maxlength'].requiredLength } }}
       } @else if (errors['email']) {
-        {{ 'platform.errors.email' | transloco }}
+        {{ 'forms.errors.email' | transloco }}
       } @else if (errors['taxId']) {
-        {{ 'platform.errors.taxId' | transloco }}
+        {{ 'forms.errors.taxId' | transloco }}
       }
     }
   `,

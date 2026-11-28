@@ -36,7 +36,7 @@ import { SaveFailure } from './save-failure';
         [disabled]="!dirty() || saving()"
         (click)="save.emit()"
       >
-        {{ (saving() ? 'forms.saving' : 'forms.save') | transloco }}
+        {{ (saving() ? 'forms.saving' : (saveKey() ?? 'forms.save')) | transloco }}
       </button>
     </div>
   `,
@@ -53,6 +53,8 @@ export class FormActions {
   readonly form = input.required<AbstractControl>();
   readonly saving = input(false);
   readonly failure = input<SaveFailure | null>(null);
+  /** The text of the save button, such as «Enviar invitación»; «Guardar» by default. */
+  readonly saveKey = input<string | undefined>('forms.save');
 
   readonly save = output<void>();
   readonly discard = output<void>();
