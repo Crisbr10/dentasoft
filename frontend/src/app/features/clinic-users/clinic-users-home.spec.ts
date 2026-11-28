@@ -7,7 +7,7 @@ import {
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
-import { OidcSecurityService } from 'angular-auth-oidc-client';
+import { Session } from '../../core/auth/session';
 
 import { es, translocoTesting } from '../../../testing/i18n';
 import { ApiConfiguration } from '../../api/api-configuration';
@@ -91,10 +91,7 @@ describe('ClinicUsersHome', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: ApiConfiguration, useValue: { rootUrl: API } },
-        {
-          provide: OidcSecurityService,
-          useValue: { userData: signal({ userData: { sub: ME.userId }, allUserData: [] }) },
-        },
+        { provide: Session, useValue: { userId: signal(ME.userId) } },
       ],
     });
     http = TestBed.inject(HttpTestingController);

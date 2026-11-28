@@ -69,7 +69,10 @@ describe('Session', () => {
       isAuthenticated$: new BehaviorSubject<{ isAuthenticated: boolean }>({
         isAuthenticated: true,
       }),
-      userData: signal({ userData: { name: 'Ana Prueba' }, allUserData: [] }),
+      userData: signal({
+        userData: { name: 'Ana Prueba', sub: '0190c0de-0000-7000-8000-000000000001' },
+        allUserData: [],
+      }),
     };
     clinic = { clear: vi.fn(), revalidate: vi.fn() };
     router = { url: '/pacientes/42', navigateByUrl: vi.fn(() => Promise.resolve(true)) };
@@ -291,5 +294,9 @@ describe('Session', () => {
 
   it('shows the name of the ID token', () => {
     expect(session.userName()).toBe('Ana Prueba');
+  });
+
+  it('gives the user id of the ID token, which is the userId of their memberships', () => {
+    expect(session.userId()).toBe('0190c0de-0000-7000-8000-000000000001');
   });
 });

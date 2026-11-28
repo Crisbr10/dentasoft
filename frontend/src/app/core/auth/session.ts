@@ -79,6 +79,15 @@ export class Session {
     return typeof data?.name === 'string' ? data.name : null;
   });
 
+  /**
+   * The Keycloak `sub` of the ID token, which is the `userId` of the user's memberships (ADR 0015).
+   * Only for convenience in the interface, such as not offering actions on one's own row.
+   */
+  readonly userId = computed(() => {
+    const data = this.oidc.userData().userData as { sub?: unknown } | null;
+    return typeof data?.sub === 'string' ? data.sub : null;
+  });
+
   /** Goes to the Keycloak login and, after it, back to returnUrl. */
   login(returnUrl: string): void {
     if (isAppPath(returnUrl)) {

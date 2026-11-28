@@ -5,7 +5,6 @@ import {
   Injector,
   OnInit,
   afterNextRender,
-  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -17,7 +16,6 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { OidcSecurityService } from 'angular-auth-oidc-client';
 
 import { Api } from '../../api/api';
 import { changeRole } from '../../api/fn/clinic-users-controller/change-role';
@@ -26,38 +24,22 @@ import { list3 } from '../../api/fn/clinic-users-controller/list-3';
 import { resendInvitation } from '../../api/fn/clinic-users-controller/resend-invitation';
 import { ClinicUserDetails } from '../../api/models/clinic-user-details';
 import { PagedModelClinicUserDetails } from '../../api/models/paged-model-clinic-user-details';
+import { Session } from '../../core/auth/session';
 import { CLINIC_ROLES, ClinicRole } from '../../core/clinic/active-clinic';
 import { confirm } from '../../shared/dialogs/confirm-dialog';
 import { FailureMessage } from '../../shared/forms/failure-message';
 import { SaveFailure, toActionFailure } from '../../shared/forms/save-failure';
 import { providePaginatorIntl } from '../../shared/lists/paginator-intl';
+import { displayName, userStatus } from './clinic-user-names';
 import { InviteUserForm } from './invite-user-form';
 
 /** People per page of the list (the backend accepts up to 50). */
 export const USERS_PAGE_SIZE = 20;
 
-/** The access of a person to the clinic, as the list shows it. */
-export type UserStatus = 'ACTIVE' | 'PENDING' | 'INACTIVE';
-
 /** What the status region announces after an action on a row. */
 interface Notice {
   readonly key: 'resent' | 'roleChanged' | 'deactivated';
   readonly params: Record<string, string>;
-}
-
-export function userStatus(user: ClinicUserDetails): UserStatus {
-  if (!user.active) {
-    return 'INACTIVE';
-  }
-  return user.invitationPending ? 'PENDING' : 'ACTIVE';
-}
-
-/** The full name, or the email while the person has not accepted the invitation. */
-export function displayName(user: ClinicUserDetails): string {
-  const name = [user.profile?.firstName, user.profile?.lastName]
-    .filter((part) => part?.trim())
-    .join(' ');
-  return name || (user.profile?.email ?? '');
 }
 
 /**
@@ -89,7 +71,7 @@ export function displayName(user: ClinicUserDetails): string {
 export class ClinicUsersHome implements OnInit {
   private readonly api = inject(Api);
   private readonly dialog = inject(MatDialog);
-  private readonly oidc = inject(OidcSecurityService);
+  private readonly session = inject(Session);
   private readonly transloco = inject(TranslocoService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -112,10 +94,7 @@ export class ClinicUsersHome implements OnInit {
   private readonly chosen = signal<Readonly<Record<string, ClinicRole>>>({});
 
   /** The Keycloak `sub` of the signed-in user, which is the `userId` of their own row. */
-  private readonly currentUserId = computed(() => {
-    const data = this.oidc.userData().userData as { sub?: unknown } | null;
-    return typeof data?.sub === 'string' ? data.sub : null;
-  });
+  private readonly currentUserId = this.session.userId;
 
   ngOnInit(): void {
     void this.load(0);
